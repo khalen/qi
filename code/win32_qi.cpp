@@ -1,4 +1,5 @@
 #include "basictypes.h"
+#include "qi.h"
 
 #include <windows.h>
 #include <stdlib.h>
@@ -8,52 +9,9 @@
 
 #define internal static
 
-struct Vec2_s
+struct WindowsBitmap_s
 {
-	union {
-		float f[2];
-		struct
-		{
-			float x;
-			float y;
-		};
-	};
-};
-
-struct Input_s
-{
-	// Dpad
-	bool up, right, down, left;
-
-	// Buttons
-	bool aButton, bButton, xButton, yButton, startButton, backButton;
-	bool leftShoulder, rightShoulder;
-
-	// Analog
-	float  leftTrigger, rightTrigger;
-	Vec2_s leftStick;
-	Vec2_s rightStick;
-};
-
-struct Rect_s
-{
-	i32 left;
-	i32 top;
-	i32 width;
-	i32 height;
-};
-
-struct OffscreenBitmap_s
-{
-	// Always 32 bit, xel order is BB GG RR 00 (LE)
-	u32* pixels;
-
-	// Dimensions are in pixels, not bytes
-	u32 width;
-	u32 height;
-	u32 pitch;
-	u32 byteSize;
-
+	Bitmap_s   bitmap;
 	BITMAPINFO bmi;
 };
 
@@ -67,12 +25,12 @@ struct Sound_s
 struct Globals_s
 {
 	HWND              wnd;
-	OffscreenBitmap_s frameBuffer;
+	WindowsBitmap_s frameBuffer;
 	bool              gameRunning;
 	BITMAPINFO        bmi;
 	Input_s           gamePads[XUSER_MAX_COUNT];
 	Sound_s           sound;
-    LARGE_INTEGER     startupTime;
+	LARGE_INTEGER     startupTime;
 	double            clockConversionFactor;
 } g;
 
@@ -104,27 +62,28 @@ internal impXInputSetState* XInputSetState_ = XInputSetStateStub;
 	HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND* ppDS, LPUNKNOWN pUnkOuter)
 typedef DIRECTSOUND_CREATE(impDirectSoundCreate);
 
-double TimeMillisec()
+double
+TimeMillisec()
 {
 	LARGE_INTEGER curCounter;
 	i64           deltaCounter;
 	QueryPerformanceCounter(&curCounter);
-    deltaCounter = g.startupTime.QuadPart - curCounter.QuadPart;
-    return deltaCounter * g.clockConversionFactor;
+	deltaCounter = curCounter.QuadPart - g.startupTime.QuadPart;
+	return deltaCounter * g.clockConversionFactor;
 }
 
 internal void
-MakeOffscreenBitmap(OffscreenBitmap_s* osb, u32 width, u32 height)
+MakeOffscreenBitmap(WindowsBitmap_s* osb, u32 width, u32 height)
 {
 	memset(osb, 0, sizeof(*osb));
 
-	osb->width    = width;
-	osb->height   = height;
-	osb->pitch    = width;
-	osb->byteSize = width * height * sizeof(u32);
-	osb->pixels   = (u32*)VirtualAlloc(0, osb->byteSize, MEM_COMMIT, PAGE_READWRITE);
+	osb->bitmap.width    = width;
+	osb->bitmap.height   = height;
+	osb->bitmap.pitch    = width;
+	osb->bitmap.byteSize = width * height * sizeof(u32);
+	osb->bitmap.pixels   = (u32*)VirtualAlloc(0, osb->bitmap.byteSize, MEM_COMMIT, PAGE_READWRITE);
 
-	memset(osb->pixels, 0, osb->byteSize);
+	memset(osb->bitmap.pixels, 0, osb->bitmap.byteSize);
 
 	osb->bmi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
 	osb->bmi.bmiHeader.biBitCount    = 32;
@@ -135,10 +94,10 @@ MakeOffscreenBitmap(OffscreenBitmap_s* osb, u32 width, u32 height)
 }
 
 internal void
-FreeOffscreenBitmap(OffscreenBitmap_s* osb)
+FreeOffscreenBitmap(WindowsBitmap_s* osb)
 {
-	if (osb->pixels)
-		VirtualFree(osb->pixels, 0, MEM_RELEASE);
+	if (osb->bitmap.pixels)
+		VirtualFree(osb->bitmap.pixels, 0, MEM_RELEASE);
 
 	memset(osb, 0, sizeof(*osb));
 }
@@ -156,12 +115,12 @@ GetWindowDimen(HWND wnd, Rect_s* rect)
 }
 
 internal void
-DrawGradient(OffscreenBitmap_s* osb, int xOff, int yOff)
+DrawGradient(WindowsBitmap_s* osb, int xOff, int yOff)
 {
-	u32* xel = osb->pixels;
-	for (u32 y = 0; y < osb->height; y++)
+	u32* xel = osb->bitmap.pixels;
+	for (u32 y = 0; y < osb->bitmap.height; y++)
 	{
-		for (u32 x = 0; x < osb->width; x++)
+		for (u32 x = 0; x < osb->bitmap.width; x++)
 		{
 			u32 col = ((u8)x + xOff) << 16 | ((u8)y + yOff) << 8 | 0x10;
 			*xel++  = col;
@@ -187,6 +146,12 @@ InitGlobals()
 {
 	memset(&g, 0, sizeof(g));
 
+	QueryPerformanceCounter(&g.startupTime);
+
+	LARGE_INTEGER countsPerSecond;
+	QueryPerformanceFrequency(&countsPerSecond);
+	g.clockConversionFactor = 1.0 / (double)countsPerSecond.QuadPart;
+
 	HMODULE xinputLib = LoadLibrary(XINPUT_DLL);
 	if (xinputLib != nullptr)
 	{
@@ -196,21 +161,21 @@ InitGlobals()
 }
 
 internal void
-UpdateWindow(HDC dc, OffscreenBitmap_s* osb)
+UpdateWindow(HDC dc, WindowsBitmap_s* osb)
 {
-	if (!osb->pixels)
+	if (!osb->bitmap.pixels)
 		return;
 
 	StretchDIBits(dc,
 	              0,
 	              0,
-	              osb->width,
-	              osb->height,
+	              osb->bitmap.width,
+	              osb->bitmap.height,
 	              0,
 	              0,
-	              osb->width,
-	              osb->height,
-	              osb->pixels,
+	              osb->bitmap.width,
+	              osb->bitmap.height,
+	              osb->bitmap.pixels,
 	              &osb->bmi,
 	              DIB_RGB_COLORS,
 	              SRCCOPY);
@@ -365,11 +330,9 @@ WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 const u32    kBytesPerSample = sizeof(i16) * 2;
 const int    kSamplesPerSec  = 48000; // Samples / sec
 const float  kTwoPi          = 3.1415927f * 2.0f;
-static int   toneVolume      = 6000;
-static float testToneHz      = 261.63; // Cycles / sec
 
 internal void
-GenTone(i16* samples, const u32 sampleOffset, const float toneHz, const u32 numSamples)
+GenTone(i16* samples, const u32 sampleOffset, const float toneHz, const float toneVolume, const u32 numSamples)
 {
 	const float cyclesPerSample = toneHz / kSamplesPerSec;
 	const float dtPerSample     = cyclesPerSample * kTwoPi;
@@ -392,6 +355,9 @@ UpdateSound(void)
 	DWORD playOffsetBytes;
 	DWORD writeOffsetBytes;
 
+    float testToneHz      = 261.63; // Cycles / sec
+    float toneVolume      = 6000; // Cycles / sec
+
 	u32   samplesToWrite = kSamplesPerSec / 4;
 	DWORD bytesToWrite   = samplesToWrite * kBytesPerSample;
 	if (SUCCEEDED(g.sound.buffer->GetCurrentPosition(&playOffsetBytes, &writeOffsetBytes)))
@@ -410,10 +376,12 @@ UpdateSound(void)
 		u32  region2Samples     = (u32)region2Size / kBytesPerSample;
 		u32  writeOffsetSamples = writeOffsetBytes / kBytesPerSample;
 
-		GenTone(region1, writeOffsetSamples, testToneHz, samplesToWrite - region2Samples);
+		GenTone(
+		    region1, writeOffsetSamples, testToneHz, toneVolume, samplesToWrite - region2Samples);
 		GenTone(region2,
 		        writeOffsetSamples + region1Samples,
 		        testToneHz,
+		        toneVolume,
 		        samplesToWrite - region1Samples);
 
 		g.sound.buffer->Unlock(region1Data, region1Size, region2Data, region2Size);
@@ -487,7 +455,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 
 	if (g.wnd)
 	{
-        bool isPlaying = false;
+		bool isPlaying = false;
 		InitDirectSound();
 
 		HDC dc = GetDC(g.wnd);
@@ -506,12 +474,12 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				DispatchMessage(&message);
 			}
 			SampleInput();
-            UpdateSound();
-            if ( !isPlaying)
-            {
-                g.sound.buffer->Play(0, 0, DSBPLAY_LOOPING);
-                isPlaying = true;
-            }
+			UpdateSound();
+			if (!isPlaying)
+			{
+				g.sound.buffer->Play(0, 0, DSBPLAY_LOOPING);
+				isPlaying = true;
+			}
 			DrawGradient(&g.frameBuffer, xOff++, yOff++);
 			UpdateWindow(dc, &g.frameBuffer);
 		}

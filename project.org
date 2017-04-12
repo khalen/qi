@@ -1,0 +1,9 @@
+
+* TODO Finish documenting the platform layer 
+
+* TODO Design audio
+
+* TODO Generic input
+
+* TODO Unify keyboard and controller
+The keyboard and controller need to be unified to generate a single input structure, that handles buttons / sticks / etc.
