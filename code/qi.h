@@ -55,5 +55,9 @@ struct Bitmap_s
 	u32 byteSize;
 };
 
+
+void DrawGradient(Bitmap_s* osb, int xOff, int yOff);
+void GameUpdateAndRender( Bitmap_s* screenBitmap );
+
 #define __QI_H
 #endif // #ifndef __QI_H

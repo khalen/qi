@@ -1,9 +1,17 @@
+* TODO Implement the platform layer 
 
-* TODO Finish documenting the platform layer 
+** TODO GameUpdateAndRender()
+*** TODO Pass time since last call
+*** DONE Pass screen bitmap to update
+    CLOSED: [2017-04-14 Fri 17:33]
+*** WAITING Pass sound buffer to update                             :WAITING:
 
-* TODO Design audio
+    - State "WAITING"    from "DONE"       [2017-04-14 Fri 17:36] \\
+      Need to finish designing audio API
 
-* TODO Generic input
+** TODO Design audio layer
 
-* TODO Unify keyboard and controller
+** TODO Generic input
+
+*** TODO Unify keyboard and controller
 The keyboard and controller need to be unified to generate a single input structure, that handles buttons / sticks / etc.

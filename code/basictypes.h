@@ -13,6 +13,9 @@ typedef signed int         i32;
 typedef unsigned long long u64;
 typedef long long          i64;
 
+typedef float  r32;
+typedef double r64;
+
 static_assert( sizeof( u8 ) == 1, "Bad size u8" );
 static_assert( sizeof( i8 ) == 1, "Bad size i8" );
 static_assert( sizeof( u16 ) == 2, "Bad size u16" );
@@ -21,5 +24,8 @@ static_assert( sizeof( u32 ) == 4, "Bad size u32" );
 static_assert( sizeof( i32 ) == 4, "Bad size i32" );
 static_assert( sizeof( u64 ) == 8, "Bad size u64" );
 static_assert( sizeof( i64 ) == 8, "Bad size i64" );
+
+static_assert( sizeof( r32 ) == 4, "Bad size u64" );
+static_assert( sizeof( r64 ) == 8, "Bad size i64" );
 
 #endif // #ifndef BASICTYPES_H

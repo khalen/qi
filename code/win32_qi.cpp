@@ -1,6 +1,10 @@
 #include "basictypes.h"
 #include "qi.h"
 
+#include "qi.cpp"
+#include "qi_math.cpp"
+#include "qi_sound.cpp"
+
 #include <windows.h>
 #include <stdlib.h>
 #include <xinput.h>
@@ -24,14 +28,14 @@ struct Sound_s
 
 struct Globals_s
 {
-	HWND              wnd;
+	HWND            wnd;
 	WindowsBitmap_s frameBuffer;
-	bool              gameRunning;
-	BITMAPINFO        bmi;
-	Input_s           gamePads[XUSER_MAX_COUNT];
-	Sound_s           sound;
-	LARGE_INTEGER     startupTime;
-	double            clockConversionFactor;
+	bool            gameRunning;
+	BITMAPINFO      bmi;
+	Input_s         gamePads[XUSER_MAX_COUNT];
+	Sound_s         sound;
+	LARGE_INTEGER   startupTime;
+	double          clockConversionFactor;
 } g;
 
 #define NOTE_UNUSED(x) ((void)x);
@@ -112,20 +116,6 @@ GetWindowDimen(HWND wnd, Rect_s* rect)
 	rect->top    = 0;
 	rect->width  = clientRect.right - clientRect.left;
 	rect->height = clientRect.bottom - clientRect.top;
-}
-
-internal void
-DrawGradient(WindowsBitmap_s* osb, int xOff, int yOff)
-{
-	u32* xel = osb->bitmap.pixels;
-	for (u32 y = 0; y < osb->bitmap.height; y++)
-	{
-		for (u32 x = 0; x < osb->bitmap.width; x++)
-		{
-			u32 col = ((u8)x + xOff) << 16 | ((u8)y + yOff) << 8 | 0x10;
-			*xel++  = col;
-		}
-	}
 }
 
 internal int
@@ -327,23 +317,8 @@ WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return result;
 }
 
-const u32    kBytesPerSample = sizeof(i16) * 2;
-const int    kSamplesPerSec  = 48000; // Samples / sec
-const float  kTwoPi          = 3.1415927f * 2.0f;
-
-internal void
-GenTone(i16* samples, const u32 sampleOffset, const float toneHz, const float toneVolume, const u32 numSamples)
-{
-	const float cyclesPerSample = toneHz / kSamplesPerSec;
-	const float dtPerSample     = cyclesPerSample * kTwoPi;
-	float       t               = sampleOffset * dtPerSample;
-	for (u32 sampleIdx = 0; sampleIdx < numSamples * 2; sampleIdx += 2, t += dtPerSample)
-	{
-		i16 sample             = (i16)(sinf(t) * toneVolume + 0.5f);
-		samples[sampleIdx + 0] = sample;
-		samples[sampleIdx + 1] = sample;
-	}
-}
+const u32   kBytesPerSample   = sizeof(i16) * 2;
+const int   kSamplesPerSecond = 48000; // Samples / sec
 
 internal void
 UpdateSound(void)
@@ -355,10 +330,10 @@ UpdateSound(void)
 	DWORD playOffsetBytes;
 	DWORD writeOffsetBytes;
 
-    float testToneHz      = 261.63; // Cycles / sec
-    float toneVolume      = 6000; // Cycles / sec
+	float testToneHz = 261.63; // Cycles / sec
+	float toneVolume = 6000;   // Cycles / sec
 
-	u32   samplesToWrite = kSamplesPerSec / 4;
+	u32   samplesToWrite = kSamplesPerSecond / 4;
 	DWORD bytesToWrite   = samplesToWrite * kBytesPerSample;
 	if (SUCCEEDED(g.sound.buffer->GetCurrentPosition(&playOffsetBytes, &writeOffsetBytes)))
 	{
@@ -376,12 +351,17 @@ UpdateSound(void)
 		u32  region2Samples     = (u32)region2Size / kBytesPerSample;
 		u32  writeOffsetSamples = writeOffsetBytes / kBytesPerSample;
 
-		GenTone(
-		    region1, writeOffsetSamples, testToneHz, toneVolume, samplesToWrite - region2Samples);
+		GenTone(region1,
+		        writeOffsetSamples,
+		        testToneHz,
+		        toneVolume,
+		        kSamplesPerSecond,
+		        samplesToWrite - region2Samples);
 		GenTone(region2,
 		        writeOffsetSamples + region1Samples,
 		        testToneHz,
 		        toneVolume,
+		        kSamplesPerSecond,
 		        samplesToWrite - region1Samples);
 
 		g.sound.buffer->Unlock(region1Data, region1Size, region2Data, region2Size);
@@ -402,7 +382,7 @@ InitDirectSound(void)
 		format.wFormatTag      = WAVE_FORMAT_PCM;
 		format.nChannels       = 2;
 		format.wBitsPerSample  = 16;
-		format.nSamplesPerSec  = kSamplesPerSec;
+		format.nSamplesPerSec  = kSamplesPerSecond;
 		u16 bytesPerSample     = (format.wBitsPerSample * format.nChannels) / 8;
 		format.nAvgBytesPerSec = format.nSamplesPerSec * bytesPerSample;
 		format.nBlockAlign     = bytesPerSample;
@@ -480,7 +460,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				g.sound.buffer->Play(0, 0, DSBPLAY_LOOPING);
 				isPlaying = true;
 			}
-			DrawGradient(&g.frameBuffer, xOff++, yOff++);
+			DrawGradient(&g.frameBuffer.bitmap, xOff++, yOff++);
 			UpdateWindow(dc, &g.frameBuffer);
 		}
 	}
