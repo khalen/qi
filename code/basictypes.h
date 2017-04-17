@@ -16,6 +16,9 @@ typedef long long          i64;
 typedef float  r32;
 typedef double r64;
 
+typedef r32 Time_t;
+typedef r64 PreciseTime_t;
+
 static_assert( sizeof( u8 ) == 1, "Bad size u8" );
 static_assert( sizeof( i8 ) == 1, "Bad size i8" );
 static_assert( sizeof( u16 ) == 2, "Bad size u16" );

@@ -5,10 +5,10 @@
 #include "qi_math.cpp"
 #include "qi_sound.cpp"
 
-#include <windows.h>
-#include <stdlib.h>
-#include <xinput.h>
+#include <Windows.h>
 #include <dsound.h>
+#include <stdlib.h>
+#include <Xinput.h>
 #include <math.h>
 
 #define internal static
@@ -34,6 +34,7 @@ struct Globals_s
 	BITMAPINFO      bmi;
 	Input_s         gamePads[XUSER_MAX_COUNT];
 	Sound_s         sound;
+	SoundBuffer_s   soundUpdateBuffer;
 	LARGE_INTEGER   startupTime;
 	double          clockConversionFactor;
 } g;
@@ -317,8 +318,7 @@ WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return result;
 }
 
-const u32   kBytesPerSample   = sizeof(i16) * 2;
-const int   kSamplesPerSecond = 48000; // Samples / sec
+const int kSamplesPerSecond = 48000; // Samples / sec
 
 internal void
 UpdateSound(void)
@@ -330,14 +330,36 @@ UpdateSound(void)
 	DWORD playOffsetBytes;
 	DWORD writeOffsetBytes;
 
-	float testToneHz = 261.63; // Cycles / sec
-	float toneVolume = 6000;   // Cycles / sec
+	r32 testToneHz = 261.63; // Cycles / sec
+	r32 toneVolume = 20000;
+    u32 latency = g.soundUpdateBuffer.samplesPerSec / 30;
+    u32 latencyBytes = latency * g.soundUpdateBuffer.bytesPerSample;
+    static u32 nextByteToLock;
 
-	u32   samplesToWrite = kSamplesPerSecond / 4;
-	DWORD bytesToWrite   = samplesToWrite * kBytesPerSample;
+    DSBCAPS caps;
+	caps.dwSize = sizeof(caps);
+    g.sound.buffer->GetCaps(&caps);
+
 	if (SUCCEEDED(g.sound.buffer->GetCurrentPosition(&playOffsetBytes, &writeOffsetBytes)))
 	{
-		g.sound.buffer->Lock(writeOffsetBytes,
+        u32 byteToLock = nextByteToLock;
+        u32 targetCursor = (playOffsetBytes + latencyBytes) % caps.dwBufferBytes;
+        u32 bytesToWrite;
+
+		if (byteToLock > targetCursor)
+		{
+            bytesToWrite = caps.dwBufferBytes - byteToLock;
+            bytesToWrite += targetCursor;
+		}
+        else
+        {
+            bytesToWrite = targetCursor - byteToLock;
+        }
+        nextByteToLock = (nextByteToLock + bytesToWrite) % caps.dwBufferBytes;
+
+		GenTone(&g.soundUpdateBuffer, bytesToWrite / g.soundUpdateBuffer.bytesPerSample, testToneHz, toneVolume);
+
+		g.sound.buffer->Lock(byteToLock,
 		                     bytesToWrite,
 		                     &region1Data,
 		                     &region1Size,
@@ -345,27 +367,40 @@ UpdateSound(void)
 		                     &region2Size,
 		                     0);
 
-		i16* region1            = (i16*)region1Data;
-		u32  region1Samples     = (u32)region1Size / kBytesPerSample;
-		i16* region2            = (i16*)region2Data;
-		u32  region2Samples     = (u32)region2Size / kBytesPerSample;
-		u32  writeOffsetSamples = writeOffsetBytes / kBytesPerSample;
-
-		GenTone(region1,
-		        writeOffsetSamples,
-		        testToneHz,
-		        toneVolume,
-		        kSamplesPerSecond,
-		        samplesToWrite - region2Samples);
-		GenTone(region2,
-		        writeOffsetSamples + region1Samples,
-		        testToneHz,
-		        toneVolume,
-		        kSamplesPerSecond,
-		        samplesToWrite - region1Samples);
+		memcpy(region1Data, g.soundUpdateBuffer.bytes, region1Size);
+        if ( region2Size )
+            memcpy(region2Data, g.soundUpdateBuffer.bytes + region1Size, region2Size);
 
 		g.sound.buffer->Unlock(region1Data, region1Size, region2Data, region2Size);
 	}
+}
+
+internal void
+InitSoundBuffer()
+{
+    DSBCAPS caps;
+    caps.dwSize = sizeof(caps);
+    g.sound.buffer->GetCaps(&caps);
+
+    SoundBuffer_s buf;
+    MakeSoundBuffer(&buf, caps.dwBufferBytes / 4, 2, 48000);
+    GenTone(&buf, buf.numSamples, 261.0f, 32000.0f);
+
+	VOID* region1Data;
+	DWORD region1Size;
+	VOID* region2Data;
+	DWORD region2Size;
+	g.sound.buffer->Lock(0,
+	                     caps.dwBufferBytes,
+	                     &region1Data,
+	                     &region1Size,
+	                     &region2Data,
+	                     &region2Size,
+	                     0);
+    memcpy(region1Data, buf.bytes, region1Size);
+    g.sound.buffer->Unlock(region1Data, region1Size, region2Data, region2Size);
+
+    FreeSoundBuffer(&buf);
 }
 
 internal void
@@ -402,6 +437,8 @@ InitDirectSound(void)
 				bufDesc.lpwfxFormat   = &format;
 				g.sound.device->CreateSoundBuffer(&bufDesc, &g.sound.buffer, 0);
 				OutputDebugStringA("Created Sound Buffer\n");
+                InitSoundBuffer();
+                g.sound.buffer->SetVolume(0);
 			}
 		}
 	}
@@ -436,7 +473,9 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 	if (g.wnd)
 	{
 		bool isPlaying = false;
+
 		InitDirectSound();
+		MakeSoundBuffer(&g.soundUpdateBuffer, 48000 / 30, 2, 48000);
 
 		HDC dc = GetDC(g.wnd);
 
