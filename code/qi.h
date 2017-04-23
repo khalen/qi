@@ -20,7 +20,7 @@ struct Vec2_s
 	};
 };
 
-struct Input_s
+struct SimpleInput_s
 {
 	// Dpad
 	bool up, right, down, left;
@@ -55,9 +55,71 @@ struct Bitmap_s
 	u32 byteSize;
 };
 
+#define CONTROLLER_MAX_COUNT 4
+
+struct Button_s
+{
+	bool endedDown;
+	int  halfTransitionCount;
+};
+
+struct Analog_s
+{
+	Vec2_s startEnd;
+	Vec2_s minMax;
+};
+
+struct Controller_s
+{
+	bool     analog;
+	Analog_s leftStickX;
+	Analog_s leftStickY;
+	Analog_s rightStickX;
+	Analog_s rightStickY;
+	Analog_s leftTrigger;
+	Analog_s rightTrigger;
+
+	union {
+		Button_s buttons[10];
+
+		struct
+		{
+			Button_s upButton;
+			Button_s rightButton;
+			Button_s downButton;
+			Button_s leftButton;
+
+			Button_s aButton;
+			Button_s bButton;
+			Button_s xButton;
+			Button_s yButton;
+
+			Button_s startButton;
+			Button_s backButton;
+ 
+			Button_s leftShoulder;
+			Button_s rightShoulder;
+		};
+	};
+};
+
+struct Input_s
+{
+	Controller_s controllers[CONTROLLER_MAX_COUNT];
+};
+
+struct Memory_s
+{
+    size_t permanentSize;
+    u8* permanentStorage;
+
+    size_t transientSize;
+    u8* transientStorage;
+    u8* transientPos;
+};
 
 void DrawGradient(Bitmap_s* osb, int xOff, int yOff);
-void GameUpdateAndRender( Bitmap_s* screenBitmap );
+void GameUpdateAndRender(Bitmap_s* screenBitmap);
 
 #define __QI_H
 #endif // #ifndef __QI_H

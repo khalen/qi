@@ -52,7 +52,7 @@ GenTone(SoundBuffer_s* outputBuf, const u32 samplesToWrite, const r32 toneHz, co
 	i16* curSubSample = outputBuf->samples;
 	for (u32 sampleIdx = 0; sampleIdx < samplesToWrite; sampleIdx++ )
 	{
-		i16 sample = (i16)(sinf(outputBuf->theta) * toneVolume + 0.5);
+		i16 sample = (i16)(sinf(outputBuf->theta) * toneVolume );
         outputBuf->theta += dtPerSample;
         if ( outputBuf->theta > Q_2PI )
             outputBuf->theta -= Q_2PI;
