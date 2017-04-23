@@ -31,4 +31,6 @@ static_assert( sizeof( i64 ) == 8, "Bad size i64" );
 static_assert( sizeof( r32 ) == 4, "Bad size u64" );
 static_assert( sizeof( r64 ) == 8, "Bad size i64" );
 
+#define internal static
+
 #endif // #ifndef BASICTYPES_H

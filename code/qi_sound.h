@@ -27,9 +27,8 @@ static_assert(sizeof(SoundBuffer_s) == 32, "Wrong size for SoundBuffer_s");
 
 SoundBuffer_s* Qis_MakeSoundBuffer(const int numSamples, const int channels);
 void Qis_FreeSoundBuffer(SoundBuffer_s* buffer);
-
-void
-GenTone(SoundBuffer_s* outputBuf, const u32 offsetSamples, const r32 toneHz, const r32 toneVolume);
+void Qis_UpdateSound(SoundBuffer_s* soundBuffer, const u32 samplesToWrite);
+void Qis_Init();
 
 #define __QI_SOUND_H
 #endif // #ifndef __QI_SOUND_H

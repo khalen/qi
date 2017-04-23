@@ -351,7 +351,7 @@ WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 const int kSamplesPerSecond = 48000; // Samples / sec
 
 internal void
-UpdateSound(void)
+Win32UpdateSound(void)
 {
 	VOID* region1Data;
 	DWORD region1Size;
@@ -387,7 +387,7 @@ UpdateSound(void)
 		}
 		nextByteToLock = ((nextByteToLock + bytesToWrite) % caps.dwBufferBytes);
 
-		GenTone(&g.soundUpdateBuffer, bytesToWrite / g.soundUpdateBuffer.bytesPerSample, testToneHz, toneVolume);
+        Qis_UpdateSound(&g.soundUpdateBuffer, bytesToWrite / g.soundUpdateBuffer.bytesPerSample);
 
 		if (SUCCEEDED(g.sound.buffer->Lock(
 		        byteToLock, bytesToWrite, &region1Data, &region1Size, &region2Data, &region2Size, 0)))
@@ -399,28 +399,6 @@ UpdateSound(void)
 			g.sound.buffer->Unlock(region1Data, region1Size, region2Data, region2Size);
 		}
 	}
-}
-
-internal void
-InitSoundBuffer()
-{
-	DSBCAPS caps;
-	caps.dwSize = sizeof(caps);
-	g.sound.buffer->GetCaps(&caps);
-
-	SoundBuffer_s buf;
-	MakeSoundBuffer(&buf, caps.dwBufferBytes / 4, 2, 48000);
-	GenTone(&buf, buf.numSamples, 261.0f, 32000.0f);
-
-	VOID* region1Data;
-	DWORD region1Size;
-	VOID* region2Data;
-	DWORD region2Size;
-	g.sound.buffer->Lock(0, caps.dwBufferBytes, &region1Data, &region1Size, &region2Data, &region2Size, 0);
-	memcpy(region1Data, buf.bytes, region1Size);
-	g.sound.buffer->Unlock(region1Data, region1Size, region2Data, region2Size);
-
-	FreeSoundBuffer(&buf);
 }
 
 internal void
@@ -451,12 +429,9 @@ InitDirectSound(void)
 			if (SUCCEEDED(g.sound.primaryBuffer->SetFormat(&format)))
 			{
 				bufDesc.dwFlags = 0;
-				// 1 seconds worth of audio buffer
 				bufDesc.dwBufferBytes = format.nAvgBytesPerSec;
 				bufDesc.lpwfxFormat   = &format;
 				g.sound.device->CreateSoundBuffer(&bufDesc, &g.sound.buffer, 0);
-				OutputDebugStringA("Created Sound Buffer\n");
-				InitSoundBuffer();
 				g.sound.buffer->SetVolume(0);
 			}
 		}
@@ -494,7 +469,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 		bool isPlaying = false;
 
 		InitDirectSound();
-		MakeSoundBuffer(&g.soundUpdateBuffer, 48000, 2, 48000);
+		Qis_MakeSoundBuffer(&g.soundUpdateBuffer, 48000, 2, 48000);
 
 		HDC dc = GetDC(g.wnd);
 
@@ -512,13 +487,15 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				DispatchMessage(&message);
 			}
 			SampleInput();
-			UpdateSound();
+			Win32UpdateSound();
 			if (!isPlaying)
 			{
 				g.sound.buffer->Play(0, 0, DSBPLAY_LOOPING);
 				isPlaying = true;
 			}
-			DrawGradient(&g.frameBuffer.bitmap, xOff++, yOff++);
+
+            Qi_GameUpdateAndRender(&g.memory, &g.inputState, &g.frameBuffer.bitmap);
+            // 			DrawGradient(&g.frameBuffer.bitmap, xOff++, yOff++);
 			UpdateWindow(dc, &g.frameBuffer);
 		}
 	}

@@ -7,18 +7,7 @@
 // Part of the Qi engine and game, Copyright 2017, Jon Davis
 
 #include "basictypes.h"
-
-struct Vec2_s
-{
-	union {
-		float f[2];
-		struct
-		{
-			float x;
-			float y;
-		};
-	};
-};
+#include "qi_math.h"
 
 struct SimpleInput_s
 {
@@ -118,8 +107,9 @@ struct Memory_s
     u8* transientPos;
 };
 
-void DrawGradient(Bitmap_s* osb, int xOff, int yOff);
-void GameUpdateAndRender(Bitmap_s* screenBitmap);
+struct SoundBuffer_s;
+
+void Qi_GameUpdateAndRender(Memory_s* memory, Input_s* input, Bitmap_s* screenBitmap);
 
 #define __QI_H
 #endif // #ifndef __QI_H

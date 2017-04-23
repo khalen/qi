@@ -7,7 +7,13 @@
 #include "basictypes.h"
 
 #include "qi.h"
+#include "qi_sound.h"
 
+struct
+{
+	int xOff;
+	int yOff;
+} g_game;
 
 void
 DrawGradient(Bitmap_s* osb, int xOff, int yOff)
@@ -23,3 +29,10 @@ DrawGradient(Bitmap_s* osb, int xOff, int yOff)
 	}
 }
 
+void
+Qi_GameUpdateAndRender(Memory_s*      memory,
+                       Input_s*       input,
+                       Bitmap_s*      screenBitmap)
+{
+	DrawGradient(screenBitmap, g_game.xOff, g_game.yOff);
+}
