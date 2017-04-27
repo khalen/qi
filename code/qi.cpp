@@ -9,11 +9,27 @@
 #include "qi.h"
 #include "qi_sound.h"
 
-struct
+struct GameGlobals_s
 {
-	int xOff;
-	int yOff;
-} g_game;
+	int       xOff;
+	int       yOff;
+	Memory_s* memory;
+};
+
+GameGlobals_s* game;
+
+template<typename T>
+T*
+GameAllocate()
+{
+	Assert(game->memory && (uintptr_t)game->memory->permanentPos & 0xF == 0
+	       && (game->memory->permanentSize
+	           - (size_t)(game->memory->permanentPos - game->memory->permanentStorage > allocSize)));
+	size_t allocSize = sizeof(T) + ((sizeof(T) + 15) & 0xF);
+	T*     result    = (T*)game->memory->permanentPos;
+	game->memory->permanentPos += allocSize;
+	return result;
+}
 
 void
 DrawGradient(Bitmap_s* osb, int xOff, int yOff)
@@ -29,10 +45,37 @@ DrawGradient(Bitmap_s* osb, int xOff, int yOff)
 	}
 }
 
-void
-Qi_GameUpdateAndRender(Memory_s*      memory,
-                       Input_s*       input,
-                       Bitmap_s*      screenBitmap)
+internal void
+InitGameGlobals(Memory_s* memory)
 {
-	DrawGradient(screenBitmap, g_game.xOff, g_game.yOff);
+	Assert(memory && (memory->permanentSize - (size_t)(memory->permanentPos - memory->permanentStorage)
+	                  > sizeof(GameGlobals_s)));
+
+	// This can't use GameAlloc<>(), because we haven't allocated the game globals struct yet.
+	size_t allocSize = sizeof(GameGlobals_s) + ((sizeof(GameGlobals_s) + 15) & 0xF);
+	game             = (GameGlobals_s*)memory->permanentPos;
+	memory->permanentPos += allocSize;
+	game->memory = memory;
+}
+
+internal void
+UpdateGameState(Input_s* input)
+{
+	Assert(game);
+	const Controller_s* controller = &input->controllers[0];
+	game->xOff += 10 * controller->leftStickX.startEnd.y;
+	game->yOff += 10 * controller->leftStickY.startEnd.y;
+}
+
+void
+Qi_GameUpdateAndRender(Memory_s* memory, Input_s* input, Bitmap_s* screenBitmap)
+{
+	if (game == nullptr)
+    {
+		InitGameGlobals(memory);
+        Qis_Init();
+    }
+
+	UpdateGameState(input);
+	DrawGradient(screenBitmap, game->xOff, game->yOff);
 }

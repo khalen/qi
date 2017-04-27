@@ -1,0 +1,49 @@
+#ifndef __HAS_H
+
+//
+// Copyright 2017, Quantum Immortality Software and Jon Davis
+//
+// HAS macro system and basic defines
+//
+// We want HAS(FOO) to:
+// a) Evaluate to 1 / true if FOO is defined as HAS_X,
+// b) Evaluate to 0 / false if FOO is defined as HAS__,
+// c) Error if FOO is undefined or defined as 0 or some other invalid token.
+//
+
+#define HAS_X 1
+#define HAS__ 2
+
+#define HAS(test) (2 / test - 1)
+#define WHEN(test) ((test) == 0 ? HAS__ : HAS_X)
+
+#if defined(QI_DEV_BUILD)
+#define DEV_BUILD HAS_X
+#else
+#define DEV_BUILD HAS__
+#endif
+
+#if defined(QI_FAST_BUILD)
+#define FAST_BUILD HAS_X
+#else
+#define FAST_BUILD HAS__
+#endif
+
+#define RELEASE_BUILD WHEN(!HAS(DEV_BUILD) && HAS(FAST_BUILD))
+
+#if HAS(RELEASE_BUILD)
+
+#pragma message "RELEASE_BUILD enabled"
+#else
+
+#if HAS(DEV_BUILD)
+#pragma message("DEV_BUILD enabled")
+#endif
+
+#if HAS(FAST_BUILD)
+#pragma message("FAST_BUILD enabled")
+#endif
+#endif
+
+#define __HAS_H
+#endif // #ifndef __HAS_H

@@ -4,6 +4,8 @@
 #ifndef BASICTYPES_H
 #define BASICTYPES_H
 
+#include "has.h"
+
 typedef unsigned char      u8;
 typedef signed char        i8;
 typedef unsigned short     u16;
@@ -32,5 +34,10 @@ static_assert( sizeof( r32 ) == 4, "Bad size u64" );
 static_assert( sizeof( r64 ) == 8, "Bad size i64" );
 
 #define internal static
+
+#define KB(amt) ((amt) * (size_t)1024)
+#define MB(amt) (KB(amt) * 1024)
+#define GB(amt) (MB(amt) * 1024)
+#define TB(amt) (GB(amt) * 1024)
 
 #endif // #ifndef BASICTYPES_H

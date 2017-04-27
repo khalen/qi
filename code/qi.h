@@ -9,6 +9,12 @@
 #include "basictypes.h"
 #include "qi_math.h"
 
+#if defined(QI_PERFORMANCE)
+#define Assert(foo) (void)(foo)
+#else
+#define Assert(foo) if (!(foo)) *(volatile u32 *)0 = 0xdeadbeef
+#endif
+
 struct SimpleInput_s
 {
 	// Dpad
@@ -101,6 +107,7 @@ struct Memory_s
 {
     size_t permanentSize;
     u8* permanentStorage;
+    u8* permanentPos;
 
     size_t transientSize;
     u8* transientStorage;

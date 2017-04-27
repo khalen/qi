@@ -152,6 +152,24 @@ InitGlobals()
 		XInputGetState_ = (impXInputGetState*)GetProcAddress(xinputLib, "XInputGetState");
 		XInputSetState_ = (impXInputSetState*)GetProcAddress(xinputLib, "XInputSetState");
 	}
+
+#if HAS(DEV_BUILD)
+    size_t baseAddressPerm = TB(2);
+    size_t baseAddressTrans = TB(4);
+#else
+    size_t baseAddressPerm = 0;
+    size_t baseAddressTrans = 0;
+#endif
+
+	g.memory.permanentSize    = MB(64);
+	g.memory.permanentStorage = (u8*)VirtualAlloc((void *)baseAddressPerm, g.memory.permanentSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    Assert(g.memory.permanentStorage != nullptr);
+	g.memory.permanentPos     = g.memory.permanentStorage;
+
+	g.memory.transientSize    = GB(4);
+	g.memory.transientStorage = (u8*)VirtualAlloc((void *)baseAddressTrans, g.memory.transientSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    Assert(g.memory.transientStorage != nullptr);
+	g.memory.transientPos     = g.memory.transientStorage;
 }
 
 internal void
@@ -360,8 +378,6 @@ Win32UpdateSound(void)
 	DWORD playOffsetBytes;
 	DWORD writeOffsetBytes;
 
-	r32        testToneHz   = 261.63; // Cycles / sec
-	r32        toneVolume   = 20000;
 	u32        latency      = g.soundUpdateBuffer.samplesPerSec / 15;
 	u32        latencyBytes = latency * g.soundUpdateBuffer.bytesPerSample;
 	static u32 nextByteToLock;
@@ -387,7 +403,7 @@ Win32UpdateSound(void)
 		}
 		nextByteToLock = ((nextByteToLock + bytesToWrite) % caps.dwBufferBytes);
 
-        Qis_UpdateSound(&g.soundUpdateBuffer, bytesToWrite / g.soundUpdateBuffer.bytesPerSample);
+		Qis_UpdateSound(&g.soundUpdateBuffer, bytesToWrite / g.soundUpdateBuffer.bytesPerSample);
 
 		if (SUCCEEDED(g.sound.buffer->Lock(
 		        byteToLock, bytesToWrite, &region1Data, &region1Size, &region2Data, &region2Size, 0)))
@@ -428,7 +444,7 @@ InitDirectSound(void)
 		{
 			if (SUCCEEDED(g.sound.primaryBuffer->SetFormat(&format)))
 			{
-				bufDesc.dwFlags = 0;
+				bufDesc.dwFlags       = 0;
 				bufDesc.dwBufferBytes = format.nAvgBytesPerSec;
 				bufDesc.lpwfxFormat   = &format;
 				g.sound.device->CreateSoundBuffer(&bufDesc, &g.sound.buffer, 0);
@@ -474,8 +490,6 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 		HDC dc = GetDC(g.wnd);
 
 		g.gameRunning = true;
-		int xOff      = 0;
-		int yOff      = 0;
 		while (g.gameRunning)
 		{
 			MSG message;
@@ -494,8 +508,8 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				isPlaying = true;
 			}
 
-            Qi_GameUpdateAndRender(&g.memory, &g.inputState, &g.frameBuffer.bitmap);
-            // 			DrawGradient(&g.frameBuffer.bitmap, xOff++, yOff++);
+			Qi_GameUpdateAndRender(&g.memory, &g.inputState, &g.frameBuffer.bitmap);
+			// 			DrawGradient(&g.frameBuffer.bitmap, xOff++, yOff++);
 			UpdateWindow(dc, &g.frameBuffer);
 		}
 	}

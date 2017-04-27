@@ -17,3 +17,79 @@
 *** TODO Unify keyboard and controller
 The keyboard and controller need to be unified to generate a single input structure, that handles buttons / sticks / etc.
 
+
+The formula for percentage closer filtering for $n$ occluders $o_i$ and receiver $r$ is
+
+\begin{equation*}
+\frac{1}{n} \sum_{i=1}^n U(o_i - r)
+\end{equation*}
+
+where $U(x)$ is the unit step function
+
+\begin{equation*}
+u(x) =
+\begin{cases}
+0 & x \le 0 \\
+1 & x > 0
+\end{cases}
+\end{equation*}
+
+and $w_i$ are the weights per pcf sample, ie. $\frac{1}{n}$ for a box filter.
+
+#+begin_src mathematica :exports results
+Export["fig1.png", Plot[UnitStep[x], {x, -1, 1}, PlotStyle->Directive[Thick, Red]]]
+#+end_src
+
+#+results:
+
+[[file:fig1.png]]
+
+One way to write the step function is as the limit of exponentials:
+
+\begin{equation*}
+u(o_i - r) = \lim_{k \to \infty} \frac{e^{ko_i}}{e^{ko_i} + e^{kr}}
+\end{equation*}
+
+#+begin_src mathematica :exports results
+u[o_, r_, k_] := Exp[k * o] / (Exp[k * o] + Exp[k * r])
+funcs = Table[u[x, 0, k], {k, 10, 100, 30}]
+plot = Plot[funcs, {x, -1, 1}, PlotLegends->Placed["k = {10, 40, 70, 100}", Above]]
+Export["fig2.png", plot]
+#+end_src
+
+#+results:
+
+[[file:fig2.png]]
+
+Rewriting the pcf formula using the above gives
+
+\begin{equation}
+\begin{align}
+\frac{1}{n} \sum_{i=1}^n u(o_i - r) & = \frac{1}{n} 
+ \sum_{i = 1}^n \lim_{k \to \infty}
+ \frac{e^{ko_i}}{e^{ko_i} + e^{kr}} \\
+& = \lim_{k \to \infty}
+ \frac{1}{ne^{kr}}
+ \sum_{i=1}^n \frac{e^{ko_i}}{e^{k(o_i - r)} + 1}
+\end{align}
+\end{equation}
+
+Assume our shadow receiver is planar (at least within the filtering window). This necessarily means that
+$r \ge o_i$, or the receiver could shadow itself which would violate the assumption.
+
+This implies that the term $e^{k(o_i - r)}$ converges to 0 for all occluders. This gives
+
+\begin{equation*}
+\begin{align}
+\lim_{k \to \infty}
+ \frac{1}{ne^{kr}}
+  \sum_{i=1}^n \frac{e^{ko_i}}{e^{k(o_i - r)} + 1} & \approx
+\lim_{k \to \infty}
+ \frac {1}{ne^{kr}} \sum_{i=1}^n e^{ko_i} \\
+ & \equiv
+\lim_{k \to \infty}
+ \frac {E[e^{ko}]}{e^{kr}}
+\end{align}
+\end{equation*}
+
+KJHjrhgkjrhgjkegrj
