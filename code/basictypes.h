@@ -40,4 +40,10 @@ static_assert( sizeof( r64 ) == 8, "Bad size i64" );
 #define GB(amt) (MB(amt) * 1024)
 #define TB(amt) (GB(amt) * 1024)
 
+template<typename T, size_t N>
+constexpr int countof(T(&)[N])
+{
+    return N;
+}
+
 #endif // #ifndef BASICTYPES_H

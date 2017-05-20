@@ -12,8 +12,12 @@
 #if defined(QI_PERFORMANCE)
 #define Assert(foo) (void)(foo)
 #else
-#define Assert(foo) if (!(foo)) *(volatile u32 *)0 = 0xdeadbeef
+#define Assert(foo) \
+	if (!(foo))     \
+	*(volatile u32*)0 = 0xdeadbeef
 #endif
+
+#define TARGET_FPS 30.0
 
 struct SimpleInput_s
 {
@@ -50,7 +54,8 @@ struct Bitmap_s
 	u32 byteSize;
 };
 
-#define CONTROLLER_MAX_COUNT 4
+#define CONTROLLER_MAX_COUNT 5
+#define KBD (CONTROLLER_MAX_COUNT - 1)
 
 struct Button_s
 {
@@ -58,24 +63,49 @@ struct Button_s
 	int  halfTransitionCount;
 };
 
+#define TRIGGER_DEADZONE 0.1f
+struct Trigger_s
+{
+	r32    reading;
+	r32    __Pad0;
+	Vec2_s minMax;
+};
+
+#define ANALOG_DEADZONE 0.1f
 struct Analog_s
 {
-	Vec2_s startEnd;
-	Vec2_s minMax;
+	Trigger_s trigger;
+	Vec2_s    dir;
 };
 
 struct Controller_s
 {
-	bool     analog;
-	Analog_s leftStickX;
-	Analog_s leftStickY;
-	Analog_s rightStickX;
-	Analog_s rightStickY;
-	Analog_s leftTrigger;
-	Analog_s rightTrigger;
+	bool isAnalog;
+	bool isConnected;
 
 	union {
-		Button_s buttons[10];
+#define ANALOG_COUNT 2
+		Analog_s analogs[ANALOG_COUNT];
+		struct
+		{
+			Analog_s leftStick;
+			Analog_s rightStick;
+		};
+	};
+
+	union {
+#define TRIGGER_COUNT 2
+		Trigger_s triggers[TRIGGER_COUNT];
+		struct
+		{
+			Trigger_s leftTrigger;
+			Trigger_s rightTrigger;
+		};
+	};
+
+	union {
+#define BUTTON_COUNT 12
+		Button_s buttons[BUTTON_COUNT];
 
 		struct
 		{
@@ -91,7 +121,7 @@ struct Controller_s
 
 			Button_s startButton;
 			Button_s backButton;
- 
+
 			Button_s leftShoulder;
 			Button_s rightShoulder;
 		};
@@ -105,18 +135,24 @@ struct Input_s
 
 struct Memory_s
 {
-    size_t permanentSize;
-    u8* permanentStorage;
-    u8* permanentPos;
+	size_t permanentSize;
+	u8*    permanentStorage;
+	u8*    permanentPos;
 
-    size_t transientSize;
-    u8* transientStorage;
-    u8* transientPos;
+	size_t transientSize;
+	u8*    transientStorage;
+	u8*    transientPos;
 };
 
 struct SoundBuffer_s;
 
 void Qi_GameUpdateAndRender(Memory_s* memory, Input_s* input, Bitmap_s* screenBitmap);
+
+// Functions to be provided by the platform layer
+void* QiPlat_ReadEntireFile(const char* fileName, size_t* fileSize);
+bool QiPlat_WriteEntireFile(const char* fileName, const void* ptr, const size_t size);
+void QiPlat_ReleaseFileBuffer(void* buffer);
+r64 QiPlat_WallSeconds();
 
 #define __QI_H
 #endif // #ifndef __QI_H

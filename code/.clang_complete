@@ -2,6 +2,9 @@
 -Wextra
 -fms-extensions
 -D__COMPLETION__
+-DQI_DEV_BUILD=1
+-DQI_WIN32=1
+-DQI_PROFILE_BUILD=1
 -IC:/Program Files (x86)/Microsoft Visual Studio/2017/Professional/VC/Tools/MSVC/14.10.25017/ATLMFC/include
 -IC:/Program Files (x86)/Microsoft Visual Studio/2017/Professional/VC/Tools/MSVC/14.10.25017/include
 -IC:/Program Files (x86)/Windows Kits/NETFXSDK/4.6.1/include/um
