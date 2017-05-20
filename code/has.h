@@ -11,11 +11,11 @@
 // c) Error if FOO is undefined or defined as 0 or some other invalid token.
 //
 
-#define HAS_X 1
 #define HAS__ 2
+#define HAS_X 4
 
-#define HAS(test) (2 / test - 1)
-#define WHEN(test) ((test) == 0 ? HAS__ : HAS_X)
+#define HAS(test)  (1 % ((test) / 2))
+#define WHEN(test) (2 + (test) * 2)
 
 #if defined(QI_DEV_BUILD)
 #define DEV_BUILD HAS_X
@@ -27,6 +27,12 @@
 #define FAST_BUILD HAS_X
 #else
 #define FAST_BUILD HAS__
+#endif
+
+#if defined(QI_PROFILE_BUILD)
+#define PROF_BUILD HAS_X
+#else
+#define PROF_BUILD HAS__
 #endif
 
 #define RELEASE_BUILD WHEN(!HAS(DEV_BUILD) && HAS(FAST_BUILD))

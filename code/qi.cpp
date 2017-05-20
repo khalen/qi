@@ -39,7 +39,7 @@ DrawGradient(Bitmap_s* osb, int xOff, int yOff)
 	{
 		for (u32 x = 0; x < osb->width; x++)
 		{
-			u32 col = ((u8)x + xOff) << 16 | ((u8)y + yOff) << 8 | 0x10;
+			u32 col = (((x + xOff) & 0xFF)) << 16 | (((y + yOff) & 0xFF)) << 8 | 0x10;
 			*xel++  = col;
 		}
 	}
@@ -62,19 +62,22 @@ internal void
 UpdateGameState(Input_s* input)
 {
 	Assert(game);
-	const Controller_s* controller = &input->controllers[0];
-	game->xOff += 10 * controller->leftStickX.startEnd.y;
-	game->yOff += 10 * controller->leftStickY.startEnd.y;
+	for (int controllerIdx = 0; controllerIdx < CONTROLLER_MAX_COUNT; controllerIdx++)
+	{
+		const Controller_s* controller = &input->controllers[controllerIdx];
+		game->xOff -= (int)(5 * controller->leftStick.dir.x);
+		game->yOff += (int)(5 * controller->leftStick.dir.y);
+	}
 }
 
 void
 Qi_GameUpdateAndRender(Memory_s* memory, Input_s* input, Bitmap_s* screenBitmap)
 {
 	if (game == nullptr)
-    {
+	{
 		InitGameGlobals(memory);
-        Qis_Init();
-    }
+		Qis_Init();
+	}
 
 	UpdateGameState(input);
 	DrawGradient(screenBitmap, game->xOff, game->yOff);

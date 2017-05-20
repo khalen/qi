@@ -8,6 +8,12 @@
 
 #include "basictypes.h"
 
+#define QI_SOUND_SAMPLES_PER_SECOND 44100
+#define QI_SOUND_BYTES_PER_CHANNEL sizeof(i16)
+#define QI_SOUND_CHANNELS 2
+#define QI_SOUND_BYTES_PER_SAMPLE (QI_SOUND_BYTES_PER_CHANNEL * QI_SOUND_CHANNELS)
+#define QI_SOUND_REQUESTED_LATENCY_MS 30
+
 struct SoundBuffer_s
 {
 	u32 channels;

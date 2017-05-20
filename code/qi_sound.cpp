@@ -67,7 +67,7 @@ Qis_FreeSoundBuffer(SoundBuffer_s* buffer)
 void
 Qis_UpdateSound(SoundBuffer_s* soundBuffer, const u32 samplesToWrite)
 {
-	GenTone(soundBuffer, samplesToWrite, g_sound.toneHz, g_sound.toneVolume);
+	GenTone(soundBuffer, samplesToWrite, (r32)g_sound.toneHz, (r32)g_sound.toneVolume);
 }
 
 void
