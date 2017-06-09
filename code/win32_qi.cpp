@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <Xinput.h>
 #include <math.h>
+#include <xaudio2.h>
 
 #define internal static
 
@@ -22,14 +23,17 @@ struct WindowsBitmap_s
 	BITMAPINFO bmi;
 };
 
-#define AL_NUM_BUFFERS 3
+#define XA_NUM_BUFFERS 2
+#define XA_UPDATE_BUFFER_SAMPLES (u32)(QI_SOUND_SAMPLES_PER_SECOND / 1000.0f * QI_SOUND_REQUESTED_LATENCY_MS + 0.5f)
+#define XA_UPDATE_BUFFER_BYTES (XA_UPDATE_BUFFER_SAMPLES * QI_SOUND_BYTES_PER_SAMPLE)
 
 struct Sound_s
 {
-	ALCdevice*  alDevice;
-	ALCcontext* alContext;
-	ALuint      source;
-	ALuint      buffers[AL_NUM_BUFFERS];
+	IXAudio2*               xaudio;
+	IXAudio2MasteringVoice* masteringVoice;
+	IXAudio2SourceVoice*    sourceVoice;
+	u8                      buffers[XA_NUM_BUFFERS][XA_UPDATE_BUFFER_BYTES];
+	u32                     buffersSubmitted;
 };
 
 // All the globals!
@@ -501,106 +505,111 @@ WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 internal void
-CheckAlError()
+InitXAudio2(void)
 {
-	ALCenum error = alGetError();
-	if (error != AL_NO_ERROR)
+	if (FAILED(XAudio2Create(&g.sound.xaudio)))
 	{
-		// TODO: Better logging
-		OutputDebugString("OpenAL error!\n");
-		__debugbreak();
+		OutputDebugString("Failed to initialize XAudio2\n");
+		return;
 	}
-}
 
-#define CHECK_AL(value) \
-	(value);            \
-	CheckAlError();
+#if HAS(DEV_BUILD) && 0
+    XAUDIO2_DEBUG_CONFIGURATION dbgOpts = {};
+    dbgOpts.TraceMask = XAUDIO2_LOG_ERRORS | XAUDIO2_LOG_WARNINGS;
+    dbgOpts.BreakMask = XAUDIO2_LOG_ERRORS;
+    g.sound.xaudio->SetDebugConfiguration(&dbgOpts, 0);
+#endif
 
-const u32 kAlLatencySamples = QI_SOUND_SAMPLES_PER_SECOND / 1000 * QI_SOUND_REQUESTED_LATENCY_MS;
-
-internal void
-InitOpenAL(void)
-{
-	if (alcIsExtensionPresent(nullptr, "ALC_ENUMERATION_EXT"))
+	if (FAILED(g.sound.xaudio->CreateMasteringVoice(&g.sound.masteringVoice)))
 	{
-		const ALCchar* devList = CHECK_AL(alcGetString(nullptr, ALC_DEVICE_SPECIFIER));
-		OutputDebugString("OpenAL Devices:\n");
-		while (devList && *devList != 0)
-		{
-			OutputDebugString(devList);
-			OutputDebugString("\n");
-			devList += strlen(devList) + 1;
-		}
+		OutputDebugString("Failed to create mastering voice\n");
+		return;
 	}
-	g.sound.alDevice  = CHECK_AL(alcOpenDevice(nullptr));
 
-    ALCint params[] = {
-        ALC_FREQUENCY, QI_SOUND_SAMPLES_PER_SECOND,
-        ALC_REFRESH, 1000 / (QI_SOUND_REQUESTED_LATENCY_MS / 4),
-        0, 0
-    };
-	g.sound.alContext = CHECK_AL(alcCreateContext(g.sound.alDevice, params));
-	if (!alcMakeContextCurrent(g.sound.alContext))
-		OutputDebugString("Couldn't make OpenAL context current!\n");
-	CheckAlError();
+	WAVEFORMATEX waveFormat    = {};
+	waveFormat.wFormatTag      = WAVE_FORMAT_PCM;
+	waveFormat.nChannels       = QI_SOUND_CHANNELS;
+	waveFormat.nSamplesPerSec  = QI_SOUND_SAMPLES_PER_SECOND;
+	waveFormat.nAvgBytesPerSec = QI_SOUND_BYTES_PER_SAMPLE * QI_SOUND_SAMPLES_PER_SECOND;
+	waveFormat.nBlockAlign     = QI_SOUND_BYTES_PER_SAMPLE;
+	waveFormat.wBitsPerSample  = (QI_SOUND_BYTES_PER_SAMPLE / QI_SOUND_CHANNELS) * 8;
+	waveFormat.cbSize          = 0;
 
-	// Create source & buffers
-	CHECK_AL(alGenSources(1, &g.sound.source));
-	CHECK_AL(alGenBuffers(AL_NUM_BUFFERS, g.sound.buffers));
-
-	// Initialize buffers w/silence and enqueue
-	const size_t bufferBytes = kAlLatencySamples * QI_SOUND_BYTES_PER_SAMPLE;
-	u16*         tempBuf     = (u16*)malloc(bufferBytes);
-	memset(tempBuf, 0, bufferBytes);
-	for (u32 bufIdx = 0; bufIdx < AL_NUM_BUFFERS; bufIdx++)
+	if (FAILED(
+	        g.sound.xaudio->CreateSourceVoice(&g.sound.sourceVoice, &waveFormat, 0, 1.0f, nullptr, nullptr, nullptr)))
 	{
-		CHECK_AL(alBufferData(
-		    g.sound.buffers[bufIdx], AL_FORMAT_STEREO16, tempBuf, bufferBytes, QI_SOUND_SAMPLES_PER_SECOND));
-		CHECK_AL(alSourceQueueBuffers(g.sound.source, 1, &g.sound.buffers[bufIdx]));
+		OutputDebugString("Failed to create source voice\n");
+		return;
 	}
+
+    g.sound.sourceVoice->Start( 0, 0 );
+
+    Qis_MakeSoundBuffer( &g.soundUpdateBuffer, XA_UPDATE_BUFFER_SAMPLES, QI_SOUND_CHANNELS, QI_SOUND_SAMPLES_PER_SECOND);
 }
 
 internal void
 Win32UpdateSound()
 {
-	ALint buffersProcessed = 0;
+    static r64 lastTime = 0.0;
+    if ( lastTime == 0.0 )
+    {
+        lastTime = QiPlat_WallSeconds();
+    }
+    else
+    {
+        r64 curTime = QiPlat_WallSeconds();
+        u32 elapsedMs = (u32)((curTime - lastTime) * 1000.0);
+#if HAS(DEV_BUILD)
+        if (elapsedMs > QI_SOUND_REQUESTED_LATENCY_MS)
+        {
+			char msg[1024];
+			snprintf(msg,
+			         sizeof(msg),
+			         "Missed audio update, requested latency %d ms since last call %d\n",
+			         QI_SOUND_REQUESTED_LATENCY_MS,
+			         elapsedMs);
+			OutputDebugString(msg);
+		}
+#else
+		Assert(elapsedMs < QI_SOUND_REQUESTED_LATENCY_MS);
+#endif
+		lastTime = curTime;
+    }
 
-	CHECK_AL(alGetSourcei(g.sound.source, AL_BUFFERS_PROCESSED, &buffersProcessed));
-	while (buffersProcessed)
+	XAUDIO2_VOICE_STATE xstate;
+	g.sound.sourceVoice->GetState(&xstate, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+	i32 bufsToQueue = XA_NUM_BUFFERS - xstate.BuffersQueued;
+
+#if 0
+    if ( bufsToQueue > 0 )
+    {
+        char msg[1024];
+		snprintf(msg, sizeof(msg), "Queueing %d bufs\n", bufsToQueue);
+        OutputDebugString(msg);
+	}
+#endif
+
+	XAUDIO2_BUFFER xaBuf = {};
+	xaBuf.AudioBytes     = XA_UPDATE_BUFFER_BYTES;
+
+	for (i32 buf = 0; buf < bufsToQueue; buf++)
 	{
-		ALuint buffer = 0;
+		i32            bufIdx    = g.sound.buffersSubmitted % XA_NUM_BUFFERS;
+		u8* curBuffer = &g.sound.buffers[bufIdx][0];
 
-		CHECK_AL(alSourceUnqueueBuffers(g.sound.source, 1, &buffer));
+		Qis_UpdateSound(&g.soundUpdateBuffer, XA_UPDATE_BUFFER_SAMPLES);
+        memcpy(curBuffer, g.soundUpdateBuffer.samples, XA_UPDATE_BUFFER_BYTES);
 
-		Qis_UpdateSound(&g.soundUpdateBuffer, kAlLatencySamples);
-
-		CHECK_AL(alBufferData(buffer,
-		                      AL_FORMAT_STEREO16,
-		                      g.soundUpdateBuffer.samples,
-		                      kAlLatencySamples * g.soundUpdateBuffer.bytesPerSample,
-		                      g.soundUpdateBuffer.samplesPerSec));
-		CHECK_AL(alSourceQueueBuffers(g.sound.source, 1, &buffer));
-		buffersProcessed--;
+		xaBuf.pAudioData = curBuffer;
+		g.sound.sourceVoice->SubmitSourceBuffer(&xaBuf);
+		g.sound.buffersSubmitted++;
 	}
 
-	ALint sourceState = 0;
-	CHECK_AL(alGetSourcei(g.sound.source, AL_SOURCE_STATE, &sourceState));
-
-	if (sourceState != AL_PLAYING)
-	{
-		ALint numQueued = 0;
-		CHECK_AL(alGetSourcei(g.sound.source, AL_BUFFERS_QUEUED, &numQueued));
-		if (numQueued > 0)
-		{
-			CHECK_AL(alSourcePlay(g.sound.source));
-		}
-		else
-		{
-			OutputDebugString("Sound underflow??\n");
-		}
-	}
+#if HAS(DEV_BUILD) && 0
+    XAUDIO2_PERFORMANCE_DATA perfDat = {};
+    g.sound.xaudio->GetPerformanceData(&perfDat);
+#endif
 }
-
 
 int CALLBACK
 WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
@@ -630,10 +639,8 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 
 	if (g.wnd)
 	{
-		InitOpenAL();
+		InitXAudio2();
 		timeBeginPeriod(1);
-
-		Qis_MakeSoundBuffer(&g.soundUpdateBuffer, QI_SOUND_SAMPLES_PER_SECOND, 2, QI_SOUND_SAMPLES_PER_SECOND);
 
 		HDC dc = GetDC(g.wnd);
 
@@ -685,31 +692,33 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 
 			g.inputState = newInput;
 
-            Win32UpdateSound();
+			Win32UpdateSound();
 			Qi_GameUpdateAndRender(&g.memory, &g.inputState, &g.frameBuffer.bitmap);
 			QiProf_DrawTicks(&g.frameBuffer.bitmap, fpsTicks, countof(fpsTicks), 1024, 10, 50, 0);
 
 			const r64 secondsPerFrame = 1.0 / TARGET_FPS;
 
 			r64 frameElapsed = QiPlat_WallSeconds() - frameStart;
+            u32 maxSoundSleepMS = QI_SOUND_REQUESTED_LATENCY_MS / XA_NUM_BUFFERS;
+
 			if (frameElapsed < secondsPerFrame)
 			{
-                u32 msToSleep = (u32)(1000.0 * (secondsPerFrame - frameElapsed));
-                while( msToSleep > QI_SOUND_REQUESTED_LATENCY_MS / 2)
-                {
-                    Sleep((DWORD)msToSleep);
-                    msToSleep -= (QI_SOUND_REQUESTED_LATENCY_MS / 2);
-                    Win32UpdateSound();
-                }
+				u32 msToSleep = (u32)(1000.0 * (secondsPerFrame - frameElapsed));
+				while (msToSleep > maxSoundSleepMS)
+				{
+					Win32UpdateSound();
+					Sleep((DWORD)maxSoundSleepMS);
+                    msToSleep -= maxSoundSleepMS;
+				}
 
 				if (msToSleep > 0)
 					Sleep(msToSleep);
 
 				while (frameElapsed < secondsPerFrame)
-                {
+				{
+					Win32UpdateSound();
 					frameElapsed = QiPlat_WallSeconds() - frameStart;
-                    Win32UpdateSound();
-                }
+				}
 			}
 			else
 			{
@@ -717,7 +726,6 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 			}
 
 			frameStart = QiPlat_WallSeconds();
-
 			UpdateWindow(dc, &g.frameBuffer);
 		}
 	}

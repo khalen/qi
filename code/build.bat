@@ -23,7 +23,7 @@ set DEBUG=-Z7
 set ALLBUILDOPTS=-GR- -EHa -MT
 
 set LINK_OPTS=/LIBPATH:%THIRDPARTY%\OpenAL\libs\Win64
-set LIBS=user32.lib gdi32.lib winmm.lib OpenAL32.lib
+set LIBS=user32.lib gdi32.lib winmm.lib OpenAL32.lib xaudio2.lib
 
 cl -nologo %ALLBUILDOPS% %WARNINGS% %OPTIMIZATIONS% %DEBUG% %DEFINES% %INCLUDE_DIRS% %SOURCE_DIR%\win32_qi.cpp %LIBS% /link %LINK_OPTS%
 
