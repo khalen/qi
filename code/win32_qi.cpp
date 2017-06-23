@@ -48,9 +48,13 @@ struct Globals_s
 	u32             cursorBuf[16];
 	u32             curCursorPos;
 
+	char gameEXEPath[MAX_PATH];
+    char gameRecordBasePath[MAX_PATH];
+
 	HMODULE            gameDLL;
 	FILETIME           gameDLLLastWriteTime;
 	char               gameDLLPath[MAX_PATH];
+	char               gameDLLOrigPath[MAX_PATH];
 	const GameFuncs_s* game;
 
 	HANDLE loopingFile;
@@ -82,6 +86,57 @@ XINPUT_SET_STATE(XInputSetStateStub)
 }
 internal impXInputSetState* XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
+
+internal char*
+StringCopy(char* dest, size_t destSize, const char* src)
+{
+	Assert(dest && src && destSize < UINT_MAX);
+
+	size_t chrPos = 0;
+	while (*src && chrPos < destSize - 1)
+	{
+		dest[chrPos] = src[chrPos];
+		chrPos++;
+	}
+
+	dest[chrPos] = 0;
+	return dest;
+}
+
+// Note: byte length, not string length ie. doesn't parse utf8
+internal size_t
+StringLen(const char* const src)
+{
+	Assert(src);
+
+	const char* cur = src;
+	while (*cur)
+		cur++;
+	return cur - src;
+}
+
+// Note: NOT strncat() semantics!! dstTotalSize is the total size of the destination buffer, not
+// (as in strncat) the -remaining- size.
+internal char*
+StringAppend(char* dest, size_t dstTotalSize, const char* src)
+{
+	Assert(dest && src && dstTotalSize > 0);
+
+	const char* const lastValidDstPos = dest + dstTotalSize - 1;
+	char*             curDestPos      = dest + StringLen(dest);
+	while (*src && curDestPos < lastValidDstPos)
+		*curDestPos++ = *src++;
+	*curDestPos       = 0;
+	return dest;
+}
+
+internal void
+MakeGameEXERelativePath(char* dst, const char* filename)
+{
+    StringCopy(dst, MAX_PATH, g.gameEXEPath);
+    StringAppend(dst, MAX_PATH, filename);
+    ;
+}
 
 double
 Qi_WallSeconds()
@@ -210,7 +265,7 @@ internal void
 LoadGameDLL()
 {
 	WIN32_FILE_ATTRIBUTE_DATA fileData = {};
-	if (GetFileAttributesEx(g.gameDLLPath, GetFileExInfoStandard, &fileData))
+	if (GetFileAttributesEx(g.gameDLLOrigPath, GetFileExInfoStandard, &fileData))
 	{
 		if (fileData.ftLastWriteTime.dwLowDateTime == g.gameDLLLastWriteTime.dwLowDateTime
 		    && fileData.ftLastWriteTime.dwHighDateTime == g.gameDLLLastWriteTime.dwHighDateTime)
@@ -228,9 +283,10 @@ LoadGameDLL()
 
 	OutputDebugString("Loading Game DLL\n");
 
-	CopyFile(g.gameDLLPath, TMP_DLL_NAME, FALSE);
+	CopyFile(g.gameDLLOrigPath, g.gameDLLPath, FALSE);
 
-	g.gameDLL = LoadLibrary(TMP_DLL_NAME);
+	g.gameDLL = LoadLibrary(g.gameDLLPath);
+
 	if (g.gameDLL)
 	{
 		typedef const GameFuncs_s* GetGameFuncs_f();
@@ -279,22 +335,16 @@ InitGlobals()
 	g.memory.transientPos = g.memory.transientStorage;
 
 	// Set up module path
-	char  exeName[MAX_PATH];
-	DWORD fileNameLen   = GetModuleFileNameA(0, exeName, sizeof(exeName));
-	char* pastLastSlash = exeName;
+	DWORD fileNameLen   = GetModuleFileNameA(0, g.gameEXEPath, sizeof(g.gameEXEPath));
+	char* pastLastSlash = g.gameEXEPath;
 	for (u32 i = 0; i < fileNameLen; i++)
-		if (exeName[i] == '\\')
-			pastLastSlash = exeName + i + 1;
+		if (g.gameEXEPath[i] == '\\')
+			pastLastSlash = g.gameEXEPath + i + 1;
+    *pastLastSlash = 0;
 
-	const char* gameDLLName = GAME_DLL_NAME;
-	while (*gameDLLName)
-		*pastLastSlash++ = *gameDLLName++;
-	*pastLastSlash       = 0;
-
-	const char* gameDLLPathSrc = exeName;
-	char*       gameDLLPathDst = g.gameDLLPath;
-	while (*gameDLLPathSrc)
-		*gameDLLPathDst++ = *gameDLLPathSrc++;
+    MakeGameEXERelativePath(g.gameDLLOrigPath, GAME_DLL_NAME);
+    MakeGameEXERelativePath(g.gameDLLPath, TMP_DLL_NAME);
+    MakeGameEXERelativePath(g.gameRecordBasePath, "qi_");
 
 	LoadGameDLL();
 
@@ -453,49 +503,6 @@ ProcessKeyboardButton(Button_s* button, bool isDown)
 	button->endedDown = isDown;
 }
 
-internal char*
-StringCopy(char* dest, const char* src, size_t destSize)
-{
-	Assert(dest && src && destSize < UINT_MAX);
-
-	size_t chrPos = 0;
-	while (*src && chrPos < destSize - 1)
-	{
-		dest[chrPos] = src[chrPos];
-		chrPos++;
-	}
-
-	dest[chrPos] = 0;
-	return dest;
-}
-
-// Note: byte length, not string length ie. doesn't parse utf8
-internal size_t
-StringLen(const char* const src)
-{
-	Assert(src);
-
-	const char* cur = src;
-	while (*cur)
-		cur++;
-	return cur - src;
-}
-
-// Note: NOT strncat() semantics!! dstTotalSize is the total size of the destination buffer, not
-// (as in strncat) the -remaining- size.
-internal char*
-StringAppend(char* dest, const char* src, size_t dstTotalSize)
-{
-	Assert(dest && src && dstTotalSize > 0);
-
-	const char* const lastValidDstPos = dest + dstTotalSize - 1;
-	char*             curDestPos      = dest + StringLen(dest);
-	while (*src && curDestPos < lastValidDstPos)
-		*curDestPos++ = *src++;
-	*curDestPos       = 0;
-	return dest;
-}
-
 internal const char*
 IntToString(const i32 src)
 {
@@ -525,16 +532,15 @@ IntToString(const i32 src)
 	return result;
 }
 
-#define LOOP_FILE_NAME "qi"
 #define LOOP_FILE_EXT ".rec"
 
 internal const char*
 GetLoopingChannelFileName(i32 channel)
 {
 	static char loopFile[MAX_PATH];
-	StringCopy(loopFile, LOOP_FILE_NAME, sizeof(loopFile));
-	StringAppend(loopFile, IntToString(channel), sizeof(loopFile));
-	StringAppend(loopFile, LOOP_FILE_EXT, sizeof(loopFile));
+	StringCopy(loopFile, sizeof(loopFile), g.gameRecordBasePath);
+	StringAppend(loopFile, sizeof(loopFile), IntToString(channel));
+	StringAppend(loopFile, sizeof(loopFile), LOOP_FILE_EXT);
 	return loopFile;
 }
 
