@@ -1,14 +1,9 @@
 #include "basictypes.h"
 #include "qi.h"
-
-#include "qi_profile.cpp"
-#include "qi.cpp"
-#include "qi_math.cpp"
-#include "qi_sound.cpp"
+#include "qi_sound.h"
+#include "qi_debug.h"
 
 #include <Windows.h>
-#include <al.h>
-#include <alc.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <Xinput.h>
@@ -23,7 +18,7 @@ struct WindowsBitmap_s
 	BITMAPINFO bmi;
 };
 
-#define XA_NUM_BUFFERS 2
+#define XA_NUM_BUFFERS 3
 #define XA_UPDATE_BUFFER_SAMPLES (u32)(QI_SOUND_SAMPLES_PER_SECOND / 1000.0f * QI_SOUND_REQUESTED_LATENCY_MS + 0.5f)
 #define XA_UPDATE_BUFFER_BYTES (XA_UPDATE_BUFFER_SAMPLES * QI_SOUND_BYTES_PER_SAMPLE)
 
@@ -47,11 +42,21 @@ struct Globals_s
 
 	WindowsBitmap_s frameBuffer;
 	Sound_s         sound;
-	SoundBuffer_s   soundUpdateBuffer;
+	SoundBuffer_s*  soundUpdateBuffer;
 	Input_s         inputState;
 	Memory_s        memory;
 	u32             cursorBuf[16];
 	u32             curCursorPos;
+
+	HMODULE            gameDLL;
+	FILETIME           gameDLLLastWriteTime;
+	char               gameDLLPath[MAX_PATH];
+	const GameFuncs_s* game;
+
+	HANDLE loopingFile;
+	i32    recordingChannel;
+	i32    playbackChannel;
+	bool   isLooping;
 } g;
 
 #define NOTE_UNUSED(x) ((void)x);
@@ -79,7 +84,7 @@ internal impXInputSetState* XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
 
 double
-QiPlat_WallSeconds()
+Qi_WallSeconds()
 {
 	LARGE_INTEGER curCounter;
 	i64           deltaCounter;
@@ -200,6 +205,41 @@ OnSize(HWND wnd)
 	return 0;
 }
 
+#define TMP_DLL_NAME "qi_game_runtime.dll"
+internal void
+LoadGameDLL()
+{
+	WIN32_FILE_ATTRIBUTE_DATA fileData = {};
+	if (GetFileAttributesEx(g.gameDLLPath, GetFileExInfoStandard, &fileData))
+	{
+		if (fileData.ftLastWriteTime.dwLowDateTime == g.gameDLLLastWriteTime.dwLowDateTime
+		    && fileData.ftLastWriteTime.dwHighDateTime == g.gameDLLLastWriteTime.dwHighDateTime)
+			return;
+
+		g.gameDLLLastWriteTime = fileData.ftLastWriteTime;
+	}
+
+	if (g.gameDLL != nullptr)
+	{
+		FreeLibrary(g.gameDLL);
+		g.gameDLL = nullptr;
+		g.game    = nullptr;
+	}
+
+	OutputDebugString("Loading Game DLL\n");
+
+	CopyFile(g.gameDLLPath, TMP_DLL_NAME, FALSE);
+
+	g.gameDLL = LoadLibrary(TMP_DLL_NAME);
+	if (g.gameDLL)
+	{
+		typedef const GameFuncs_s* GetGameFuncs_f();
+		GetGameFuncs_f*            GetGameFuncs = (GetGameFuncs_f*)GetProcAddress(g.gameDLL, "Qi_GetGameFuncs");
+		Assert(GetGameFuncs);
+		g.game = GetGameFuncs();
+	}
+}
+
 internal void
 InitGlobals()
 {
@@ -237,6 +277,33 @@ InitGlobals()
 	    = (u8*)VirtualAlloc((void*)baseAddressTrans, g.memory.transientSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	Assert(g.memory.transientStorage != nullptr);
 	g.memory.transientPos = g.memory.transientStorage;
+
+	// Set up module path
+	char  exeName[MAX_PATH];
+	DWORD fileNameLen   = GetModuleFileNameA(0, exeName, sizeof(exeName));
+	char* pastLastSlash = exeName;
+	for (u32 i = 0; i < fileNameLen; i++)
+		if (exeName[i] == '\\')
+			pastLastSlash = exeName + i + 1;
+
+	const char* gameDLLName = GAME_DLL_NAME;
+	while (*gameDLLName)
+		*pastLastSlash++ = *gameDLLName++;
+	*pastLastSlash       = 0;
+
+	const char* gameDLLPathSrc = exeName;
+	char*       gameDLLPathDst = g.gameDLLPath;
+	while (*gameDLLPathSrc)
+		*gameDLLPathDst++ = *gameDLLPathSrc++;
+
+	LoadGameDLL();
+
+	Assert(g.game && g.game->sound);
+#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
+	Assert(g.game->debug);
+#endif
+
+	g.game->Init(plat);
 }
 
 internal void
@@ -386,6 +453,203 @@ ProcessKeyboardButton(Button_s* button, bool isDown)
 	button->endedDown = isDown;
 }
 
+internal char*
+StringCopy(char* dest, const char* src, size_t destSize)
+{
+	Assert(dest && src && destSize < UINT_MAX);
+
+	size_t chrPos = 0;
+	while (*src && chrPos < destSize - 1)
+	{
+		dest[chrPos] = src[chrPos];
+		chrPos++;
+	}
+
+	dest[chrPos] = 0;
+	return dest;
+}
+
+// Note: byte length, not string length ie. doesn't parse utf8
+internal size_t
+StringLen(const char* const src)
+{
+	Assert(src);
+
+	const char* cur = src;
+	while (*cur)
+		cur++;
+	return cur - src;
+}
+
+// Note: NOT strncat() semantics!! dstTotalSize is the total size of the destination buffer, not
+// (as in strncat) the -remaining- size.
+internal char*
+StringAppend(char* dest, const char* src, size_t dstTotalSize)
+{
+	Assert(dest && src && dstTotalSize > 0);
+
+	const char* const lastValidDstPos = dest + dstTotalSize - 1;
+	char*             curDestPos      = dest + StringLen(dest);
+	while (*src && curDestPos < lastValidDstPos)
+		*curDestPos++ = *src++;
+	*curDestPos       = 0;
+	return dest;
+}
+
+internal const char*
+IntToString(const i32 src)
+{
+	static char result[12];
+	char        tmpBuf[12]; // Max length of an int in ascii + room for minus sign + null terminator
+
+	i32        tmpPos     = 0;
+	const bool isNegative = (src < 0);
+
+	i32 absSrc = src & 0x7FFFFFFF;
+	while (absSrc >= 10)
+	{
+		tmpBuf[tmpPos++] = (absSrc % 10) + '0';
+		absSrc /= 10;
+	}
+	tmpBuf[tmpPos] = (char)(absSrc + '0');
+
+	if (isNegative)
+		tmpBuf[++tmpPos] = '-';
+
+	i32 resultPos = 0;
+
+	for (resultPos        = 0; tmpPos >= 0; tmpPos--, resultPos++)
+		result[resultPos] = tmpBuf[tmpPos];
+	result[resultPos]     = 0;
+
+	return result;
+}
+
+#define LOOP_FILE_NAME "qi"
+#define LOOP_FILE_EXT ".rec"
+
+internal const char*
+GetLoopingChannelFileName(i32 channel)
+{
+	static char loopFile[MAX_PATH];
+	StringCopy(loopFile, LOOP_FILE_NAME, sizeof(loopFile));
+	StringAppend(loopFile, IntToString(channel), sizeof(loopFile));
+	StringAppend(loopFile, LOOP_FILE_EXT, sizeof(loopFile));
+	return loopFile;
+}
+
+void
+BeginPlayback(i32 channel)
+{
+	Assert(channel > 0);
+	Assert(!g.playbackChannel);
+	Assert(!g.recordingChannel);
+	Assert(!g.loopingFile);
+
+	g.loopingFile = CreateFileA(
+	    GetLoopingChannelFileName(channel), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (g.loopingFile == nullptr)
+		return;
+
+	DWORD memSize;
+	DWORD bytesRead = 0;
+	if (ReadFile(g.loopingFile, &memSize, sizeof(memSize), &bytesRead, nullptr) && bytesRead == sizeof(memSize))
+	{
+		ReadFile(g.loopingFile, g.memory.permanentStorage, memSize, &bytesRead, nullptr);
+		if (bytesRead != memSize)
+		{
+			OutputDebugString("Failed to read memory block on playback\n");
+			CloseHandle(g.loopingFile);
+			return;
+		}
+	}
+
+	g.playbackChannel = channel;
+}
+
+void
+EndPlayback()
+{
+	Assert(g.playbackChannel > 0);
+	CloseHandle(g.loopingFile);
+	g.loopingFile     = nullptr;
+	g.playbackChannel = 0;
+}
+
+bool
+PlaybackInput(Input_s* input)
+{
+	DWORD bytesRead = 0;
+	ReadFile(g.loopingFile, input, sizeof(*input), &bytesRead, nullptr);
+	if (bytesRead != sizeof(*input))
+	{
+		i32 curChannel = g.playbackChannel;
+		EndPlayback();
+		BeginPlayback(curChannel);
+		if (!PlaybackInput(input))
+		{
+			EndPlayback();
+		}
+		else
+		{
+			return true;
+		}
+	}
+	else
+	{
+		return true;
+	}
+
+	return false;
+}
+
+void
+BeginRecording(i32 channel)
+{
+	Assert(channel > 0);
+	Assert(!g.recordingChannel);
+
+	// Support going from looping straight back to recording
+	if (g.loopingFile != nullptr)
+	{
+		CloseHandle(g.loopingFile);
+		g.loopingFile     = nullptr;
+		g.playbackChannel = 0;
+	}
+
+	Assert(g.loopingFile == nullptr);
+	g.loopingFile = CreateFileA(
+	    GetLoopingChannelFileName(channel), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (g.loopingFile != nullptr)
+	{
+		DWORD permSize     = (DWORD)(g.memory.permanentPos - g.memory.permanentStorage);
+		DWORD bytesWritten = 0;
+		WriteFile(g.loopingFile, &permSize, sizeof(permSize), &bytesWritten, nullptr);
+		Assert(bytesWritten == sizeof(permSize));
+		WriteFile(g.loopingFile, g.memory.permanentStorage, permSize, &bytesWritten, nullptr);
+		Assert(bytesWritten == permSize);
+	}
+	g.recordingChannel = channel;
+}
+
+void
+RecordInput(const Input_s* input)
+{
+	Assert(g.recordingChannel > 0 && g.loopingFile != nullptr);
+	DWORD bytesWritten = 0;
+	WriteFile(g.loopingFile, input, sizeof(*input), &bytesWritten, nullptr);
+	Assert(bytesWritten == sizeof(*input));
+}
+
+void
+EndRecording()
+{
+	Assert(g.recordingChannel > 0 && g.loopingFile != nullptr);
+	CloseHandle(g.loopingFile);
+	g.loopingFile      = nullptr;
+	g.recordingChannel = 0;
+}
+
 void
 ProcessKeyboardMessage(Input_s* newInput, MSG* message)
 {
@@ -451,13 +715,28 @@ ProcessKeyboardMessage(Input_s* newInput, MSG* message)
 		else if (vkCode == VK_SPACE)
 		{
 		}
-		else
+		else if (vkCode == 'L' && isDown)
 		{
+			if (g.recordingChannel > 0)
+			{
+				i32 curChannel = g.recordingChannel;
+				EndRecording();
+				BeginPlayback(curChannel);
+			}
+			else if (g.playbackChannel > 0)
+			{
+				EndPlayback();
+			}
+			else
+			{
+				BeginRecording(1);
+			}
 		}
 	}
 	break;
 	}
 }
+
 LRESULT CALLBACK
 WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -514,10 +793,10 @@ InitXAudio2(void)
 	}
 
 #if HAS(DEV_BUILD) && 0
-    XAUDIO2_DEBUG_CONFIGURATION dbgOpts = {};
-    dbgOpts.TraceMask = XAUDIO2_LOG_ERRORS | XAUDIO2_LOG_WARNINGS;
-    dbgOpts.BreakMask = XAUDIO2_LOG_ERRORS;
-    g.sound.xaudio->SetDebugConfiguration(&dbgOpts, 0);
+	XAUDIO2_DEBUG_CONFIGURATION dbgOpts = {};
+	dbgOpts.TraceMask                   = XAUDIO2_LOG_ERRORS | XAUDIO2_LOG_WARNINGS;
+	dbgOpts.BreakMask                   = XAUDIO2_LOG_ERRORS;
+	g.sound.xaudio->SetDebugConfiguration(&dbgOpts, 0);
 #endif
 
 	if (FAILED(g.sound.xaudio->CreateMasteringVoice(&g.sound.masteringVoice)))
@@ -542,26 +821,27 @@ InitXAudio2(void)
 		return;
 	}
 
-    g.sound.sourceVoice->Start( 0, 0 );
+	g.sound.sourceVoice->Start(0, 0);
 
-    Qis_MakeSoundBuffer( &g.soundUpdateBuffer, XA_UPDATE_BUFFER_SAMPLES, QI_SOUND_CHANNELS, QI_SOUND_SAMPLES_PER_SECOND);
+	g.soundUpdateBuffer = g.game->sound->MakeBuffer(
+	    &g.memory, XA_UPDATE_BUFFER_SAMPLES, QI_SOUND_CHANNELS, QI_SOUND_SAMPLES_PER_SECOND);
 }
 
 internal void
 Win32UpdateSound()
 {
-    static r64 lastTime = 0.0;
-    if ( lastTime == 0.0 )
-    {
-        lastTime = QiPlat_WallSeconds();
-    }
-    else
-    {
-        r64 curTime = QiPlat_WallSeconds();
-        u32 elapsedMs = (u32)((curTime - lastTime) * 1000.0);
+	static r64 lastTime = 0.0;
+	if (lastTime == 0.0)
+	{
+		lastTime = Qi_WallSeconds();
+	}
+	else
+	{
+		r64 curTime   = Qi_WallSeconds();
+		u32 elapsedMs = (u32)((curTime - lastTime) * 1000.0);
 #if HAS(DEV_BUILD)
-        if (elapsedMs > QI_SOUND_REQUESTED_LATENCY_MS)
-        {
+		if (elapsedMs > QI_SOUND_REQUESTED_LATENCY_MS)
+		{
 			char msg[1024];
 			snprintf(msg,
 			         sizeof(msg),
@@ -574,41 +854,27 @@ Win32UpdateSound()
 		Assert(elapsedMs < QI_SOUND_REQUESTED_LATENCY_MS);
 #endif
 		lastTime = curTime;
-    }
+	}
 
 	XAUDIO2_VOICE_STATE xstate;
 	g.sound.sourceVoice->GetState(&xstate, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 	i32 bufsToQueue = XA_NUM_BUFFERS - xstate.BuffersQueued;
-
-#if 0
-    if ( bufsToQueue > 0 )
-    {
-        char msg[1024];
-		snprintf(msg, sizeof(msg), "Queueing %d bufs\n", bufsToQueue);
-        OutputDebugString(msg);
-	}
-#endif
 
 	XAUDIO2_BUFFER xaBuf = {};
 	xaBuf.AudioBytes     = XA_UPDATE_BUFFER_BYTES;
 
 	for (i32 buf = 0; buf < bufsToQueue; buf++)
 	{
-		i32            bufIdx    = g.sound.buffersSubmitted % XA_NUM_BUFFERS;
+		i32 bufIdx    = g.sound.buffersSubmitted % XA_NUM_BUFFERS;
 		u8* curBuffer = &g.sound.buffers[bufIdx][0];
 
-		Qis_UpdateSound(&g.soundUpdateBuffer, XA_UPDATE_BUFFER_SAMPLES);
-        memcpy(curBuffer, g.soundUpdateBuffer.samples, XA_UPDATE_BUFFER_BYTES);
+		g.game->sound->Update(g.soundUpdateBuffer, XA_UPDATE_BUFFER_SAMPLES);
+		memcpy(curBuffer, g.soundUpdateBuffer->samples, XA_UPDATE_BUFFER_BYTES);
 
 		xaBuf.pAudioData = curBuffer;
 		g.sound.sourceVoice->SubmitSourceBuffer(&xaBuf);
 		g.sound.buffersSubmitted++;
 	}
-
-#if HAS(DEV_BUILD) && 0
-    XAUDIO2_PERFORMANCE_DATA perfDat = {};
-    g.sound.xaudio->GetPerformanceData(&perfDat);
-#endif
 }
 
 int CALLBACK
@@ -644,7 +910,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 
 		HDC dc = GetDC(g.wnd);
 
-		r64 frameStart = QiPlat_WallSeconds();
+		r64 frameStart = Qi_WallSeconds();
 
 		u32 fpsTicks[5];
 		u32 cps = (u32)(1024.0f / TARGET_FPS * 2);
@@ -657,6 +923,8 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 		while (g.gameRunning)
 		{
 			Input_s newInput = {};
+
+			LoadGameDLL();
 
 			Controller_s*       kbdController = &newInput.controllers[KBD];
 			const Controller_s* oldController = &g.inputState.controllers[KBD];
@@ -693,13 +961,23 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 			g.inputState = newInput;
 
 			Win32UpdateSound();
-			Qi_GameUpdateAndRender(&g.memory, &g.inputState, &g.frameBuffer.bitmap);
-			QiProf_DrawTicks(&g.frameBuffer.bitmap, fpsTicks, countof(fpsTicks), 1024, 10, 50, 0);
+
+			if (g.recordingChannel > 0)
+				RecordInput(&g.inputState);
+
+			if (g.playbackChannel > 0)
+				PlaybackInput(&g.inputState);
+
+			g.game->UpdateAndRender(&g.memory, &g.inputState, &g.frameBuffer.bitmap);
+
+#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
+			g.game->debug->DrawTicks(&g.frameBuffer.bitmap, fpsTicks, countof(fpsTicks), 1024, 10, 50, 0);
+#endif
 
 			const r64 secondsPerFrame = 1.0 / TARGET_FPS;
 
-			r64 frameElapsed = QiPlat_WallSeconds() - frameStart;
-            u32 maxSoundSleepMS = QI_SOUND_REQUESTED_LATENCY_MS / XA_NUM_BUFFERS;
+			r64 frameElapsed    = Qi_WallSeconds() - frameStart;
+			u32 maxSoundSleepMS = QI_SOUND_REQUESTED_LATENCY_MS / XA_NUM_BUFFERS;
 
 			if (frameElapsed < secondsPerFrame)
 			{
@@ -708,7 +986,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				{
 					Win32UpdateSound();
 					Sleep((DWORD)maxSoundSleepMS);
-                    msToSleep -= maxSoundSleepMS;
+					msToSleep -= maxSoundSleepMS;
 				}
 
 				if (msToSleep > 0)
@@ -717,7 +995,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				while (frameElapsed < secondsPerFrame)
 				{
 					Win32UpdateSound();
-					frameElapsed = QiPlat_WallSeconds() - frameStart;
+					frameElapsed = Qi_WallSeconds() - frameStart;
 				}
 			}
 			else
@@ -725,7 +1003,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				// TODO: Log missed frame
 			}
 
-			frameStart = QiPlat_WallSeconds();
+			frameStart = Qi_WallSeconds();
 			UpdateWindow(dc, &g.frameBuffer);
 		}
 	}
@@ -736,3 +1014,9 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 
 	return 0;
 }
+
+// Interface to game DLL
+internal PlatFuncs_s s_plat = {
+    Qi_ReadEntireFile, Qi_WriteEntireFile, Qi_ReleaseFileBuffer, Qi_WallSeconds,
+};
+const PlatFuncs_s* plat = &s_plat;

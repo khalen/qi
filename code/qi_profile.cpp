@@ -14,7 +14,7 @@
 #define BORDER_SIZE 10
 
 void
-QiProf_DrawProfileBox(Bitmap_s* bitmap, const u32 x, const u32 y, const u32 wid, const u32 hgt, const u32 color)
+Qid_DrawProfileBox(Bitmap_s* bitmap, const u32 x, const u32 y, const u32 wid, const u32 hgt, const u32 color)
 {
 	Assert(x + wid < bitmap->width && y + hgt < bitmap->height);
 	u32* curPtr = bitmap->pixels + x + y * bitmap->pitch;
@@ -29,7 +29,7 @@ QiProf_DrawProfileBox(Bitmap_s* bitmap, const u32 x, const u32 y, const u32 wid,
 }
 
 void
-QiProf_DrawTicks(Bitmap_s*  bitmap,
+Qid_DrawTicks(Bitmap_s*  bitmap,
                  const u32* tickBuf,
                  const u32  tickCount,
                  const u32  largestTickValue,
@@ -42,12 +42,12 @@ QiProf_DrawTicks(Bitmap_s*  bitmap,
 	for (u32 tick = 0; tick < tickCount; tick++)
 	{
         u32 tickPos = (u32)(tickBuf[tick] * tickScale + 0.5f) + BORDER_SIZE;
-		QiProf_DrawProfileBox(bitmap, tickPos, yOff + BORDER_SIZE, 1, ySize, color);
+		Qid_DrawProfileBox(bitmap, tickPos, yOff + BORDER_SIZE, 1, ySize, color);
 	}
 }
 
 void
-QiProf_DrawBars(Bitmap_s*  bitmap,
+Qid_DrawBars(Bitmap_s*  bitmap,
                 const u32* widthBuf,
                 const u32  widthCount,
                 const u32  maxWidth,
@@ -65,7 +65,7 @@ QiProf_DrawBars(Bitmap_s*  bitmap,
 		u32       barWidth = (u32)(widthBuf[bar] * barScale);
 		const u32 x        = Qi_Clamp(xPos, 0u, rightBorder);
 		const u32 xr       = Qi_Clamp<u32>(xPos + barWidth, 0u, rightBorder);
-        QiProf_DrawProfileBox(bitmap, x, yOff, xr - x, height, colors[bar % colorCount]);
+        Qid_DrawProfileBox(bitmap, x, yOff, xr - x, height, colors[bar % colorCount]);
         xPos += barWidth;
 	}
 }

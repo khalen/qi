@@ -6,8 +6,8 @@
 
 #include "basictypes.h"
 
-#include "qi.h"
 #include "qi_sound.h"
+#include "qi.h"
 #include "qi_math.h"
 
 #include <math.h>
@@ -39,29 +39,22 @@ GenTone(SoundBuffer_s* outputBuf, const u32 samplesToWrite, const r32 toneHz, co
 }
 
 SoundBuffer_s*
-Qis_MakeSoundBuffer(SoundBuffer_s* buffer, const int numSamples, const int channels, const int sampsPerSec)
+Qis_MakeSoundBuffer(Memory_s* memory, const int numSamples, const int channels, const int sampsPerSec)
 {
-	memset(buffer, 0, sizeof(SoundBuffer_s));
+    u32 sampleBufBytes = numSamples * channels * sizeof(i16);
+    size_t totalBytes = sizeof(SoundBuffer_s) + sampleBufBytes;
+
+    u8* mem = (u8*)Qim_AllocRaw(memory, totalBytes);
+
+    SoundBuffer_s* buffer = (SoundBuffer_s*)Qim_AllocRaw(memory, totalBytes);
 	buffer->numSamples     = numSamples;
 	buffer->channels       = channels;
 	buffer->bytesPerSample = channels * sizeof(i16);
-	buffer->byteSize       = buffer->numSamples * buffer->bytesPerSample;
-	buffer->samples        = (i16*)malloc(buffer->byteSize);
+	buffer->byteSize       = sampleBufBytes;
 	buffer->samplesPerSec  = sampsPerSec;
-
-	memset(buffer->samples, 0, buffer->byteSize);
+	buffer->samples        = (i16*)(mem + sizeof(SoundBuffer_s));
 
 	return buffer;
-}
-
-void
-Qis_FreeSoundBuffer(SoundBuffer_s* buffer)
-{
-	if (buffer && buffer->samples)
-	{
-		free(buffer->samples);
-	}
-	memset(buffer, 0, sizeof(*buffer));
 }
 
 void
@@ -77,3 +70,10 @@ Qis_Init()
 	g_sound.toneHz     = 261.2f;
 	g_sound.toneVolume = 25000;
 }
+
+static SoundFuncs_s s_sound =
+{
+    Qis_MakeSoundBuffer,
+    Qis_UpdateSound,
+};
+const SoundFuncs_s* sound = &s_sound;

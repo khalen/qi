@@ -51,5 +51,9 @@
 #endif
 #endif
 
+// TODO(plat): Find a better place for this
+#define PLAT_EXPORT __declspec(dllexport)
+#define PLAT_IMPORT __declspec(dllimport)
+
 #define __HAS_H
 #endif // #ifndef __HAS_H

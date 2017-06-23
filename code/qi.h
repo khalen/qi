@@ -9,6 +9,8 @@
 #include "basictypes.h"
 #include "qi_math.h"
 
+#define GAME_DLL_NAME "qi.dll"
+
 #if defined(QI_PERFORMANCE)
 #define Assert(foo) (void)(foo)
 #else
@@ -144,15 +146,73 @@ struct Memory_s
 	u8*    transientPos;
 };
 
-struct SoundBuffer_s;
+void* Qim_AllocRaw(Memory_s* memory, const size_t size);
+template<typename T>
+T*
+Qim_New(Memory_s* memory)
+{
+	void* buf = Qim_AllocRaw(memory, sizeof(T));
+	Assert(buf != nullptr);
+	memset(buf, 0, sizeof(T));
+	return reinterpret_cast<T*>(buf);
+}
 
-void Qi_GameUpdateAndRender(Memory_s* memory, Input_s* input, Bitmap_s* screenBitmap);
+void* Qim_TransientAllocRaw(Memory_s* memory, const size_t size);
+template<typename T>
+T*
+Qim_TransientNew(Memory_s* memory)
+{
+	void* buf = Qim_TransientAllocRaw(memory, sizeof(T));
+	Assert(buf != nullptr);
+	memset(buf, 0, sizeof(T));
+	return reinterpret_cast<T*>(buf);
+}
+
+// Game / Platform Linkage
+struct PlatFuncs_s;
+struct GameFuncs_s;
+
+// Functions provided by the base game layer
+typedef void Qi_GameUpdateAndRender_f(Memory_s* memory, Input_s* input, Bitmap_s* screenBitmap);
+typedef void Qi_Init_f(const PlatFuncs_s* plat);
+
+struct SoundFuncs_s;
+
+#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
+struct DebugFuncs_s;
+#endif
+
+struct GameFuncs_s
+{
+	const SoundFuncs_s* sound;
+#if HAS(DEV_BUILD)
+	const DebugFuncs_s* debug;
+#endif
+
+	Qi_Init_f*                Init;
+	Qi_GameUpdateAndRender_f* UpdateAndRender;
+};
 
 // Functions to be provided by the platform layer
-void* QiPlat_ReadEntireFile(const char* fileName, size_t* fileSize);
-bool QiPlat_WriteEntireFile(const char* fileName, const void* ptr, const size_t size);
-void QiPlat_ReleaseFileBuffer(void* buffer);
-r64 QiPlat_WallSeconds();
+typedef void* QiPlat_ReadEntireFile_f(const char* fileName, size_t* fileSize);
+typedef bool QiPlat_WriteEntireFile_f(const char* fileName, const void* ptr, const size_t size);
+typedef void QiPlat_ReleaseFileBuffer_f(void* buffer);
+typedef r64 QiPlat_WallSeconds_f();
+
+struct PlatFuncs_s
+{
+	QiPlat_ReadEntireFile_f*    ReadEntireFile;
+	QiPlat_WriteEntireFile_f*   WriteEntireFile;
+	QiPlat_ReleaseFileBuffer_f* ReleaseFileBuffer;
+	QiPlat_WallSeconds_f*       WallSeconds;
+};
+
+extern const PlatFuncs_s*  plat;
+extern const SoundFuncs_s* sound;
+
+#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
+extern const DebugFuncs_s* debug;
+#endif
 
 #define __QI_H
 #endif // #ifndef __QI_H

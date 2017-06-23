@@ -28,13 +28,19 @@ struct SoundBuffer_s
 		u8*  bytes;
 	};
 };
-
 static_assert(sizeof(SoundBuffer_s) == 32, "Wrong size for SoundBuffer_s");
 
-SoundBuffer_s* Qis_MakeSoundBuffer(const int numSamples, const int channels);
-void Qis_FreeSoundBuffer(SoundBuffer_s* buffer);
-void Qis_UpdateSound(SoundBuffer_s* soundBuffer, const u32 samplesToWrite);
+struct Memory_s;
+typedef SoundBuffer_s* Qis_MakeSoundBuffer_f(Memory_s* memory, const int numSamples, const int channels, const int sampsPerSec);
+typedef void Qis_UpdateSound_f(SoundBuffer_s* soundBuffer, const u32 samplesToWrite);
+
 void Qis_Init();
+
+struct SoundFuncs_s
+{
+    Qis_MakeSoundBuffer_f* MakeBuffer;
+    Qis_UpdateSound_f* Update;
+};
 
 #define __QI_SOUND_H
 #endif // #ifndef __QI_SOUND_H
