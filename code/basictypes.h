@@ -21,17 +21,41 @@ typedef double r64;
 typedef r32 Time_t;
 typedef r64 PreciseTime_t;
 
-static_assert( sizeof( u8 ) == 1, "Bad size u8" );
-static_assert( sizeof( i8 ) == 1, "Bad size i8" );
-static_assert( sizeof( u16 ) == 2, "Bad size u16" );
-static_assert( sizeof( i16 ) == 2, "Bad size i16" );
-static_assert( sizeof( u32 ) == 4, "Bad size u32" );
-static_assert( sizeof( i32 ) == 4, "Bad size i32" );
-static_assert( sizeof( u64 ) == 8, "Bad size u64" );
-static_assert( sizeof( i64 ) == 8, "Bad size i64" );
+struct Color_u
+{
+	union {
+		u32 value;
+		struct
+		{
+			u8 a, b, g, r;
+		};
+	};
 
-static_assert( sizeof( r32 ) == 4, "Bad size u64" );
-static_assert( sizeof( r64 ) == 8, "Bad size i64" );
+	Color_u(const u32 color)
+	    : value(color)
+	{
+	}
+
+	Color_u(const u8 ia, const u8 ib, const u8 ig, const u8 ir)
+	    : a(ia)
+	    , b(ib)
+	    , g(ig)
+	    , r(ir)
+	{
+	}
+};
+
+static_assert(sizeof(u8) == 1, "Bad size u8");
+static_assert(sizeof(i8) == 1, "Bad size i8");
+static_assert(sizeof(u16) == 2, "Bad size u16");
+static_assert(sizeof(i16) == 2, "Bad size i16");
+static_assert(sizeof(u32) == 4, "Bad size u32");
+static_assert(sizeof(i32) == 4, "Bad size i32");
+static_assert(sizeof(u64) == 8, "Bad size u64");
+static_assert(sizeof(i64) == 8, "Bad size i64");
+
+static_assert(sizeof(r32) == 4, "Bad size u64");
+static_assert(sizeof(r64) == 8, "Bad size i64");
 
 #define internal static
 
@@ -41,9 +65,10 @@ static_assert( sizeof( r64 ) == 8, "Bad size i64" );
 #define TB(amt) (GB(amt) * 1024)
 
 template<typename T, size_t N>
-constexpr int countof(T(&)[N])
+constexpr int
+countof(T (&)[N])
 {
-    return N;
+	return N;
 }
 
 #endif // #ifndef BASICTYPES_H

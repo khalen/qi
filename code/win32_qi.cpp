@@ -4,6 +4,7 @@
 #include "qi_debug.h"
 
 #include <Windows.h>
+#include <windowsx.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <Xinput.h>
@@ -49,7 +50,7 @@ struct Globals_s
 	u32             curCursorPos;
 
 	char gameEXEPath[MAX_PATH];
-    char gameRecordBasePath[MAX_PATH];
+	char gameRecordBasePath[MAX_PATH];
 
 	HMODULE            gameDLL;
 	FILETIME           gameDLLLastWriteTime;
@@ -61,6 +62,8 @@ struct Globals_s
 	i32    recordingChannel;
 	i32    playbackChannel;
 	bool   isLooping;
+
+	ThreadContext_s thread;
 } g;
 
 #define NOTE_UNUSED(x) ((void)x);
@@ -86,6 +89,11 @@ XINPUT_SET_STATE(XInputSetStateStub)
 }
 internal impXInputSetState* XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
+
+void Qi_Assert_Handler(const char* msg, const char* file, const int line)
+{
+    __debugbreak();
+}
 
 internal char*
 StringCopy(char* dest, size_t destSize, const char* src)
@@ -133,13 +141,12 @@ StringAppend(char* dest, size_t dstTotalSize, const char* src)
 internal void
 MakeGameEXERelativePath(char* dst, const char* filename)
 {
-    StringCopy(dst, MAX_PATH, g.gameEXEPath);
-    StringAppend(dst, MAX_PATH, filename);
-    ;
+	StringCopy(dst, MAX_PATH, g.gameEXEPath);
+	StringAppend(dst, MAX_PATH, filename);
 }
 
-double
-Qi_WallSeconds()
+internal double
+WallSeconds()
 {
 	LARGE_INTEGER curCounter;
 	i64           deltaCounter;
@@ -148,9 +155,15 @@ Qi_WallSeconds()
 	return deltaCounter * g.clockConversionFactor;
 }
 
+double
+Qi_WallSeconds(ThreadContext_s*)
+{
+	return WallSeconds();
+}
+
 // Temporary file I/O
 void*
-Qi_ReadEntireFile(const char* fileName, size_t* fileSize)
+Qi_ReadEntireFile(ThreadContext_s*, const char* fileName, size_t* fileSize)
 {
 	HANDLE hFile
 	    = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -180,7 +193,7 @@ Qi_ReadEntireFile(const char* fileName, size_t* fileSize)
 
 // TODO: More robust file writes (create / delete / rename)
 bool
-Qi_WriteEntireFile(const char* fileName, const void* ptr, const size_t size)
+Qi_WriteEntireFile(ThreadContext_s*, const char* fileName, const void* ptr, const size_t size)
 {
 	HANDLE hFile
 	    = CreateFile(fileName, GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -199,7 +212,7 @@ Qi_WriteEntireFile(const char* fileName, const void* ptr, const size_t size)
 }
 
 void
-Qi_ReleaseFileBuffer(void* buffer)
+Qi_ReleaseFileBuffer(ThreadContext_s*, void* buffer)
 {
 	Assert(buffer);
 	VirtualFree(buffer, 0, MEM_RELEASE | MEM_DECOMMIT);
@@ -279,11 +292,12 @@ LoadGameDLL()
 		FreeLibrary(g.gameDLL);
 		g.gameDLL = nullptr;
 		g.game    = nullptr;
+		Sleep(300);
 	}
 
 	OutputDebugString("Loading Game DLL\n");
 
-	CopyFile(g.gameDLLOrigPath, g.gameDLLPath, FALSE);
+	Assert(CopyFile(g.gameDLLOrigPath, g.gameDLLPath, FALSE));
 
 	g.gameDLL = LoadLibrary(g.gameDLLPath);
 
@@ -293,6 +307,9 @@ LoadGameDLL()
 		GetGameFuncs_f*            GetGameFuncs = (GetGameFuncs_f*)GetProcAddress(g.gameDLL, "Qi_GetGameFuncs");
 		Assert(GetGameFuncs);
 		g.game = GetGameFuncs();
+
+		Assert(g.game->Init);
+		g.game->Init(plat, &g.memory);
 	}
 }
 
@@ -340,11 +357,11 @@ InitGlobals()
 	for (u32 i = 0; i < fileNameLen; i++)
 		if (g.gameEXEPath[i] == '\\')
 			pastLastSlash = g.gameEXEPath + i + 1;
-    *pastLastSlash = 0;
+	*pastLastSlash        = 0;
 
-    MakeGameEXERelativePath(g.gameDLLOrigPath, GAME_DLL_NAME);
-    MakeGameEXERelativePath(g.gameDLLPath, TMP_DLL_NAME);
-    MakeGameEXERelativePath(g.gameRecordBasePath, "qi_");
+	MakeGameEXERelativePath(g.gameDLLOrigPath, GAME_DLL_NAME);
+	MakeGameEXERelativePath(g.gameDLLPath, TMP_DLL_NAME);
+	MakeGameEXERelativePath(g.gameRecordBasePath, "qi_");
 
 	LoadGameDLL();
 
@@ -352,8 +369,6 @@ InitGlobals()
 #if HAS(DEV_BUILD) || HAS(PROF_BUILD)
 	Assert(g.game->debug);
 #endif
-
-	g.game->Init(plat);
 }
 
 internal void
@@ -657,8 +672,58 @@ EndRecording()
 }
 
 void
+ProcessMouseMessage(Input_s* newInput, MSG* message)
+{
+	Controller_s* kbdController = &newInput->controllers[KBD];
+
+	switch (message->message)
+	{
+	case WM_LBUTTONDOWN:
+	{
+		ProcessKeyboardButton(&kbdController->leftMouse, true);
+	}
+	break;
+	case WM_LBUTTONUP:
+	{
+		ProcessKeyboardButton(&kbdController->leftMouse, false);
+	}
+	break;
+	case WM_MBUTTONDOWN:
+	{
+		ProcessKeyboardButton(&kbdController->middleMouse, true);
+	}
+	break;
+	case WM_MBUTTONUP:
+	{
+		ProcessKeyboardButton(&kbdController->middleMouse, false);
+	}
+	break;
+	case WM_RBUTTONDOWN:
+	{
+		ProcessKeyboardButton(&kbdController->rightMouse, true);
+	}
+	break;
+	case WM_RBUTTONUP:
+	{
+		ProcessKeyboardButton(&kbdController->rightMouse, false);
+	}
+	break;
+	case WM_MOUSEMOVE:
+	{
+		newInput->mouse.x = (r32)GET_X_LPARAM(message->lParam);
+		newInput->mouse.y = (r32)GET_Y_LPARAM(message->lParam);
+	}
+	break;
+	default:
+		break;
+	}
+}
+
+void
 ProcessKeyboardMessage(Input_s* newInput, MSG* message)
 {
+	Controller_s* kbdController = &newInput->controllers[KBD];
+
 	switch (message->message)
 	{
 	case WM_SYSKEYDOWN:
@@ -673,10 +738,9 @@ ProcessKeyboardMessage(Input_s* newInput, MSG* message)
 		if (wasDown == isDown)
 			break;
 
-		Controller_s* kbdController = &newInput->controllers[KBD];
 		if (vkCode == 'W')
 		{
-			ProcessKeyboardStick(&kbdController->leftStick, 0.0f, 1.0f, isDown);
+			ProcessKeyboardStick(&kbdController->leftStick, 0.0f, -1.0f, isDown);
 		}
 		else if (vkCode == 'D')
 		{
@@ -684,7 +748,7 @@ ProcessKeyboardMessage(Input_s* newInput, MSG* message)
 		}
 		else if (vkCode == 'S')
 		{
-			ProcessKeyboardStick(&kbdController->leftStick, 0.0f, -1.0f, isDown);
+			ProcessKeyboardStick(&kbdController->leftStick, 0.0f, 1.0f, isDown);
 		}
 		else if (vkCode == 'A')
 		{
@@ -828,9 +892,6 @@ InitXAudio2(void)
 	}
 
 	g.sound.sourceVoice->Start(0, 0);
-
-	g.soundUpdateBuffer = g.game->sound->MakeBuffer(
-	    &g.memory, XA_UPDATE_BUFFER_SAMPLES, QI_SOUND_CHANNELS, QI_SOUND_SAMPLES_PER_SECOND);
 }
 
 internal void
@@ -839,11 +900,11 @@ Win32UpdateSound()
 	static r64 lastTime = 0.0;
 	if (lastTime == 0.0)
 	{
-		lastTime = Qi_WallSeconds();
+		lastTime = WallSeconds();
 	}
 	else
 	{
-		r64 curTime   = Qi_WallSeconds();
+		r64 curTime   = WallSeconds();
 		u32 elapsedMs = (u32)((curTime - lastTime) * 1000.0);
 #if HAS(DEV_BUILD)
 		if (elapsedMs > QI_SOUND_REQUESTED_LATENCY_MS)
@@ -868,6 +929,10 @@ Win32UpdateSound()
 
 	XAUDIO2_BUFFER xaBuf = {};
 	xaBuf.AudioBytes     = XA_UPDATE_BUFFER_BYTES;
+
+	if (g.soundUpdateBuffer == nullptr)
+		g.soundUpdateBuffer = g.game->sound->MakeBuffer(
+		    &g.memory, XA_UPDATE_BUFFER_SAMPLES, QI_SOUND_CHANNELS, QI_SOUND_SAMPLES_PER_SECOND);
 
 	for (i32 buf = 0; buf < bufsToQueue; buf++)
 	{
@@ -896,14 +961,18 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 
 	RegisterClass(&wndClass);
 
+	DWORD wndStyle = (WS_OVERLAPPEDWINDOW | WS_VISIBLE) & ~(WS_MAXIMIZE | WS_SIZEBOX);
+	RECT  wndRect  = {50, 50, 50 + (GAME_RES_X / GAME_DOWNRES_FACTOR), 50 + (GAME_RES_Y / GAME_DOWNRES_FACTOR)};
+	AdjustWindowRect(&wndRect, wndStyle, FALSE);
+
 	g.wnd = CreateWindowExA(0,
 	                        "QIClass",
 	                        "QI",
-	                        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-	                        CW_USEDEFAULT,
-	                        CW_USEDEFAULT,
-	                        CW_USEDEFAULT,
-	                        CW_USEDEFAULT,
+	                        wndStyle,
+	                        wndRect.left,
+	                        wndRect.top,
+	                        wndRect.right - wndRect.left,
+	                        wndRect.bottom - wndRect.top,
 	                        nullptr,
 	                        nullptr,
 	                        instance,
@@ -916,7 +985,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 
 		HDC dc = GetDC(g.wnd);
 
-		r64 frameStart = Qi_WallSeconds();
+		r64 frameStart = WallSeconds();
 
 		u32 fpsTicks[5];
 		u32 cps = (u32)(1024.0f / TARGET_FPS * 2);
@@ -947,6 +1016,12 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				if (message.message == WM_QUIT)
 					g.gameRunning = false;
 
+				if (message.message >= WM_MOUSEFIRST && message.message <= WM_MOUSELAST)
+				{
+					ProcessMouseMessage(&newInput, &message);
+					continue;
+				}
+
 				switch (message.message)
 				{
 				case WM_SYSKEYUP:
@@ -955,6 +1030,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				case WM_KEYDOWN:
 				{
 					ProcessKeyboardMessage(&newInput, &message);
+					continue;
 				}
 				default:
 				{
@@ -974,15 +1050,16 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 			if (g.playbackChannel > 0)
 				PlaybackInput(&g.inputState);
 
-			g.game->UpdateAndRender(&g.memory, &g.inputState, &g.frameBuffer.bitmap);
-
-#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
-			g.game->debug->DrawTicks(&g.frameBuffer.bitmap, fpsTicks, countof(fpsTicks), 1024, 10, 50, 0);
-#endif
-
 			const r64 secondsPerFrame = 1.0 / TARGET_FPS;
 
-			r64 frameElapsed    = Qi_WallSeconds() - frameStart;
+			g.inputState.dT = (Time_t)secondsPerFrame;
+			g.game->UpdateAndRender(&g.thread, &g.inputState, &g.frameBuffer.bitmap);
+
+#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
+			g.game->debug->DrawTicks(&g.thread, &g.frameBuffer.bitmap, fpsTicks, countof(fpsTicks), 1024, 10, 50, 0);
+#endif
+
+			r64 frameElapsed    = WallSeconds() - frameStart;
 			u32 maxSoundSleepMS = QI_SOUND_REQUESTED_LATENCY_MS / XA_NUM_BUFFERS;
 
 			if (frameElapsed < secondsPerFrame)
@@ -1001,7 +1078,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				while (frameElapsed < secondsPerFrame)
 				{
 					Win32UpdateSound();
-					frameElapsed = Qi_WallSeconds() - frameStart;
+					frameElapsed = WallSeconds() - frameStart;
 				}
 			}
 			else
@@ -1009,7 +1086,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 				// TODO: Log missed frame
 			}
 
-			frameStart = Qi_WallSeconds();
+			frameStart = WallSeconds();
 			UpdateWindow(dc, &g.frameBuffer);
 		}
 	}

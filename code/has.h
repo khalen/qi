@@ -37,16 +37,15 @@
 
 #define RELEASE_BUILD WHEN(!HAS(DEV_BUILD) && HAS(FAST_BUILD))
 
-#if HAS(RELEASE_BUILD)
-
+#if HAS(RELEASE_BUILD) && !defined(__clang__)
 #pragma message "RELEASE_BUILD enabled"
 #else
 
-#if HAS(DEV_BUILD)
+#if HAS(DEV_BUILD) && !defined(__clang__)
 #pragma message("DEV_BUILD enabled")
 #endif
 
-#if HAS(FAST_BUILD)
+#if HAS(FAST_BUILD) && !defined(__clang__)
 #pragma message("FAST_BUILD enabled")
 #endif
 #endif

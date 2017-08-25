@@ -14,11 +14,12 @@
 #include <string.h>
 #include <malloc.h>
 
-struct
+struct SoundGlobals_s
 {
 	r32 toneHz;
 	int toneVolume;
-} g_sound;
+};
+static SoundGlobals_s* g_sound;
 
 internal void
 GenTone(SoundBuffer_s* outputBuf, const u32 samplesToWrite, const r32 toneHz, const r32 toneVolume)
@@ -41,12 +42,12 @@ GenTone(SoundBuffer_s* outputBuf, const u32 samplesToWrite, const r32 toneHz, co
 SoundBuffer_s*
 Qis_MakeSoundBuffer(Memory_s* memory, const int numSamples, const int channels, const int sampsPerSec)
 {
-    u32 sampleBufBytes = numSamples * channels * sizeof(i16);
-    size_t totalBytes = sizeof(SoundBuffer_s) + sampleBufBytes;
+	u32    sampleBufBytes = numSamples * channels * sizeof(i16);
+	size_t totalBytes     = sizeof(SoundBuffer_s) + sampleBufBytes;
 
-    u8* mem = (u8*)Qim_AllocRaw(memory, totalBytes);
+	u8* mem = (u8*)Qim_AllocRaw(memory, totalBytes);
 
-    SoundBuffer_s* buffer = (SoundBuffer_s*)Qim_AllocRaw(memory, totalBytes);
+	SoundBuffer_s* buffer  = (SoundBuffer_s*)Qim_AllocRaw(memory, totalBytes);
 	buffer->numSamples     = numSamples;
 	buffer->channels       = channels;
 	buffer->bytesPerSample = channels * sizeof(i16);
@@ -60,20 +61,37 @@ Qis_MakeSoundBuffer(Memory_s* memory, const int numSamples, const int channels, 
 void
 Qis_UpdateSound(SoundBuffer_s* soundBuffer, const u32 samplesToWrite)
 {
-	GenTone(soundBuffer, samplesToWrite, (r32)g_sound.toneHz, (r32)g_sound.toneVolume);
+#if 0
+	GenTone(soundBuffer, samplesToWrite, (r32)g_sound->toneHz, (r32)g_sound->toneVolume);
+#else
+	memset(soundBuffer->samples, 0, samplesToWrite * soundBuffer->bytesPerSample);
+#endif
 }
 
-void
-Qis_Init()
+static void Qis_Init(const SubSystem_s*, bool);
+
+SubSystem_s SoundSubSystem = {
+    "Sound",
+    Qis_Init,
+    sizeof(SoundGlobals_s),
+    nullptr
+};
+
+internal void
+Qis_Init(const SubSystem_s* sys, bool isReinit)
 {
-	memset(&g_sound, 0, sizeof(g_sound));
-	g_sound.toneHz     = 261.2f;
-	g_sound.toneVolume = 25000;
+    Assert(sys->globalPtr);
+	g_sound = (SoundGlobals_s*)sys->globalPtr;
+
+	if (!isReinit)
+	{
+		memset(g_sound, 0, sizeof(*g_sound));
+		g_sound->toneHz     = 261.2f;
+		g_sound->toneVolume = 25000;
+	}
 }
 
-static SoundFuncs_s s_sound =
-{
-    Qis_MakeSoundBuffer,
-    Qis_UpdateSound,
+static SoundFuncs_s s_sound = {
+    Qis_MakeSoundBuffer, Qis_UpdateSound,
 };
 const SoundFuncs_s* sound = &s_sound;

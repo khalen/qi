@@ -26,7 +26,7 @@ rem set DEBUG=
 rem set ALLBUILDOPTS=-GR- -EHa -MT
 
 set INCLUDE_DIRS=
-set WARNINGS=-WX -W4 -wd4201 -wd4100 -wd4189
+set WARNINGS=-WX -W4 -wd4201 -wd4100 -wd4189 -wd4505
 
 set LINK_OPTS=/incremental:no
 set LIBS=user32.lib gdi32.lib winmm.lib xaudio2.lib

@@ -11,30 +11,10 @@
 
 #define GAME_DLL_NAME "qi.dll"
 
-#if defined(QI_PERFORMANCE)
-#define Assert(foo) (void)(foo)
-#else
-#define Assert(foo) \
-	if (!(foo))     \
-	*(volatile u32*)0 = 0xdeadbeef
-#endif
-
 #define TARGET_FPS 30.0
-
-struct SimpleInput_s
-{
-	// Dpad
-	bool up, right, down, left;
-
-	// Buttons
-	bool aButton, bButton, xButton, yButton, startButton, backButton;
-	bool leftShoulder, rightShoulder;
-
-	// Analog
-	float  leftTrigger, rightTrigger;
-	Vec2_s leftStick;
-	Vec2_s rightStick;
-};
+#define GAME_RES_X 1920
+#define GAME_RES_Y 1080
+#define GAME_DOWNRES_FACTOR 2
 
 struct Rect_s
 {
@@ -106,7 +86,7 @@ struct Controller_s
 	};
 
 	union {
-#define BUTTON_COUNT 12
+#define BUTTON_COUNT 15
 		Button_s buttons[BUTTON_COUNT];
 
 		struct
@@ -126,13 +106,19 @@ struct Controller_s
 
 			Button_s leftShoulder;
 			Button_s rightShoulder;
+
+			Button_s leftMouse;
+			Button_s middleMouse;
+			Button_s rightMouse;
 		};
 	};
 };
 
 struct Input_s
 {
+	Time_t       dT;
 	Controller_s controllers[CONTROLLER_MAX_COUNT];
+	Vec2_s       mouse;
 };
 
 struct Memory_s
@@ -145,6 +131,19 @@ struct Memory_s
 	u8*    transientStorage;
 	u8*    transientPos;
 };
+
+struct SubSystem_s;
+typedef void Qi_Init_SubSystem_f(const SubSystem_s* sys, bool isReInit);
+
+struct SubSystem_s
+{
+	const char*          name;
+	Qi_Init_SubSystem_f* initFunc;
+	size_t               globalSize;
+	void*                globalPtr;
+};
+
+#define MAX_SUBSYSTEMS 16
 
 void* Qim_AllocRaw(Memory_s* memory, const size_t size);
 template<typename T>
@@ -168,13 +167,18 @@ Qim_TransientNew(Memory_s* memory)
 	return reinterpret_cast<T*>(buf);
 }
 
+struct ThreadContext_s
+{
+	int dummy;
+};
+
 // Game / Platform Linkage
 struct PlatFuncs_s;
 struct GameFuncs_s;
 
 // Functions provided by the base game layer
-typedef void Qi_GameUpdateAndRender_f(Memory_s* memory, Input_s* input, Bitmap_s* screenBitmap);
-typedef void Qi_Init_f(const PlatFuncs_s* plat);
+typedef void Qi_GameUpdateAndRender_f(ThreadContext_s* tc, Input_s* input, Bitmap_s* screenBitmap);
+typedef void Qi_Init_f(const PlatFuncs_s* plat, Memory_s* memory);
 
 struct SoundFuncs_s;
 
@@ -194,10 +198,10 @@ struct GameFuncs_s
 };
 
 // Functions to be provided by the platform layer
-typedef void* QiPlat_ReadEntireFile_f(const char* fileName, size_t* fileSize);
-typedef bool QiPlat_WriteEntireFile_f(const char* fileName, const void* ptr, const size_t size);
-typedef void QiPlat_ReleaseFileBuffer_f(void* buffer);
-typedef r64 QiPlat_WallSeconds_f();
+typedef void* QiPlat_ReadEntireFile_f(ThreadContext_s* tc, const char* fileName, size_t* fileSize);
+typedef bool QiPlat_WriteEntireFile_f(ThreadContext_s* tc, const char* fileName, const void* ptr, const size_t size);
+typedef void QiPlat_ReleaseFileBuffer_f(ThreadContext_s* tc, void* buffer);
+typedef r64 QiPlat_WallSeconds_f(ThreadContext_s* tc);
 
 struct PlatFuncs_s
 {
