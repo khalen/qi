@@ -19,6 +19,8 @@ struct GameGlobals_s
 	Memory_s*   memory;
 	SubSystem_s gameSubsystems[MAX_SUBSYSTEMS];
 	Vec2_s      playerPos;
+	i32         screenWid;
+	i32         screenHgt;
 };
 
 GameGlobals_s* g_game;
@@ -69,8 +71,17 @@ internal void
 UpdateGameState(Input_s* input)
 {
 	Assert(g_game);
-	for (int controllerIdx = 0; controllerIdx < CONTROLLER_MAX_COUNT; controllerIdx++)
+
+	const r32 tileWid = g_game->screenWid / 16.0f;
+
+	// Controller 0 left stick
+	const r32 playerSpd = 2.0f * tileWid * input->dT;
+	Analog_s* ctr0      = &input->controllers[KBD].analogs[0];
+	if (ctr0->trigger.reading > 0.0f)
 	{
+		Vec2_s dPlayerPos = {};
+		Vec2MulScalar(&dPlayerPos, &ctr0->dir, ctr0->trigger.reading * playerSpd);
+		Vec2Add(&g_game->playerPos, &g_game->playerPos, &dPlayerPos);
 	}
 }
 
@@ -159,24 +170,14 @@ DrawRectangle(Bitmap_s* bitmap, r32 x, r32 y, r32 width, r32 height, r32 r, r32 
 void
 Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 {
+    g_game->screenWid = screenBitmap->width;
+	g_game->screenHgt = screenBitmap->height;
+
 	Assert(g_game && g_game->isInitialized);
 	UpdateGameState(input);
 
 	// Clear screen
 	DrawRectangle(screenBitmap, 0.0f, 0.0f, (r32)screenBitmap->width, (r32)screenBitmap->height, 1.0f, 0.0f, 1.0f);
-
-	const r32 tileWid = screenBitmap->width / 16.0f;
-	const r32 tileHgt = screenBitmap->height / 9.0f;
-
-	// Controller 0 left stick
-	const r32 playerSpd = 2.0f * tileWid * input->dT;
-	Analog_s* ctr0      = &input->controllers[KBD].analogs[0];
-	if (ctr0->trigger.reading > 0.0f)
-	{
-		Vec2_s dPlayerPos = {};
-		Vec2MulScalar(&dPlayerPos, &ctr0->dir, ctr0->trigger.reading * playerSpd);
-		Vec2Add(&g_game->playerPos, &g_game->playerPos, &dPlayerPos);
-	}
 
 	u32 tiles[9][17] = {
 	    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -189,6 +190,9 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 	    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	};
+
+	const r32 tileWid = screenBitmap->width / 16.0f;
+	const r32 tileHgt = screenBitmap->height / 9.0f;
 
 	for (u32 row = 0; row < 9; row++)
 	{
