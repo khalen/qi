@@ -90,9 +90,10 @@ XINPUT_SET_STATE(XInputSetStateStub)
 internal impXInputSetState* XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
 
-void Qi_Assert_Handler(const char* msg, const char* file, const int line)
+void
+Qi_Assert_Handler(const char* msg, const char* file, const int line)
 {
-    __debugbreak();
+	__debugbreak();
 }
 
 internal char*
@@ -584,7 +585,6 @@ BeginPlayback(i32 channel)
 			return;
 		}
 	}
-
 	g.playbackChannel = channel;
 }
 

@@ -11,6 +11,7 @@
 -Wno-unknown-pragmas
 -Wno-deprecated-declarations
 -Wno-#pragma-messages
+-Wno-unused-parameter
 -fms-extensions
 -D__COMPLETION__
 -DQI_DEV_BUILD=1
