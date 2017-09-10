@@ -740,7 +740,7 @@ ProcessKeyboardMessage(Input_s* newInput, MSG* message)
 
 		if (vkCode == 'W')
 		{
-			ProcessKeyboardStick(&kbdController->leftStick, 0.0f, -1.0f, isDown);
+			ProcessKeyboardStick(&kbdController->leftStick, 0.0f, 1.0f, isDown);
 		}
 		else if (vkCode == 'D')
 		{
@@ -748,7 +748,7 @@ ProcessKeyboardMessage(Input_s* newInput, MSG* message)
 		}
 		else if (vkCode == 'S')
 		{
-			ProcessKeyboardStick(&kbdController->leftStick, 0.0f, 1.0f, isDown);
+			ProcessKeyboardStick(&kbdController->leftStick, 0.0f, -1.0f, isDown);
 		}
 		else if (vkCode == 'A')
 		{

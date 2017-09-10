@@ -13,6 +13,9 @@
 #include "qi_math.cpp"
 #include "qi_sound.cpp"
 
+#define TILEMAP_WID 17
+#define TILEMAP_HGT 9
+
 struct GameGlobals_s
 {
 	bool        isInitialized;
@@ -152,12 +155,14 @@ RenderRectangle(Bitmap_s* bitmap, i32 x0, i32 y0, i32 x1, i32 y1, r32 r, r32 g, 
 	y0 = Qi_Clamp<i32>(y0, 0, bitmap->height);
 	y1 = Qi_Clamp<i32>(y1, y0, bitmap->height);
 
+    y0 = bitmap->height - y0;
+    y1 = bitmap->height - y1;
 	u32* xel = bitmap->pixels + y1 * bitmap->pitch;
-	for (i32 y = y0; y < y1; y++)
+	for (i32 y = y1; y < y0; y++)
 	{
-		xel -= bitmap->pitch;
 		for (i32 x = x0; x < x1; x++)
 			xel[x] = color;
+		xel += bitmap->pitch;
 	}
 }
 
@@ -179,7 +184,7 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	// Clear screen
 	DrawRectangle(screenBitmap, 0.0f, 0.0f, (r32)screenBitmap->width, (r32)screenBitmap->height, 1.0f, 0.0f, 1.0f);
 
-	u32 tiles[9][17] = {
+	u32 tiles[TILEMAP_HGT][TILEMAP_WID] = {
 	    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1},
 	    {1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1},
@@ -191,16 +196,16 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	};
 
-	const r32 tileWid = screenBitmap->width / 16.0f;
-	const r32 tileHgt = screenBitmap->height / 9.0f;
+	const r32 tileWid = screenBitmap->width / (float)(TILEMAP_WID - 1);
+	const r32 tileHgt = screenBitmap->height / (float)TILEMAP_HGT;
 
-	for (u32 row = 0; row < 9; row++)
+	for (i32 row = 0; row < TILEMAP_HGT; row++ )
 	{
-		for (u32 col = 0; col < 17; col++)
+		for (i32 col = 0; col < TILEMAP_WID; col++)
 		{
 			const r32 tx = col * tileWid - tileWid / 2.0f;
 			const r32 ty = row * tileHgt;
-			if (tiles[row][col] > 0)
+			if (tiles[TILEMAP_HGT - row - 1][col] > 0)
 				DrawRectangle(screenBitmap, tx, ty, tileWid, tileHgt, 1.0f, 1.0f, 1.0f);
 			else
 				DrawRectangle(screenBitmap, tx, ty, tileWid, tileHgt, 0.2f, 0.5f, 0.5f);
