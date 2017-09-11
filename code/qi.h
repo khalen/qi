@@ -12,9 +12,12 @@
 #define GAME_DLL_NAME "qi.dll"
 
 #define TARGET_FPS 30.0
-#define GAME_RES_X 1920
-#define GAME_RES_Y 1080
+#define GAME_IDEAL_RES_X 1920
+#define GAME_IDEAL_RES_Y 1080
 #define GAME_DOWNRES_FACTOR 2
+
+#define GAME_RES_X  (GAME_IDEAL_RES_X / GAME_DOWNRES_FACTOR)
+#define GAME_RES_Y  (GAME_IDEAL_RES_Y / GAME_DOWNRES_FACTOR)
 
 struct Rect_s
 {
@@ -130,6 +133,51 @@ struct Memory_s
 	size_t transientSize;
 	u8*    transientStorage;
 	u8*    transientPos;
+};
+
+#define TILE_SIZE_METERS_X   1.4f
+#define TILE_SIZE_METERS_Y   1.4f
+
+#define SCREEN_TILE_WIDTH 16
+#define SCREEN_TILE_HEIGHT 9
+#define TILE_SIZE_DIM (GAME_RES_X / SCREEN_TILE_WIDTH)
+#define TILE_SIZE_BITS 6
+static_assert((1 << TILE_SIZE_BITS) >= TILE_SIZE_DIM, "Not enough bits for TILE_SIZE_BITS");
+
+#define TILE_CHUNK_DIM 64
+#define TILE_CHUNK_BITS 6
+static_assert((1 << TILE_CHUNK_BITS) >= TILE_CHUNK_DIM, "Not enough bits for TILE_CHUNK_BITS");
+
+#define TILE_FRAC_BITS 8
+#define TILE_COORD_BITS (TILE_SIZE_BITS + TILE_FRAC_BITS)
+
+struct WorldCoord_s
+{
+    union
+    {
+        struct
+        {
+            u64 subTile : TILE_FRAC_BITS;
+            u64 tile : TILE_CHUNK_BITS;
+            u64 chunk;
+        };
+        u64 value;
+    };
+};
+
+// Player / tile definitions
+struct WorldPos_s
+{
+    union
+    {
+        struct
+        {
+            WorldCoord_s x;
+            WorldCoord_s y;
+            WorldCoord_s z;
+        };
+        WorldCoord_s coords[3];
+    };
 };
 
 struct SubSystem_s;

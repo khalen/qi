@@ -962,7 +962,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 	RegisterClass(&wndClass);
 
 	DWORD wndStyle = (WS_OVERLAPPEDWINDOW | WS_VISIBLE) & ~(WS_MAXIMIZE | WS_SIZEBOX);
-	RECT  wndRect  = {50, 50, 50 + (GAME_RES_X / GAME_DOWNRES_FACTOR), 50 + (GAME_RES_Y / GAME_DOWNRES_FACTOR)};
+	RECT  wndRect  = {50, 50, 50 + GAME_RES_X, 50 + GAME_RES_Y};
 	AdjustWindowRect(&wndRect, wndStyle, FALSE);
 
 	g.wnd = CreateWindowExA(0,
