@@ -6,9 +6,6 @@
 
 #include "has.h"
 
-#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
-#include "basictypes.h"
-
 #include "qi.h"
 #include "qi_debug.h"
 
@@ -16,38 +13,38 @@
 
 #include "qi_profile.cpp"
 
+#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
+
 struct DebugGlobals_s
 {
-    u64 pad0;
+	u64 pad0;
 };
 
 internal DebugGlobals_s* g_debug;
 
-void Qi_Assert_Handler(const char* msg, const char* file, const int line)
+void
+Qi_Assert_Handler(const char* msg, const char* file, const int line)
 {
-    __debugbreak();
+#if HAS(OSX_BUILD)
+#else
+	__debugbreak();
+#endif
 }
 
 static void QiDebug_Init(const SubSystem_s* sys, bool);
 
-SubSystem_s DebugSubSystem = {
-    "Debug",
-    QiDebug_Init,
-    sizeof(DebugGlobals_s),
-    nullptr
-};
+SubSystem_s DebugSubSystem = {"Debug", QiDebug_Init, sizeof(DebugGlobals_s), nullptr};
 
 internal void
 QiDebug_Init(const SubSystem_s* sys, bool isReinit)
 {
-    Assert(sys->globalPtr);
-    g_debug = (DebugGlobals_s*)sys->globalPtr;
-    if(!isReinit)
-        memset(g_debug, 0, sizeof(*g_debug));
+	Assert(sys->globalPtr);
+	g_debug = (DebugGlobals_s*)sys->globalPtr;
+	if (!isReinit)
+		memset(g_debug, 0, sizeof(*g_debug));
 }
 
-internal DebugFuncs_s s_debug =
-{
+internal DebugFuncs_s s_debug = {
     Qid_DrawBars,
     Qid_DrawProfileBox,
     Qid_DrawTicks,

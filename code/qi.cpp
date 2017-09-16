@@ -92,7 +92,9 @@ extern SubSystem_s SoundSubSystem;
 extern SubSystem_s DebugSubSystem;
 
 internal SubSystem_s* s_subSystems[] = {
-    &GameSubSystem, &SoundSubSystem, &DebugSubSystem,
+    &GameSubSystem,
+    &SoundSubSystem,
+    &DebugSubSystem,
 };
 
 internal void
@@ -128,19 +130,19 @@ InitGameSystems(Memory_s* memory)
 }
 
 internal u32
-RoundReal(r32 val)
+         RoundReal(r32 val)
 {
 	return (u32)(val + 0.5f);
 }
 
 internal i32
-RoundIReal(r32 val)
+         RoundIReal(r32 val)
 {
 	return (i32)(val + 0.5f);
 }
 
 internal u32
-PackColor(r32 r, r32 g, r32 b)
+         PackColor(r32 r, r32 g, r32 b)
 {
 	return (RoundReal(r * 255.0f) << 16) | (RoundReal(g * 255.0f) << 8) | (RoundReal(b * 255.0f) << 0);
 }
@@ -155,8 +157,8 @@ RenderRectangle(Bitmap_s* bitmap, i32 x0, i32 y0, i32 x1, i32 y1, r32 r, r32 g, 
 	y0 = Qi_Clamp<i32>(y0, 0, bitmap->height);
 	y1 = Qi_Clamp<i32>(y1, y0, bitmap->height);
 
-    y0 = bitmap->height - y0;
-    y1 = bitmap->height - y1;
+	y0       = bitmap->height - y0;
+	y1       = bitmap->height - y1;
 	u32* xel = bitmap->pixels + y1 * bitmap->pitch;
 	for (i32 y = y1; y < y0; y++)
 	{
@@ -175,7 +177,7 @@ DrawRectangle(Bitmap_s* bitmap, r32 x, r32 y, r32 width, r32 height, r32 r, r32 
 void
 Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 {
-    g_game->screenWid = screenBitmap->width;
+	g_game->screenWid = screenBitmap->width;
 	g_game->screenHgt = screenBitmap->height;
 
 	Assert(g_game && g_game->isInitialized);
@@ -199,7 +201,7 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	const r32 tileWid = screenBitmap->width / (float)(TILEMAP_WID - 1);
 	const r32 tileHgt = screenBitmap->height / (float)TILEMAP_HGT;
 
-	for (i32 row = 0; row < TILEMAP_HGT; row++ )
+	for (i32 row = 0; row < TILEMAP_HGT; row++)
 	{
 		for (i32 col = 0; col < TILEMAP_WID; col++)
 		{
@@ -236,7 +238,10 @@ Qi_Init(const PlatFuncs_s* platFuncs, Memory_s* memory)
 }
 
 internal GameFuncs_s s_game = {
-    sound, debug, Qi_Init, Qi_GameUpdateAndRender,
+    sound,
+    debug,
+    Qi_Init,
+    Qi_GameUpdateAndRender,
 };
 const GameFuncs_s* game = &s_game;
 

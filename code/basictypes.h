@@ -5,6 +5,8 @@
 #define BASICTYPES_H
 
 #include "has.h"
+#include <stdlib.h>
+#include <stdint.h>
 
 typedef unsigned char      u8;
 typedef signed char        i8;

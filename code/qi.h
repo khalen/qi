@@ -8,6 +8,8 @@
 
 #include "basictypes.h"
 #include "qi_math.h"
+#include "qi_debug.h"
+#include <string.h>
 
 #define GAME_DLL_NAME "qi.dll"
 

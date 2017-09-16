@@ -35,6 +35,17 @@
 #define PROF_BUILD HAS__
 #endif
 
+#if defined(QI_OSX_BUILD)
+#define OSX_BUILD HAS_X
+#define WIN32_BUILD HAS__
+#elif defined(QI_WIN32_BUILD)
+#define OSX_BUILD HAS__
+#define WIN32_BUILD HAS_X
+#else
+#error Undefined platform! Add platform to has.h
+#endif
+
+
 #define RELEASE_BUILD WHEN(!HAS(DEV_BUILD) && HAS(FAST_BUILD))
 
 #if HAS(RELEASE_BUILD) && !defined(__clang__)
@@ -51,8 +62,15 @@
 #endif
 
 // TODO(plat): Find a better place for this
+#if HAS(OSX_BUILD)
+#define PLAT_EXPORT extern "C" __attribute__((visibility("default")))
+#define PLAT_IMPORT
+#elif HAS(WIN32_BUILD)
 #define PLAT_EXPORT __declspec(dllexport)
 #define PLAT_IMPORT __declspec(dllimport)
+#else
+#error Undefined platform! Need define for PLAT_EXPORT / PLAT_IMPORT
+#endif
 
 #define __HAS_H
 #endif // #ifndef __HAS_H

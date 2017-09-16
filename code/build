@@ -1,0 +1,38 @@
+#!/bin/bash
+
+SOURCE_DIR=~/qi/code
+BUILD_DIR=~/work/build
+DATA_DIR=~/qi/data
+THIRDPARTY=~/qi/thirdparty
+
+pushd $BUILD_DIR
+
+# Debug build
+DVERSION=1.0
+DEFINES="-DQI_DEV_BUILD=1 -DQI_OSX_BUILD=1 -DQI_PROFILE_BUILD=1"
+OPTIMIZATIONS=
+DEBUG=-g
+ALLBUILDOPTS="-std=c++17 -fms-extensions -fvisibility=hidden -fvisibility-inlines-hidden"
+
+# Fast profile build
+# DEFINES= "-DQI_FAST_BUILD=1 -DQI_OSX=1 -DQI_PROFILE_BUILD=1"
+# OPTIMIZATIONS=-O2
+# DEBUG=
+# ALLBUILDOPTS=
+
+# Release build
+# DEFINES= "-DQI_FAST_BUILD=1 -DQI_OSX=1"
+# OPTIMIZATIONS=-O2
+# DEBUG=
+# ALLBUILDOPTS=
+
+INCLUDE_DIRS=
+WARNINGS=
+
+LINK_OPTS=
+LIBS="-framework Cocoa"
+
+clang++ $ALLBUILDOPTS $WARNINGS $OPTIMIZATIONS $DEBUG $DEFINES $INCLUDE_DIRS -dynamiclib -current_version $DVERSION -compatibility_version $DVERSION $SOURCE_DIR/qi.cpp -o $BUILD_DIR/qi.dylib
+clang++ $ALLBUILDOPTS $WARNINGS $OPTIMIZATIONS $DEBUG $DEFINES $INCLUDE_DIRS $LIBS $SOURCE_DIR/osx_qi.mm -o $BUILD_DIR/osx_qi
+
+popd
