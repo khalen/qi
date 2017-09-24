@@ -2,81 +2,800 @@
 #include "qi.h"
 #include "qi_sound.h"
 #include "qi_debug.h"
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <dlfcn.h>
+#include <libproc.h>
 
 #undef internal
 #import <Cocoa/Cocoa.h>
+#include <mach/mach.h>
+#include <mach/mach_time.h>
+
+#import <OpenGL/OpenGL.h>
 
 #define internal static
+#include "qi_ogl.cpp"
 
-@interface QIAppDelegate : NSObject<NSApplicationDelegate, NSWindowDelegate>
+#define NUM_AUDIO_BUFFERS 2
+struct Sound_s
+{
+};
+
+// All the globals!
+struct Globals_s
+{
+	bool   gameRunning;
+	double clockConversionFactor;
+
+	Bitmap_s       frameBuffer;
+	Sound_s        sound;
+	SoundBuffer_s* soundUpdateBuffer;
+	Input_s        inputState;
+	Memory_s       memory;
+	u32            cursorBuf[16];
+	u32            curCursorPos;
+
+	char gameAppPath[PATH_MAX];
+	char gameRecordBasePath[PATH_MAX];
+
+	void*              gameDylib;
+	char               gameDylibPath[PATH_MAX];
+	i32                gameDylibLastMtime;
+	const GameFuncs_s* game;
+
+	FILE* loopingFile;
+	i32   recordingChannel;
+	i32   playbackChannel;
+	bool  isLooping;
+
+	r64 timeConversionFactor;
+
+	ThreadContext_s thread;
+} g;
+
+NSOpenGLContext* gGLContext;
+
+#define NOTE_UNUSED(x) ((void)x);
+
+@interface QIAppDelegate : NSObject <NSApplicationDelegate>
 @end
 
-@implementation QIAppDelegate
+@interface QIGlView : NSOpenGLView
+@end
+
+@implementation QIGlView
+
+- (id)init
+{
+	self = [super init];
+	return self;
+}
+
+- (void)prepareOpenGL
+{
+	[super prepareOpenGL];
+	[[self openGLContext] makeCurrentContext];
+}
+
+- (void)reshape
+{
+	[super reshape];
+
+	NSRect bounds = [self bounds];
+	[gGLContext makeCurrentContext];
+	[gGLContext update];
+
+	glViewport(0, 0, bounds.size.width, bounds.size.height);
+	printf("Resized to %f %f\n", bounds.size.width, bounds.size.height);
+}
+
+@end
+
+void
+Qi_Assert_Handler(const char* msg, const char* file, const int line)
+{
+#if HAS(OSX_BUILD)
+	asm("int $3");
+#else
+	__debugbreak();
+#endif
+}
+
+static void
+CreateMainMenu()
+{
+	id menuBar     = [[NSMenu new] autorelease];
+	id appMenuItem = [[NSMenuItem new] autorelease];
+
+	[menuBar addItem:appMenuItem];
+	[NSApp setMainMenu:menuBar];
+
+	id        appMenu = [[NSMenu new] autorelease];
+	NSString* appName = @"QI";
+
+	NSString* toggleFullscreenTitle = @"Toggle Full Screen";
+	id        toggleFullscreenItem =
+	    [[[NSMenuItem alloc] initWithTitle:toggleFullscreenTitle action:@selector(toggleFullScreen:) keyEquivalent:@"f"]
+	        autorelease];
+	[appMenu addItem:toggleFullscreenItem];
+
+	NSString*   quitTitle = [@"Quit " stringByAppendingString:appName];
+	NSMenuItem* quitItem = [[NSMenuItem alloc] initWithTitle:quitTitle action:@selector(terminate:) keyEquivalent:@"q"];
+	[appMenu addItem:quitItem];
+
+	[appMenuItem setSubmenu:appMenu];
+}
+
+@implementation QIAppDelegate : NSObject
 
 - (void)applicationDidFinishLaunching:(NSNotification*)notification
 {
+	printf("Did finish launching\n");
 }
 
-- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)sender
 {
-    return YES;
+	return YES;
 }
 
-- (void) applicationWillTerminate:(id)sender
+- (void)applicationWillTerminate:(id)sender {}
+
+@end
+
+static char*
+StringCopy(char* dest, size_t destSize, const char* src)
 {
+	Assert(dest && src && destSize < UINT_MAX);
+
+	size_t chrPos = 0;
+	while (*src && chrPos < destSize - 1)
+	{
+		dest[chrPos] = src[chrPos];
+		chrPos++;
+	}
+
+	dest[chrPos] = 0;
+	return dest;
+}
+
+// Note: byte length, not string length ie. doesn't parse utf8
+static size_t
+StringLen(const char* const src)
+{
+	Assert(src);
+
+	const char* cur = src;
+	while (*cur)
+		cur++;
+	return cur - src;
+}
+
+// Note: NOT strncat() semantics!! dstTotalSize is the total size of the destination buffer, not
+// (as in strncat) the -remaining- size.
+static char*
+StringAppend(char* dest, size_t dstTotalSize, const char* src)
+{
+	Assert(dest && src && dstTotalSize > 0);
+
+	const char* const lastValidDstPos = dest + dstTotalSize - 1;
+	char*             curDestPos      = dest + StringLen(dest);
+	while (*src && curDestPos < lastValidDstPos)
+		*curDestPos++ = *src++;
+	*curDestPos = 0;
+	return dest;
+}
+
+static void
+MakeGameEXERelativePath(char* dst, const char* filename)
+{
+	StringCopy(dst, PATH_MAX, g.gameAppPath);
+	StringAppend(dst, PATH_MAX, filename);
+}
+
+static void
+Osx_UpdateSound()
+{
+}
+
+static r64
+WallSeconds()
+{
+	return (r64)mach_absolute_time() * g.timeConversionFactor;
+}
+
+static void
+Osx_LoadGameDylib()
+{
+	struct stat statbuf;
+	if (stat(g.gameDylibPath, &statbuf) != 0)
+	{
+		fprintf(stderr, "Couldn't find game dylib: %s\n", g.gameDylibPath);
+		return;
+	}
+
+	if (statbuf.st_mtimespec.tv_sec == g.gameDylibLastMtime)
+		return;
+
+	g.gameDylibLastMtime = statbuf.st_mtimespec.tv_sec;
+
+	if (g.gameDylib != nullptr)
+	{
+		dlclose(g.gameDylib);
+		g.gameDylib = nullptr;
+	}
+
+	printf("Hotloading game dylib\n");
+
+	g.gameDylib = dlopen(g.gameDylibPath, RTLD_LAZY | RTLD_GLOBAL);
+
+	if (g.gameDylib)
+	{
+		typedef const GameFuncs_s* GetGameFuncs_f();
+		GetGameFuncs_f*            GetGameFuncs = (GetGameFuncs_f*)dlsym(g.gameDylib, "Qi_GetGameFuncs");
+		Assert(GetGameFuncs);
+		g.game = GetGameFuncs();
+
+		Assert(g.game->Init);
+		g.game->Init(plat, &g.memory);
+	}
+	else
+	{
+		fprintf(stderr, "Couldn't dlopen game dylib: %s\n", g.gameDylibPath);
+	}
+}
+
+// Game platform service functions
+static r64 Qi_WallSeconds(ThreadContext_s*)
+{
+    return WallSeconds();
+}
+
+static void* Qi_ReadEntireFile(ThreadContext_s*, const char* fileName, size_t* fileSize)
+{
+	struct stat statBuf;
+	if (stat(fileName, &statBuf) != 0)
+	{
+		Assert(0 && "Couldn't stat a shader file");
+	}
+
+	void* fileBuf = malloc(statBuf.st_size + 1);
+	memset(fileBuf, 0, statBuf.st_size + 1);
+	Assert(fileBuf);
+
+	FILE* f = fopen(fileName, "rb");
+	fread(fileBuf, 1, statBuf.st_size, f);
+	fclose(f);
+
+	return fileBuf;
+}
+
+static bool Qi_WriteEntireFile(ThreadContext_s*, const char* fileName, const void* ptr, const size_t size)
+{
+    FILE* outFile = fopen(fileName, "wb");
+    size_t wroteSize = fwrite(ptr, 1, size, outFile);
+    Assert(wroteSize == size);
+    fclose(outFile);
+    return true;
+}
+
+static void Qi_ReleaseFileBuffer(ThreadContext_s*, void* buffer)
+{
+    free(buffer);
+}
+
+static void
+InitGameGlobals()
+{
+	mach_timebase_info_data_t timebase;
+
+	mach_timebase_info(&timebase);
+	g.timeConversionFactor = 1.0 / 1.0e9;
+
+#if HAS(DEV_BUILD)
+	size_t baseAddressPerm  = TB(2);
+	size_t baseAddressTrans = TB(4);
+#else
+	size_t baseAddressPerm  = 0;
+	size_t baseAddressTrans = 0;
+#endif
+
+	g.memory.permanentSize = MB(64);
+	g.memory.permanentStorage
+	    = (u8*)mmap((void*)baseAddressPerm, g.memory.permanentSize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (g.memory.permanentStorage == (void*)MAP_FAILED)
+    {
+        fprintf(stderr, "mmap failed with code: %d\n", errno);
+        exit(1);
+    }
+	Assert(g.memory.permanentStorage != nullptr);
+	g.memory.permanentPos = g.memory.permanentStorage;
+
+	g.memory.transientSize = GB(4);
+	g.memory.transientStorage
+	    = (u8*)mmap((void*)baseAddressTrans, g.memory.transientSize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (g.memory.transientStorage == (void*)MAP_FAILED)
+    {
+        fprintf(stderr, "mmap failed with code: %d\n", errno);
+        exit(1);
+    }
+	Assert(g.memory.transientStorage != nullptr);
+	g.memory.transientPos = g.memory.transientStorage;
+
+	// Set up module path
+	pid_t pid = getpid();
+	proc_pidpath(pid, g.gameAppPath, sizeof(g.gameAppPath));
+	size_t fileNameLen = StringLen(g.gameAppPath);
+
+	char* pastLastSlash = g.gameAppPath;
+	for (u32 i = 0; i < fileNameLen; i++)
+		if (g.gameAppPath[i] == '/')
+			pastLastSlash = g.gameAppPath + i + 1;
+	*pastLastSlash = 0;
+
+	MakeGameEXERelativePath(g.gameDylibPath, "qi.dylib");
+	MakeGameEXERelativePath(g.gameRecordBasePath, "qi_");
+
+	Osx_LoadGameDylib();
+
+	// Assert(g.game && g.game->sound);
+	Assert(g.game);
+#if HAS(DEV_BUILD) || HAS(PROF_BUILD)
+	Assert(g.game->debug);
+#endif
+
+	g.frameBuffer.width = GAME_RES_X;
+	g.frameBuffer.height = GAME_RES_Y;
+    g.frameBuffer.pitch = (g.frameBuffer.width + 0xF) & ~0xF;
+    size_t fbSize = g.frameBuffer.pitch * g.frameBuffer.height * sizeof(u32);
+    g.frameBuffer.byteSize = fbSize;
+    g.frameBuffer.pixels = (u32 *)mmap(0, fbSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    Assert(g.frameBuffer.pixels != (u32 *)MAP_FAILED);
+    for (u32 c = 0; c < g.frameBuffer.pitch / sizeof(u32) * g.frameBuffer.height; c++)
+        g.frameBuffer.pixels[c] = 0xFF00FFFF;
+}
+
+static const char*
+IntToString(const i32 src)
+{
+	static char result[12];
+	char        tmpBuf[12]; // Max length of an int in ascii + room for minus sign + null terminator
+
+	i32        tmpPos     = 0;
+	const bool isNegative = (src < 0);
+
+	i32 absSrc = src & 0x7FFFFFFF;
+	while (absSrc >= 10)
+	{
+		tmpBuf[tmpPos++] = (absSrc % 10) + '0';
+		absSrc /= 10;
+	}
+	tmpBuf[tmpPos] = (char)(absSrc + '0');
+
+	if (isNegative)
+		tmpBuf[++tmpPos] = '-';
+
+	i32 resultPos = 0;
+
+	for (resultPos = 0; tmpPos >= 0; tmpPos--, resultPos++)
+		result[resultPos] = tmpBuf[tmpPos];
+	result[resultPos] = 0;
+
+	return result;
+}
+
+#define LOOP_FILE_EXT ".rec"
+
+static const char*
+GetLoopingChannelFileName(i32 channel)
+{
+	static char loopFile[PATH_MAX];
+	StringCopy(loopFile, sizeof(loopFile), g.gameRecordBasePath);
+	StringAppend(loopFile, sizeof(loopFile), IntToString(channel));
+	StringAppend(loopFile, sizeof(loopFile), LOOP_FILE_EXT);
+	return loopFile;
+}
+
+void
+BeginPlayback(i32 channel)
+{
+	Assert(channel > 0);
+	Assert(!g.playbackChannel);
+	Assert(!g.recordingChannel);
+	Assert(!g.loopingFile);
+
+	g.loopingFile = fopen(GetLoopingChannelFileName(channel), "rb");
+	if (g.loopingFile == nullptr)
+		return;
+
+	size_t memSize;
+	if (fread(&memSize, 1, sizeof(size_t), g.loopingFile) != sizeof(size_t))
+	{
+		fclose(g.loopingFile);
+		g.loopingFile = nullptr;
+		fprintf(stderr, "Couldn't read size intro block from looping file %s\n", GetLoopingChannelFileName(channel));
+		return;
+	}
+
+	if (fread(g.memory.permanentStorage, 1, memSize, g.loopingFile) != memSize)
+	{
+		fprintf(stderr, "Failed to read memory block on playback\n");
+		fclose(g.loopingFile);
+		g.loopingFile = nullptr;
+		return;
+	}
+	g.playbackChannel = channel;
+}
+
+void
+EndPlayback()
+{
+	Assert(g.playbackChannel > 0);
+	fclose(g.loopingFile);
+	g.loopingFile     = nullptr;
+	g.playbackChannel = 0;
+}
+
+bool
+PlaybackInput(Input_s* input)
+{
+	size_t bytesRead = 0;
+	bytesRead        = fread(input, 1, sizeof(*input), g.loopingFile);
+	if (bytesRead != sizeof(*input))
+	{
+		i32 curChannel = g.playbackChannel;
+		EndPlayback();
+		BeginPlayback(curChannel);
+		if (!PlaybackInput(input))
+		{
+			EndPlayback();
+		}
+		else
+		{
+			return true;
+		}
+	}
+	else
+	{
+		return true;
+	}
+
+	return false;
+}
+
+void
+BeginRecording(i32 channel)
+{
+	Assert(channel > 0);
+	Assert(!g.recordingChannel);
+
+	// Support going from looping straight back to recording
+	if (g.loopingFile != nullptr)
+	{
+		fclose(g.loopingFile);
+		g.loopingFile     = nullptr;
+		g.playbackChannel = 0;
+	}
+
+	Assert(g.loopingFile == nullptr);
+	g.loopingFile = fopen(GetLoopingChannelFileName(channel), "wb");
+	if (g.loopingFile != nullptr)
+	{
+		size_t permSize     = (size_t)(g.memory.permanentPos - g.memory.permanentStorage);
+		size_t bytesWritten = 0;
+		bytesWritten        = fwrite(&permSize, 1, sizeof(size_t), g.loopingFile);
+		Assert(bytesWritten == sizeof(permSize));
+		bytesWritten = fwrite(g.memory.permanentStorage, 1, permSize, g.loopingFile);
+		Assert(bytesWritten == permSize);
+	}
+
+	g.recordingChannel = channel;
+}
+
+void
+RecordInput(const Input_s* input)
+{
+	Assert(g.recordingChannel > 0 && g.loopingFile != nullptr);
+	size_t bytesWritten = 0;
+	bytesWritten        = fwrite(input, 1, sizeof(*input), g.loopingFile);
+	Assert(bytesWritten == sizeof(*input));
+}
+
+void
+EndRecording()
+{
+	Assert(g.recordingChannel > 0 && g.loopingFile != nullptr);
+	fclose(g.loopingFile);
+	g.loopingFile      = nullptr;
+	g.recordingChannel = 0;
+}
+
+static void
+ProcessKeyboardStick(Analog_s* analog, r32 valueX, r32 valueY, bool isDown)
+{
+	Vec2_s incDir;
+	incDir.x = isDown ? valueX : -valueX;
+	incDir.y = isDown ? valueY : -valueY;
+
+	// This is gross
+	Vec2_s oldDir = analog->dir;
+	oldDir.x      = oldDir.x < 0.0f ? -1.0f : oldDir.x > 0.0f ? 1.0f : 0.0f;
+	oldDir.y      = oldDir.y < 0.0f ? -1.0f : oldDir.y > 0.0f ? 1.0f : 0.0f;
+
+	Vec2Add(&analog->dir, &oldDir, &incDir);
+	Vec2Normalize(&analog->dir);
+	analog->trigger.reading  = Vec2Length(&analog->dir);
+	analog->trigger.minMax.x = analog->trigger.minMax.y = analog->trigger.reading;
+}
+
+static void
+ProcessKeyboardButton(Button_s* button, bool isDown)
+{
+	button->halfTransitionCount++;
+	button->endedDown = isDown;
+}
+
+static void
+Osx_HandleKeyEvent(NSEvent* event, Input_s* newInput)
+{
+	bool          isDown        = ([event type] == NSEventTypeKeyDown);
+	Controller_s* kbdController = &newInput->controllers[KBD];
+
+	unichar vkCode        = [[event charactersIgnoringModifiers] characterAtIndex:0];
+	i32     modifierFlags = [event modifierFlags];
+	bool    commandKey    = (modifierFlags & NSEventModifierFlagCommand) != 0;
+	// bool    controlKey    = (modifierFlags & NSEventModifierFlagControl) != 0;
+	// bool    alternateKey  = (modifierFlags & NSEventModifierFlagAlternate) != 0;
+
+	if (vkCode == 'w')
+	{
+		ProcessKeyboardStick(&kbdController->leftStick, 0.0f, 1.0f, isDown);
+	}
+	else if (vkCode == 'd')
+	{
+		ProcessKeyboardStick(&kbdController->leftStick, 1.0f, 0.0f, isDown);
+	}
+	else if (vkCode == 's')
+	{
+		ProcessKeyboardStick(&kbdController->leftStick, 0.0f, -1.0f, isDown);
+	}
+	else if (vkCode == 'a')
+	{
+		ProcessKeyboardStick(&kbdController->leftStick, -1.0f, 0.0f, isDown);
+	}
+	else if (vkCode == 'q')
+	{
+		if (isDown && commandKey)
+			g.gameRunning = false;
+		else
+			ProcessKeyboardButton(&kbdController->leftShoulder, isDown);
+	}
+	else if (vkCode == 'e')
+	{
+		ProcessKeyboardButton(&kbdController->rightShoulder, isDown);
+	}
+	else if (vkCode == 0xF700)
+	{
+		ProcessKeyboardButton(&kbdController->upButton, isDown);
+	}
+	else if (vkCode == 0xF703)
+	{
+		ProcessKeyboardButton(&kbdController->rightButton, isDown);
+	}
+	else if (vkCode == 0xF701)
+	{
+		ProcessKeyboardButton(&kbdController->downButton, isDown);
+	}
+	else if (vkCode == 0xf702)
+	{
+		ProcessKeyboardButton(&kbdController->leftButton, isDown);
+	}
+	else if (vkCode == 27)
+	{
+		g.gameRunning = false;
+	}
+	else if (vkCode == ' ')
+	{
+	}
+	else if (vkCode == 'l' && isDown)
+	{
+		if (g.recordingChannel > 0)
+		{
+			i32 curChannel = g.recordingChannel;
+			EndRecording();
+			BeginPlayback(curChannel);
+		}
+		else if (g.playbackChannel > 0)
+		{
+			EndPlayback();
+		}
+		else
+		{
+			BeginRecording(1);
+		}
+	}
 }
 
 int
 main(int argc, const char* argv[])
 {
-    // Autorelease Pool:
-    // Objects declared in this scope will be automatically
-    // released at the end of it, when the pool is "drained".
-    NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+// In dev builds, chdir into the hardcoded data directory to facilitate running the exe from
+// non distribution places
+#if HAS(DEV_BUILD)
+	chdir(QI_DEV_DATA_DIR);
+#endif
 
-    // Create a shared app instance.
-    // This will initialize the global variable
-    // 'NSApp' with the application instance.
-    [NSApplication sharedApplication];
+	InitGameGlobals();
 
-    //
-    // Create a window:
-    //
+	r64 secs = WallSeconds();
+	usleep(1000 * 1000);
+	r64 oneSec = WallSeconds() - secs;
+    printf("Onesec: %g\n", oneSec);
 
-    // Style flags:
-    NSUInteger windowStyle = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable;
+	// Autorelease Pool
+	// Objects declared in this scope will be automatically
+	// released at the end of it, when the pool is "drained".
+	NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
 
-    // Window bounds (x, y, width, height).
-    NSRect windowRect = NSMakeRect(100, 100, 400, 400);
-    NSWindow * window = [[NSWindow alloc] initWithContentRect:windowRect
-                                          styleMask:windowStyle
-                                          backing:NSBackingStoreBuffered
-                                          defer:NO];
-    [window autorelease];
+	// Create a shared app instance.
+	// This will initialize the global variable
+	// 'NSApp' with the application instance.
+	[NSApplication sharedApplication];
 
-    // Window controller:
-    NSWindowController * windowController = [[NSWindowController alloc] initWithWindow:window];
-    [windowController autorelease];
+	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+	[NSApp activateIgnoringOtherApps:YES];
 
-    // This will add a simple text view to the window,
-    // so we can write a test string on it.
-    NSText * textView = [[NSText alloc] initWithFrame:windowRect];
-    [textView autorelease];
+	QIAppDelegate* qiDelegate = [[QIAppDelegate alloc] init];
+	[qiDelegate autorelease];
 
-    [window setContentView:textView];
-    [textView insertText:@"Hello OSX/Cocoa world!"];
+	[NSApp setDelegate:qiDelegate];
 
-    // TODO: Create app delegate to handle system events.
-    // TODO: Create menus (especially Quit!)
+	CreateMainMenu();
 
-    // Show window and run event loop.
-    [window orderFrontRegardless];
-    [NSApp run];
+	// Style flags:
+	NSUInteger windowStyle = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable;
 
-    [pool drain];
+	// Window bounds (x, y, width, height).
+	NSRect    windowRect = NSMakeRect(0, 0, 1920 / 2, 1080 / 2);
+	NSWindow* window =
+	    [[NSWindow alloc] initWithContentRect:windowRect styleMask:windowStyle backing:NSBackingStoreBuffered defer:NO];
+	[window autorelease];
 
-    return 0;
+#if 1
+	NSOpenGLPixelFormatAttribute openGLAttributes[] = {NSOpenGLPFAAccelerated,
+	                                                   NSOpenGLPFADoubleBuffer,
+	                                                   NSOpenGLPFAColorSize,
+	                                                   24,
+	                                                   NSOpenGLPFAAlphaSize,
+	                                                   8,
+	                                                   NSOpenGLPFADepthSize,
+	                                                   24,
+	                                                   NSOpenGLPFAOpenGLProfile,
+	                                                   NSOpenGLProfileVersion4_1Core,
+	                                                   0};
+
+	NSOpenGLPixelFormat* glFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:openGLAttributes];
+	gGLContext                    = [[NSOpenGLContext alloc] initWithFormat:glFormat shareContext:nullptr];
+
+	[gGLContext makeCurrentContext];
+	QiOgl_Init();
+
+	NSView* cv = [window contentView];
+	[cv setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+	[cv setAutoresizesSubviews:YES];
+
+	QIGlView* oglView = [[QIGlView alloc] init];
+	[oglView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+	[oglView setPixelFormat:glFormat];
+	[oglView setOpenGLContext:gGLContext];
+	[oglView setFrame:[cv bounds]];
+
+	[cv addSubview:oglView];
+
+	GLint swapInt = 1;
+	[gGLContext setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
+	[gGLContext setView:[window contentView]];
+	[gGLContext makeCurrentContext];
+#endif
+
+	// Show window and run event loop.
+	[window makeKeyAndOrderFront:nil];
+
+	r64 frameStart = WallSeconds();
+	g.gameRunning  = true;
+
+	while (g.gameRunning)
+	{
+		Input_s newInput = {};
+
+		Osx_LoadGameDylib();
+
+		Controller_s*       kbdController = &newInput.controllers[KBD];
+		const Controller_s* oldController = &g.inputState.controllers[KBD];
+		for (int button = 0; button < BUTTON_COUNT; button++)
+			kbdController->buttons[button].endedDown = oldController->buttons[button].endedDown;
+		for (int analog = 0; analog < ANALOG_COUNT; analog++)
+			kbdController->analogs[analog] = oldController->analogs[analog];
+
+		// SampleXInputControllers(&newInput, &g.inputState);
+
+		NSEvent* event;
+		while (
+		    (event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:nil inMode:NSDefaultRunLoopMode dequeue:YES])
+		    != nil)
+		{
+			switch ([event type])
+			{
+			case NSEventTypeKeyDown:
+			case NSEventTypeKeyUp:
+				Osx_HandleKeyEvent(event, &newInput);
+				break;
+			default:
+				[NSApp sendEvent:event];
+				break;
+			}
+		}
+
+		g.inputState = newInput;
+
+		Osx_UpdateSound();
+
+		if (g.recordingChannel > 0)
+			RecordInput(&g.inputState);
+
+		if (g.playbackChannel > 0)
+			PlaybackInput(&g.inputState);
+
+		const r64 secondsPerFrame = 1.0 / TARGET_FPS;
+
+		g.inputState.dT = (Time_t)secondsPerFrame;
+		g.game->UpdateAndRender(&g.thread, &g.inputState, &g.frameBuffer);
+
+		r64 frameElapsed    = WallSeconds() - frameStart;
+		u32 maxSoundSleepMS = QI_SOUND_REQUESTED_LATENCY_MS / NUM_AUDIO_BUFFERS;
+
+		if (frameElapsed < secondsPerFrame)
+		{
+			u32 msToSleep = (u32)(1000.0 * (secondsPerFrame - frameElapsed));
+			while (msToSleep > maxSoundSleepMS)
+			{
+				Osx_UpdateSound();
+				usleep(maxSoundSleepMS * 1000);
+				msToSleep -= maxSoundSleepMS;
+			}
+
+			if (msToSleep > 0)
+				usleep(msToSleep * 1000);
+
+			while (frameElapsed < secondsPerFrame)
+			{
+				Osx_UpdateSound();
+				frameElapsed = WallSeconds() - frameStart;
+			}
+		}
+		else
+		{
+			// TODO: Log missed frame
+		}
+
+		frameStart = WallSeconds();
+        QiOgl_Clear();
+		QiOgl_BlitBufferToScreen(&g.frameBuffer);
+        [gGLContext flushBuffer];
+	}
+
+	[pool drain];
+
+	return EXIT_SUCCESS;
 }
+
+// Interface to game DLL
+static PlatFuncs_s s_plat = {
+    Qi_ReadEntireFile, Qi_WriteEntireFile, Qi_ReleaseFileBuffer, Qi_WallSeconds,
+};
+const PlatFuncs_s* plat = &s_plat;
 
 #if 0
 struct WindowsBitmap_s
@@ -142,7 +861,7 @@ XINPUT_GET_STATE(XInputGetStateStub)
 	NOTE_UNUSED(pState);
 	return ERROR_DEVICE_NOT_CONNECTED;
 }
-internal impXInputGetState* XInputGetState_ = XInputGetStateStub;
+static impXInputGetState* XInputGetState_ = XInputGetStateStub;
 #define XInputGetState XInputGetState_
 
 #define XINPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration)
@@ -153,8 +872,9 @@ XINPUT_SET_STATE(XInputSetStateStub)
 	NOTE_UNUSED(pVibration);
 	return ERROR_DEVICE_NOT_CONNECTED;
 }
-internal impXInputSetState* XInputSetState_ = XInputSetStateStub;
-#define XInputSetState XInputSetState_
+static impXInputSetState* XInputSetState_ = XInputSetStateStub;
+#define XInputSetState X
+InputSetState_
 
 void
 Qi_Assert_Handler(const char* msg, const char* file, const int line)
@@ -162,7 +882,7 @@ Qi_Assert_Handler(const char* msg, const char* file, const int line)
 	__debugbreak();
 }
 
-internal char*
+static char*
 StringCopy(char* dest, size_t destSize, const char* src)
 {
 	Assert(dest && src && destSize < UINT_MAX);
@@ -179,7 +899,7 @@ StringCopy(char* dest, size_t destSize, const char* src)
 }
 
 // Note: byte length, not string length ie. doesn't parse utf8
-internal size_t
+static size_t
 StringLen(const char* const src)
 {
 	Assert(src);
@@ -192,28 +912,28 @@ StringLen(const char* const src)
 
 // Note: NOT strncat() semantics!! dstTotalSize is the total size of the destination buffer, not
 // (as in strncat) the -remaining- size.
-internal char*
+static char*
 StringAppend(char* dest, size_t dstTotalSize, const char* src)
 {
 	Assert(dest && src && dstTotalSize > 0);
 
 	const char* const lastValidDstPos = dest + dstTotalSize - 1;
 	char*             curDestPos      = dest + StringLen(dest);
-	while (*src && curDestPos < lastValidDstPos)
+	while (*src && curDestPos < lastValidDstP
+os)
 		*curDestPos++ = *src++;
 	*curDestPos       = 0;
 	return dest;
 }
 
-internal void
+static void
 MakeGameEXERelativePath(char* dst, const char* filename)
 {
-	StringCopy(dst, M
-AX_PATH, g.gameEXEPath);
+	StringCopy(dst, MAX_PATH, g.gameEXEPath);
 	StringAppend(dst, MAX_PATH, filename);
 }
 
-internal double
+static double
 WallSeconds()
 {
 	LARGE_INTEGER curCounter;
@@ -286,7 +1006,7 @@ Qi_ReleaseFileBuffer(ThreadContext_s*, void* buffer)
 	VirtualFree(buffer, 0, MEM_RELEASE | MEM_DECOMMIT);
 }
 
-internal void
+static void
 MakeOffscreenBitmap(WindowsBitmap_s* osb, u32 width, u32 height)
 {
 	memset(osb, 0, sizeof(*osb));
@@ -307,7 +1027,7 @@ MakeOffscreenBitmap(WindowsBitmap_s* osb, u32 width, u32 height)
 	osb->bmi.bmiHeader.biHeight      = -(int)height;
 }
 
-internal void
+static void
 FreeOffscreenBitmap(WindowsBitmap_s* osb)
 {
 	if (osb->bitmap.pixels)
@@ -316,7 +1036,7 @@ FreeOffscreenBitmap(WindowsBitmap_s* osb)
 	memset(osb, 0, sizeof(*osb));
 }
 
-internal void
+static void
 GetWindowDimen(HWND wnd, Rect_s* rect)
 {
 	memset(rect, 0, sizeof(*rect));
@@ -328,7 +1048,7 @@ GetWindowDimen(HWND wnd, Rect_s* rect)
 	rect->height = clientRect.bottom - clientRect.top;
 }
 
-internal int
+static int
 OnSize(HWND wnd)
 {
 	FreeOffscreenBitmap(&g.frameBuffer);
@@ -342,7 +1062,7 @@ OnSize(HWND wnd)
 }
 
 #define TMP_DLL_NAME "qi_game_runtime.dll"
-internal void
+static void
 LoadGameDLL()
 {
 	WIN32_FILE_ATTRIBUTE_DATA fileData = {};
@@ -381,7 +1101,7 @@ LoadGameDLL()
 	}
 }
 
-internal void
+static void
 InitGlobals()
 {
 	memset(&g, 0, sizeof(g));
@@ -439,7 +1159,7 @@ InitGlobals()
 #endif
 }
 
-internal void
+static void
 UpdateWindow(HDC dc, WindowsBitmap_s* osb)
 {
 	if (!osb->bitmap.pixels)
@@ -460,14 +1180,14 @@ UpdateWindow(HDC dc, WindowsBitmap_s* osb)
 	              SRCCOPY);
 }
 
-internal void
+static void
 ProcessDigitalButton(DWORD xinputButtons, u32 buttonBit, const Button_s* oldState, Button_s* newState)
 {
 	newState->endedDown           = (xinputButtons & buttonBit) != 0;
 	newState->halfTransitionCount = (oldState->endedDown != newState->endedDown) ? 1 : 0;
 }
 
-internal void
+static void
 ProcessTrigger(Trigger_s* newState, const u16 value, const r32 deadZone)
 {
 	r32 reading = value / 255.0f;
@@ -486,7 +1206,7 @@ ProcessTrigger(Trigger_s* newState, const u16 value, const r32 deadZone)
 	newState->minMax.y = reading;
 }
 
-internal void
+static void
 ProcessAnalog(Analog_s* newState, const i16 inX, const i16 inY, const r32 deadZone)
 {
 	r32 sqMag     = (r32)inX * inX + (r32)inY * inY;
@@ -514,7 +1234,7 @@ ProcessAnalog(Analog_s* newState, const i16 inX, const i16 inY, const r32 deadZo
 	newState->trigger.minMax.y = magnitude;
 }
 
-internal void
+static void
 SampleXInputControllers(Input_s* newInput, const Input_s* oldInput)
 {
 	for (DWORD controllerIdx = 0; controllerIdx < XUSER_MAX_COUNT; controllerIdx++)
@@ -586,7 +1306,7 @@ ProcessKeyboardButton(Button_s* button, bool isDown)
 	button->endedDown = isDown;
 }
 
-internal const char*
+static const char*
 IntToString(const i32 src)
 {
 	static char result[12];
@@ -617,7 +1337,7 @@ IntToString(const i32 src)
 
 #define LOOP_FILE_EXT ".rec"
 
-internal const char*
+static const char*
 GetLoopingChannelFileName(i32 channel)
 {
 	static char loopFile[MAX_PATH];
@@ -920,7 +1640,7 @@ WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return result;
 }
 
-internal void
+static void
 InitXAudio2(void)
 {
 	if (FAILED(XAudio2Create(&g.sound.xaudio)))
@@ -961,7 +1681,7 @@ InitXAudio2(void)
 	g.sound.sourceVoice->Start(0, 0);
 }
 
-internal void
+static void
 Win32UpdateSound()
 {
 	static r64 lastTime = 0.0;
@@ -1166,7 +1886,7 @@ WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
 }
 
 // Interface to game DLL
-internal PlatFuncs_s s_plat = {
+static PlatFuncs_s s_plat = {
     Qi_ReadEntireFile, Qi_WriteEntireFile, Qi_ReleaseFileBuffer, Qi_WallSeconds,
 };
 const PlatFuncs_s* plat = &s_plat;

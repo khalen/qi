@@ -1,15 +1,15 @@
 #!/bin/bash
 
-SOURCE_DIR=~/qi/code
+SOURCE_DIR=~/work/qi/code
 BUILD_DIR=~/work/build
-DATA_DIR=~/qi/data
-THIRDPARTY=~/qi/thirdparty
+DATA_DIR=~/work/qi/data
+THIRDPARTY=~/work/qi/thirdparty
 
 pushd $BUILD_DIR
 
 # Debug build
 DVERSION=1.0
-DEFINES="-DQI_DEV_BUILD=1 -DQI_OSX_BUILD=1 -DQI_PROFILE_BUILD=1"
+DEFINES="-DQI_DEV_BUILD=1 -DQI_OSX_BUILD=1 -DQI_PROFILE_BUILD=1 -DQI_DEV_DATA_DIR=\"$DATA_DIR\""
 OPTIMIZATIONS=
 DEBUG=-g
 ALLBUILDOPTS="-std=c++17 -fms-extensions -fvisibility=hidden -fvisibility-inlines-hidden"
@@ -26,13 +26,15 @@ ALLBUILDOPTS="-std=c++17 -fms-extensions -fvisibility=hidden -fvisibility-inline
 # DEBUG=
 # ALLBUILDOPTS=
 
-INCLUDE_DIRS=
+INCLUDE_DIRS="-I$THIRDPARTY/include"
 WARNINGS=
 
-LINK_OPTS=
-LIBS="-framework Cocoa"
+LINK_OPTS="-L$THIRDPARTY/lib/osx"
+LIBS="-framework Cocoa -lglad"
 
-clang++ $ALLBUILDOPTS $WARNINGS $OPTIMIZATIONS $DEBUG $DEFINES $INCLUDE_DIRS -dynamiclib -current_version $DVERSION -compatibility_version $DVERSION $SOURCE_DIR/qi.cpp -o $BUILD_DIR/qi.dylib
-clang++ $ALLBUILDOPTS $WARNINGS $OPTIMIZATIONS $DEBUG $DEFINES $INCLUDE_DIRS $LIBS $SOURCE_DIR/osx_qi.mm -o $BUILD_DIR/osx_qi
+clang++ $ALLBUILDOPTS $WARNINGS $OPTIMIZATIONS $DEBUG $DEFINES $INCLUDE_DIRS $LINK_OPTS -dynamiclib -current_version $DVERSION -compatibility_version $DVERSION $SOURCE_DIR/qi.cpp -o $BUILD_DIR/qi.dylib
+clang++ $ALLBUILDOPTS $WARNINGS $OPTIMIZATIONS $DEBUG $DEFINES $INCLUDE_DIRS $LINK_OPTS $LIBS $SOURCE_DIR/osx_qi.mm -o $BUILD_DIR/osx_qi
 
 popd
+
+cp $SOURCE_DIR/*.glsl $DATA_DIR

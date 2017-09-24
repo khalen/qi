@@ -16,5 +16,7 @@
 -fms-extensions
 -D__COMPLETION__
 -DQI_DEV_BUILD=1
--DQI_OSX=1
+-DQI_OSX_BUILD=1
 -DQI_PROFILE_BUILD=1
+-DQI_DEV_DATA_DIR=""
+-I../thirdparty/include

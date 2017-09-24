@@ -1,6 +1,9 @@
-/GPATH
-/GRTAGS
-/GTAGS
+GPATH
+GRTAGS
+GTAGS
 /auto/*
 /ltximg/*
 \.#*
+**/.idea/*
+*.obj
+*.o
