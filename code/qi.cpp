@@ -46,6 +46,23 @@ GameAllocate()
 	return Qim_New<T>(g_game->memory);
 }
 
+void
+MemoryArena_Init(MemoryArena_s* arena, const size_t size)
+{
+	arena->size      = size;
+	arena->curOffset = 0;
+	arena->base      = (u8*)Qim_AllocRaw(g_game->memory, size);
+}
+
+u8*
+MemoryArena_Alloc(MemoryArena_s* arena, const size_t size)
+{
+	Assert(arena && arena->curOffset + size <= arena->size);
+	u8* mem = arena->base + arena->curOffset;
+	arena->curOffset += size;
+	return mem;
+}
+
 internal void
 DrawGradient(Bitmap_s* osb, int xOff, int yOff)
 {

@@ -18,8 +18,8 @@
 #define GAME_IDEAL_RES_Y 1080
 #define GAME_DOWNRES_FACTOR 2
 
-#define GAME_RES_X  (GAME_IDEAL_RES_X / GAME_DOWNRES_FACTOR)
-#define GAME_RES_Y  (GAME_IDEAL_RES_Y / GAME_DOWNRES_FACTOR)
+#define GAME_RES_X (GAME_IDEAL_RES_X / GAME_DOWNRES_FACTOR)
+#define GAME_RES_Y (GAME_IDEAL_RES_Y / GAME_DOWNRES_FACTOR)
 
 struct Rect_s
 {
@@ -137,50 +137,15 @@ struct Memory_s
 	u8*    transientPos;
 };
 
-#define TILE_SIZE_METERS_X   1.4f
-#define TILE_SIZE_METERS_Y   1.4f
-
-#define SCREEN_TILE_WIDTH 16
-#define SCREEN_TILE_HEIGHT 9
-#define TILE_SIZE_DIM (GAME_RES_X / SCREEN_TILE_WIDTH)
-#define TILE_SIZE_BITS 6
-static_assert((1 << TILE_SIZE_BITS) >= TILE_SIZE_DIM, "Not enough bits for TILE_SIZE_BITS");
-
-#define TILE_CHUNK_DIM 64
-#define TILE_CHUNK_BITS 6
-static_assert((1 << TILE_CHUNK_BITS) >= TILE_CHUNK_DIM, "Not enough bits for TILE_CHUNK_BITS");
-
-#define TILE_FRAC_BITS 8
-#define TILE_COORD_BITS (TILE_SIZE_BITS + TILE_FRAC_BITS)
-
-struct WorldCoord_s
+struct MemoryArena_s
 {
-    union
-    {
-        struct
-        {
-            u64 subTile : TILE_FRAC_BITS;
-            u64 tile : TILE_CHUNK_BITS;
-            u64 chunk;
-        };
-        u64 value;
-    };
+	u8*    base;
+	size_t size;
+	size_t curOffset;
 };
 
-// Player / tile definitions
-struct WorldPos_s
-{
-    union
-    {
-        struct
-        {
-            WorldCoord_s x;
-            WorldCoord_s y;
-            WorldCoord_s z;
-        };
-        WorldCoord_s coords[3];
-    };
-};
+void MemoryArena_Init( MemoryArena_s* arena, const size_t size );
+u8* MemoryArena_Alloc( MemoryArena_s* arena, const size_t size );
 
 struct SubSystem_s;
 typedef void Qi_Init_SubSystem_f(const SubSystem_s* sys, bool isReInit);
@@ -249,9 +214,9 @@ struct GameFuncs_s
 
 // Functions to be provided by the platform layer
 typedef void* QiPlat_ReadEntireFile_f(ThreadContext_s* tc, const char* fileName, size_t* fileSize);
-typedef bool QiPlat_WriteEntireFile_f(ThreadContext_s* tc, const char* fileName, const void* ptr, const size_t size);
-typedef void QiPlat_ReleaseFileBuffer_f(ThreadContext_s* tc, void* buffer);
-typedef r64 QiPlat_WallSeconds_f(ThreadContext_s* tc);
+typedef bool  QiPlat_WriteEntireFile_f(ThreadContext_s* tc, const char* fileName, const void* ptr, const size_t size);
+typedef void  QiPlat_ReleaseFileBuffer_f(ThreadContext_s* tc, void* buffer);
+typedef r64   QiPlat_WallSeconds_f(ThreadContext_s* tc);
 
 struct PlatFuncs_s
 {
