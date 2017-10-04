@@ -7,3 +7,5 @@ GTAGS
 **/.idea/*
 *.obj
 *.o
+**/.DS_Store/*
+.DS_Store
