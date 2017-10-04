@@ -16,8 +16,9 @@
 
 #import <OpenGL/OpenGL.h>
 
+#include "qi_ogl.h"
+
 #define internal static
-#include "qi_ogl.cpp"
 
 #define NUM_AUDIO_BUFFERS 2
 struct Sound_s

@@ -34,6 +34,10 @@ typedef void Qid_DrawBars_f(ThreadContext_s* tc,
 
 typedef void
 Qid_DrawProfileBox_f(ThreadContext_s* tc, Bitmap_s* screen, const u32 x, const u32 y, const u32 wid, const u32 hgt, const u32 color);
+
+extern Qid_DrawTicks_f Qid_DrawTicks;
+extern Qid_DrawBars_f Qid_DrawBars;
+extern Qid_DrawProfileBox_f Qid_DrawProfileBox;
 #endif
 
 #define __QI_PROFILE_H

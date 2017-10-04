@@ -8,10 +8,9 @@
 
 #include "qi.h"
 #include "qi_debug.h"
+#include "qi_profile.h"
 
 #include <string.h>
-
-#include "qi_profile.cpp"
 
 #if HAS(DEV_BUILD) || HAS(PROF_BUILD)
 

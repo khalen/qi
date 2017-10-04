@@ -7,23 +7,28 @@
 #include "basictypes.h"
 
 #include "qi.h"
+#include "qi_tile.h"
 #include "qi_math.h"
+#include <stdio.h>
 
-#include "qi_debug.cpp"
-#include "qi_math.cpp"
-#include "qi_sound.cpp"
+#define TILEMAP_WID (17 * 1)
+#define TILEMAP_HGT (9 * 1)
 
-#define TILEMAP_WID 17
-#define TILEMAP_HGT 9
+#define SCREEN_WORLD_SIZE_X (TILEMAP_WID * TILE_SIZE_METERS_X)
+#define SCREEN_WORLD_SIZE_Y (TILEMAP_HGT * TILE_SIZE_METERS_Y)
 
 struct GameGlobals_s
 {
 	bool        isInitialized;
 	Memory_s*   memory;
 	SubSystem_s gameSubsystems[MAX_SUBSYSTEMS];
-	Vec2_s      playerPos;
-	i32         screenWid;
-	i32         screenHgt;
+
+	i32 screenWid;
+	i32 screenHgt;
+
+	World_s       world;
+	WorldPos_s    playerPos;
+	MemoryArena_s tileArena;
 };
 
 GameGlobals_s* g_game;
@@ -82,9 +87,38 @@ static void InitGameGlobals(const SubSystem_s*, bool);
 SubSystem_s GameSubSystem = {"Game", InitGameGlobals, sizeof(GameGlobals_s), nullptr};
 
 internal void
-InitGameGlobals(const SubSystem_s* sys, bool)
+InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 {
 	Assert(sys->globalPtr);
+
+	if (isReInit)
+		return;
+
+    MemoryArena_Init(&g_game->tileArena, MB(32));
+
+	g_game->playerPos.x.tile = 10;
+	g_game->playerPos.y.tile = 10;
+
+	for (i32 scrY = -32; scrY < 32; scrY++)
+	{
+		for (i32 scrX = -32; scrX < 32; scrX++)
+		{
+			for (i32 tileY = 0; tileY < TILEMAP_HGT; tileY++)
+			{
+				for (i32 tileX = 0; tileX < TILEMAP_WID; tileX++)
+				{
+					u32 value = TILE_EMPTY;
+					if ((tileX == 0 || tileX == (TILEMAP_WID - 1) || tileY == 0 || tileY == (TILEMAP_HGT - 1))
+					    && ((tileX != TILEMAP_WID / 2) && (tileY != TILEMAP_HGT / 2)))
+						value = TILE_FULL;
+					WorldPos_s worldPos = {};
+					worldPos.x.tile     = scrX * TILEMAP_WID + tileX;
+					worldPos.y.tile     = scrY * TILEMAP_HGT + tileY;
+					SetTileValue(&g_game->tileArena, &g_game->world, &worldPos, value);
+				}
+			}
+		}
+	}
 }
 
 internal void
@@ -92,16 +126,15 @@ UpdateGameState(Input_s* input)
 {
 	Assert(g_game);
 
-	const r32 tileWid = g_game->screenWid / 16.0f;
-
 	// Controller 0 left stick
-	const r32 playerSpd = 2.0f * tileWid * input->dT;
-	Analog_s* ctr0      = &input->controllers[KBD].analogs[0];
+	Analog_s* ctr0 = &input->controllers[KBD].analogs[0];
+	const r32 playerSpeed = 5.0f * input->dT; // Meters / sec
+
 	if (ctr0->trigger.reading > 0.0f)
 	{
 		Vec2_s dPlayerPos = {};
-		Vec2MulScalar(&dPlayerPos, &ctr0->dir, ctr0->trigger.reading * playerSpd);
-		Vec2Add(&g_game->playerPos, &g_game->playerPos, &dPlayerPos);
+		Vec2MulScalar(&dPlayerPos, &ctr0->dir, ctr0->trigger.reading * playerSpeed);
+		AddSubtileOffset(&g_game->playerPos, dPlayerPos);
 	}
 }
 
@@ -117,7 +150,6 @@ internal SubSystem_s* s_subSystems[] = {
 internal void
 InitGameSystems(Memory_s* memory)
 {
-
 	g_game         = (GameGlobals_s*)memory->permanentStorage;
 	g_game->memory = memory;
 
@@ -139,27 +171,24 @@ InitGameSystems(Memory_s* memory)
 
 	if (!g_game->isInitialized)
 	{
-		g_game->playerPos.x = 20.0f;
-		g_game->playerPos.y = 20.0f;
+		g_game->isInitialized = true;
 	}
-
-	g_game->isInitialized = true;
 }
 
-internal u32
-         RoundReal(r32 val)
+static u32
+RoundReal(r32 val)
 {
 	return (u32)(val + 0.5f);
 }
 
-internal i32
-         RoundIReal(r32 val)
+static i32
+RoundIReal(r32 val)
 {
 	return (i32)(val + 0.5f);
 }
 
-internal u32
-         PackColor(r32 r, r32 g, r32 b)
+static u32
+PackColor(r32 r, r32 g, r32 b)
 {
 	return (RoundReal(r * 255.0f) << 16) | (RoundReal(g * 255.0f) << 8) | (RoundReal(b * 255.0f) << 0);
 }
@@ -203,41 +232,40 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	// Clear screen
 	DrawRectangle(screenBitmap, 0.0f, 0.0f, (r32)screenBitmap->width, (r32)screenBitmap->height, 0.0f, 0.0f, 1.0f);
 
-	u32 tiles[TILEMAP_HGT][TILEMAP_WID] = {
-	    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-	    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1},
-	    {1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1},
-	    {1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1},
-	    {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	    {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1},
-	    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-	};
+	const r32 tilePixelWid = screenBitmap->width / (float)TILEMAP_WID;
+	const r32 tilePixelHgt = screenBitmap->height / (float)TILEMAP_HGT;
 
-	const r32 tileWid = screenBitmap->width / (float)(TILEMAP_WID - 1);
-	const r32 tileHgt = screenBitmap->height / (float)TILEMAP_HGT;
+	const r32 playerOffsetPixelsX = g_game->playerPos.x.offset * tilePixelWid;
+	const r32 playerOffsetPixelsY = g_game->playerPos.y.offset * tilePixelHgt;
 
-	for (i32 row = 0; row < TILEMAP_HGT; row++)
+	for (i32 row = -1; row < TILEMAP_HGT + 1; row++)
 	{
-		for (i32 col = 0; col < TILEMAP_WID; col++)
+		for (i32 col = -1; col < TILEMAP_WID + 1; col++)
 		{
-			const r32 tx = col * tileWid - tileWid / 2.0f;
-			const r32 ty = row * tileHgt;
-			if (tiles[TILEMAP_HGT - row - 1][col] > 0)
-				DrawRectangle(screenBitmap, tx, ty, tileWid, tileHgt, 1.0f, 1.0f, 1.0f);
+            const r32 sx = col * tilePixelWid - playerOffsetPixelsX;
+			const r32 sy = row * tilePixelHgt - playerOffsetPixelsY;
+
+            WorldPos_s tileCoord = {};
+            tileCoord.x.tile = col + (g_game->playerPos.x.tile - TILEMAP_WID / 2);
+            tileCoord.y.tile = row + (g_game->playerPos.y.tile - TILEMAP_HGT / 2);
+
+            u32 tileValue = GetTileValue(&g_game->world, &tileCoord);
+            if (tileValue == TILE_INVALID)
+				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 1.0f, 0.2f, 0.2f);
+			else if (tileValue == TILE_EMPTY)
+				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 0.3f, 0.3f, 0.3f);
 			else
-				DrawRectangle(screenBitmap, tx, ty, tileWid, tileHgt, 0.2f, 0.5f, 0.5f);
+				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 0.9f, 0.7f, 0.9f);
 		}
 	}
 
 	r32 playerR   = 0.5f;
 	r32 playerG   = 1.0f;
 	r32 playerB   = 0.0f;
-	r32 playerWid = tileWid * 0.75f;
-	r32 playerHgt = tileHgt;
-	r32 playerX   = g_game->playerPos.x - playerWid / 2.0f;
-	r32 playerY   = g_game->playerPos.y - playerHgt;
+	r32 playerWid = tilePixelWid * 0.75f;
+	r32 playerHgt = tilePixelHgt;
+	r32 playerX   = (screenBitmap->width / 2.0f) - playerWid / 2.0f;
+	r32 playerY   = screenBitmap->height / 2.0f;
 	DrawRectangle(screenBitmap, playerX, playerY, playerWid, playerHgt, playerR, playerG, playerB);
 }
 
