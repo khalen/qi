@@ -130,9 +130,9 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 	}
 
 	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[0], "test/test_background.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[1], "test/test_scene_layer_00.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[2], "test/test_scene_layer_01.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[3], "test/test_scene_layer_02.bmp");
+	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[1], "test/test_hero_front_head.bmp");
+	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[2], "test/test_hero_front_cape.bmp");
+	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[3], "test/test_hero_front_torso.bmp");
 	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[4], "test/test_scene_layer_03.bmp");
 }
 
@@ -257,6 +257,9 @@ struct BmpImageHeader_s
 	u32 vResolution;
 	u32 colors;
 	u32 importantColors;
+	u32 redMask;
+	u32 greenMask;
+	u32 blueMask;
 } PACKED;
 
 END_PACKED_DEFS
@@ -350,15 +353,15 @@ BltBmp(ThreadContext_s* thread,
 	rsx      = floor(rsx);
 	rsy      = floor(rsy);
 
-    i32 dx = (i32)rdx;
-    i32 dy = (i32)rdy;
-    i32 dw = (i32)(rdx1 - rdx);
-    i32 dh = (i32)(rdy1 - rdy);
+	i32 dx = (i32)rdx;
+	i32 dy = (i32)rdy;
+	i32 dw = (i32)(rdx1 - rdx);
+	i32 dh = (i32)(rdy1 - rdy);
 
-    i32 sx = (i32)rsx;
-    i32 sy = (i32)rsy;
-    i32 sw = (i32)(rsx1 - rsx);
-    i32 sh = (i32)(rsy1 - rsy);
+	i32 sx = (i32)rsx;
+	i32 sy = (i32)rsy;
+	i32 sw = (i32)(rsx1 - rsx);
+	i32 sh = (i32)(rsy1 - rsy);
 
 	// Adjust for starting offset for clipped initial rects
 	i32 sdx = (sw << 16) / dw;
@@ -391,6 +394,19 @@ BltBmp(ThreadContext_s* thread,
 	}
 }
 
+// FIXME: This is slow. Use intrinsics.
+static i32
+ShiftFromMask(const u32 mask)
+{
+	if (mask == 0)
+		return -1;
+
+	u32 r = 0;
+	while ((mask & (1 << r)) == 0)
+		r++;
+	return r;
+}
+
 internal void
 ReadBitmap(ThreadContext_s* thread, MemoryArena_s* memArena, Bitmap_s* result, const char* filename)
 {
@@ -400,8 +416,10 @@ ReadBitmap(ThreadContext_s* thread, MemoryArena_s* memArena, Bitmap_s* result, c
 
 	const BmpFileHeader_s*  fileHeader = (BmpFileHeader_s*)fileData;
 	const BmpImageHeader_s* imgHeader  = (BmpImageHeader_s*)(fileData + sizeof(BmpFileHeader_s));
-	u8*                     srcXels    = nullptr;
-	u8*                     dstXels    = nullptr;
+	u32*                    srcXels    = nullptr;
+	u32*                    dstXels    = nullptr;
+	u32 rMask, gMask, bMask, aMask;
+	u32 rShift, gShift, bShift, aShift;
 
 	if (fileHeader->type != 0x4D42) // 'BM' in ASCII
 	{
@@ -415,16 +433,39 @@ ReadBitmap(ThreadContext_s* thread, MemoryArena_s* memArena, Bitmap_s* result, c
 	}
 
 	CreateBitmap(memArena, result, imgHeader->width, imgHeader->height);
-	srcXels = fileData + fileHeader->pixelDataOffset;
-	dstXels = (u8*)result->pixels;
+	srcXels = (u32*)(fileData + fileHeader->pixelDataOffset);
+	dstXels = result->pixels;
 
-	for (u32 idx = 0; idx < result->byteSize; idx += sizeof(u32))
+	if (imgHeader->compression == 3)
 	{
-		dstXels[idx + 0] = srcXels[idx + 3];
-		dstXels[idx + 1] = srcXels[idx + 2];
-		dstXels[idx + 2] = srcXels[idx + 1];
-		dstXels[idx + 3] = srcXels[idx + 0];
+		rMask = imgHeader->redMask;
+		gMask = imgHeader->greenMask;
+		bMask = imgHeader->blueMask;
 	}
+	else
+	{
+		rMask      = 0xFF0000;
+		gMask      = 0x00FF00;
+		bMask      = 0x0000FF;
+    }
+
+    aMask = ~(rMask | gMask | bMask);
+
+    rShift = ShiftFromMask(rMask);
+    gShift = ShiftFromMask(gMask);
+    bShift = ShiftFromMask(bMask);
+	aShift = ShiftFromMask(aMask);
+
+	for (u32 idx = 0; idx < result->byteSize / sizeof(u32); idx++)
+    {
+        u32 src = srcXels[idx];
+        u32 r = (src & rMask) >> rShift;
+        u32 g = (src & gMask) >> gShift;
+        u32 b = (src & bMask) >> bShift;
+        u32 a = (src & aMask) >> aShift;
+
+        dstXels[idx] = (a << 24) | (r << 16) | (g << 8) | b;
+    }
 
 	printf("Read %s: %d x %d\n", filename, result->width, result->height);
 
@@ -474,7 +515,7 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 			tileCoord.y.tile     = row + (g_game->playerPos.y.tile - TILEMAP_HGT / 2);
 
 			u32 tileValue = GetTileValue(&g_game->world, &tileCoord);
-#if 1
+#if 0
 			if (tileValue == TILE_INVALID)
 				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 1.0f, 0.2f, 0.2f);
 			else if (tileValue == TILE_EMPTY)
@@ -491,11 +532,11 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 				       sy,
 				       tilePixelWid,
 				       tilePixelHgt,
-				       &g_game->testBitmaps[2],
+				       &g_game->testBitmaps[1],
 				       0,
 				       0,
-				       g_game->testBitmaps[2].width,
-				       g_game->testBitmaps[2].height);
+				       g_game->testBitmaps[1].width,
+				       g_game->testBitmaps[1].height);
 #endif
 		}
 	}
