@@ -20,7 +20,7 @@ internal struct
 	GLuint quadVao;
 	GLuint quadVbo;
 
-    GLint samplerUniformLocation;
+	GLint samplerUniformLocation;
 } gOgl;
 
 // TODO: Change shader load to use platform functionality once we have proper files / asset system
@@ -50,8 +50,8 @@ FreeShaderText(void* text)
 	free(text);
 }
 
-internal GLuint
-         LoadGlslShader(GLenum shaderType, const char* shaderFile)
+static GLuint
+LoadGlslShader(GLenum shaderType, const char* shaderFile)
 {
 	GLuint shader       = glCreateShader(shaderType);
 	char*  shaderSource = GetShaderText(shaderFile);
@@ -88,9 +88,9 @@ QiOgl_Init()
 
 	// Set up screen blit
 	glGenTextures(1, &gOgl.blitTexture);
-    glBindTexture(GL_TEXTURE_2D, gOgl.blitTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glBindTexture(GL_TEXTURE_2D, gOgl.blitTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	GLuint vs = LoadGlslShader(GL_VERTEX_SHADER, "blit_vs.glsl");
 	GLuint fs = LoadGlslShader(GL_FRAGMENT_SHADER, "blit_fs.glsl");
@@ -104,22 +104,22 @@ QiOgl_Init()
 	glGetProgramiv(gOgl.blitProgram, GL_LINK_STATUS, &status);
 	Assert(status == GL_TRUE);
 
-    glUseProgram(gOgl.blitProgram);
-    gOgl.samplerUniformLocation = glGetUniformLocation(gOgl.blitProgram, "tex");
+	glUseProgram(gOgl.blitProgram);
+	gOgl.samplerUniformLocation = glGetUniformLocation(gOgl.blitProgram, "tex");
 
-    #if 1
+#if 1
 	GLfloat vertices[] = {
-	    -1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,  -1.0f, 0.0f, 1.0f, 1.0f,
-	    1.0f,  1.0f,  0.0f, 1.0f, 0.0f, -1.0f, 1.0f,  0.0f, 0.0f, 0.0f,
+	    -1.0f, -1.0f, 0.0f,   0.0f, 0.0f,
+         1.0f, -1.0f, 0.0f,   1.0f, 0.0f,
+	     1.0f,  1.0f, 0.0f,   1.0f, 1.0f,
+        -1.0f,  1.0f, 0.0f,   0.0f, 1.0f,
 	};
-    #else
+#else
 	GLfloat vertices[] = {
-	    0.0f, 0.0f, 0.0f,              0.0f, 1.0f,
-        GAME_RES_X, 0.0f, 0.0f,        1.0f, 1.0f,
-        GAME_RES_X, GAME_RES_Y, 0.0f,  1.0f, 0.0f,
-        0.0f, GAME_RES_Y, 0.0f,        0.0f, 0.0f,
+	    0.0f,       0.0f,       0.0f, 0.0f, 1.0f, GAME_RES_X, 0.0f,       0.0f, 1.0f, 1.0f,
+	    GAME_RES_X, GAME_RES_Y, 0.0f, 1.0f, 0.0f, 0.0f,       GAME_RES_Y, 0.0f, 0.0f, 0.0f,
 	};
-    #endif
+#endif
 
 	glGenVertexArrays(1, &gOgl.quadVao);
 	glGenBuffers(1, &gOgl.quadVbo);
@@ -134,32 +134,33 @@ QiOgl_Init()
 	glEnableVertexAttribArray(1);
 }
 
-static void CheckGL()
+static void
+CheckGL()
 {
-    GLenum err;
-    bool errored = false;
-    while((err = glGetError()) != GL_NO_ERROR)
-    {
-        errored = true;
-        fprintf(stderr, "GL Error: 0x%x\n", err);
-    }
+	GLenum err;
+	bool   errored = false;
+	while ((err = glGetError()) != GL_NO_ERROR)
+	{
+		errored = true;
+		fprintf(stderr, "GL Error: 0x%x\n", err);
+	}
 
-    Assert(!errored);
+	Assert(!errored);
 }
 
 void
 QiOgl_BitmapToTexture(GLuint tex, const Bitmap_s* bitmap)
 {
 	glBindTexture(GL_TEXTURE_2D, tex);
-    CheckGL();
+	CheckGL();
 	glTexImage2D(
 	    GL_TEXTURE_2D, 0, GL_RGBA, bitmap->width, bitmap->height, 0, GL_BGRA, GL_UNSIGNED_BYTE, bitmap->pixels);
-    CheckGL();
+	CheckGL();
 	glBindTexture(GL_TEXTURE_2D, 0);
-    CheckGL();
+	CheckGL();
 }
 
-#define FR()  ((float)rand()) / RAND_MAX
+#define FR() ((float)rand()) / RAND_MAX
 void
 QiOgl_Clear()
 {
@@ -175,6 +176,6 @@ QiOgl_BlitBufferToScreen(const Bitmap_s* bitmap)
 	glUseProgram(gOgl.blitProgram);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, gOgl.blitTexture);
-    glUniform1i(gOgl.samplerUniformLocation, 0);
+	glUniform1i(gOgl.samplerUniformLocation, 0);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }

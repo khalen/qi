@@ -29,6 +29,8 @@ struct GameGlobals_s
 	World_s       world;
 	WorldPos_s    playerPos;
 	MemoryArena_s tileArena;
+
+	Bitmap_s testBitmaps[5];
 };
 
 GameGlobals_s* g_game;
@@ -68,18 +70,25 @@ MemoryArena_Alloc(MemoryArena_s* arena, const size_t size)
 	return mem;
 }
 
-internal void
-DrawGradient(Bitmap_s* osb, int xOff, int yOff)
+template<typename T>
+T*
+MemoryArena_PushStruct(MemoryArena_s* arena)
 {
-	u32* xel = osb->pixels;
-	for (u32 y = 0; y < osb->height; y++)
-	{
-		for (u32 x = 0; x < osb->width; x++)
-		{
-			u32 col = (((x + xOff) & 0xFF)) << 16 | (((y + yOff) & 0xFF)) << 8 | 0xc0;
-			*xel++  = col;
-		}
-	}
+	T* newT = (T*)MemoryArena_Alloc(arena, sizeof(T));
+	return newT;
+}
+
+internal void ReadBitmap(ThreadContext_s* thread, MemoryArena_s* memArena, Bitmap_s* result, const char* filename);
+
+void
+CreateBitmap(MemoryArena_s* arena, Bitmap_s* result, const u32 width, const u32 height)
+{
+	Assert(arena && result);
+	result->width    = width;
+	result->height   = height;
+	result->pitch    = width;
+	result->byteSize = width * height * sizeof(u32);
+	result->pixels   = (u32*)MemoryArena_Alloc(arena, result->byteSize);
 }
 
 static void InitGameGlobals(const SubSystem_s*, bool);
@@ -94,7 +103,7 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 	if (isReInit)
 		return;
 
-    MemoryArena_Init(&g_game->tileArena, MB(32));
+	MemoryArena_Init(&g_game->tileArena, MB(32));
 
 	g_game->playerPos.x.tile = 10;
 	g_game->playerPos.y.tile = 10;
@@ -119,6 +128,12 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 			}
 		}
 	}
+
+	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[0], "test/test_background.bmp");
+	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[1], "test/test_scene_layer_00.bmp");
+	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[2], "test/test_scene_layer_01.bmp");
+	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[3], "test/test_scene_layer_02.bmp");
+	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[4], "test/test_scene_layer_03.bmp");
 }
 
 internal void
@@ -127,7 +142,7 @@ UpdateGameState(Input_s* input)
 	Assert(g_game);
 
 	// Controller 0 left stick
-	Analog_s* ctr0 = &input->controllers[KBD].analogs[0];
+	Analog_s* ctr0        = &input->controllers[KBD].analogs[0];
 	const r32 playerSpeed = 5.0f * input->dT; // Meters / sec
 
 	if (ctr0->trigger.reading > 0.0f)
@@ -203,10 +218,8 @@ RenderRectangle(Bitmap_s* bitmap, i32 x0, i32 y0, i32 x1, i32 y1, r32 r, r32 g, 
 	y0 = Qi_Clamp<i32>(y0, 0, bitmap->height);
 	y1 = Qi_Clamp<i32>(y1, y0, bitmap->height);
 
-	y0       = bitmap->height - y0;
-	y1       = bitmap->height - y1;
-	u32* xel = bitmap->pixels + y1 * bitmap->pitch;
-	for (i32 y = y1; y < y0; y++)
+	u32* xel = bitmap->pixels + y0 * bitmap->pitch;
+	for (i32 y = y0; y < y1; y++)
 	{
 		for (i32 x = x0; x < x1; x++)
 			xel[x] = color;
@@ -220,6 +233,205 @@ DrawRectangle(Bitmap_s* bitmap, r32 x, r32 y, r32 width, r32 height, r32 r, r32 
 	RenderRectangle(bitmap, RoundIReal(x), RoundIReal(y), RoundIReal(x + width), RoundIReal(y + height), r, g, b);
 }
 
+BEGIN_PACKED_DEFS
+
+struct BmpFileHeader_s
+{
+	u16 type;
+	u32 fileSize;
+	u16 __reserved1;
+	u16 __reserved2;
+	u32 pixelDataOffset;
+} PACKED;
+
+struct BmpImageHeader_s
+{
+	u32 size;
+	u32 width;
+	u32 height;
+	u16 planes;
+	u16 bpp;
+	u32 compression;
+	u32 imageSize;
+	u32 hResolution;
+	u32 vResolution;
+	u32 colors;
+	u32 importantColors;
+} PACKED;
+
+END_PACKED_DEFS
+
+internal void
+ClipRectToBmp(const Bitmap_s* bmp, i32* bx, i32* by, i32* bw, i32* bh)
+{
+	i32 bx1 = *bx + *bw;
+	i32 by1 = *by + *bh;
+
+	if (*bx < 0)
+		*bx = 0;
+
+	if (*by < 0)
+		*by = 0;
+
+	if (bx1 < 0)
+		bx1 = 0;
+
+	if (bx1 > (i32)bmp->width)
+		bx1 = (i32)bmp->width;
+
+	if (by1 < 0)
+		by1 = 0;
+
+	if (by1 > (i32)bmp->height)
+		by1 = (i32)bmp->height;
+
+	*bw = bx1 - *bx;
+	*bh = by1 - *by;
+}
+
+internal void
+BltBmpFixed(ThreadContext_s* thread, Bitmap_s* dest, i32 dx, i32 dy, const Bitmap_s* src)
+{
+	i32 sx = 0, sy = 0;
+	i32 sw = src->width, sh = src->height;
+
+	// Clip to dest bmp
+	if (dx < 0)
+	{
+		sx -= dx;
+		sw += dx;
+		dx = 0;
+	}
+	if (dy < 0)
+	{
+		sy -= dy;
+		sy += dy;
+		dy = 0;
+	}
+	if (dx + sw >= dest->width)
+	{
+		sw -= (dx + sw - dest->width);
+	}
+	if (dy + sh >= dest->height)
+	{
+		sh -= (dy + sh - dest->height);
+	}
+	Assert(sx >= 0 && sy >= 0 && sx + sw < dest->width && sy + sh < dest->height);
+
+	for (i32 y = 0; y < sh; y++)
+	{
+		u32* const srcXelRow  = src->pixels + (sy + y) * src->pitch;
+		u32* const destXelRow = dest->pixels + (dy + y) * dest->pitch;
+		for (i32 x = 0; x < sw; x++)
+			destXelRow[x + dx] = srcXelRow[x + sx];
+	}
+}
+
+internal void
+BltBmp(ThreadContext_s* thread,
+       Bitmap_s*        dest,
+       r32              rdx,
+       r32              rdy,
+       r32              rdw,
+       r32              rdh,
+       Bitmap_s*        src,
+       r32              rsx,
+       r32              rsy,
+       r32              rsw,
+       r32              rsh)
+{
+	r32 rdx1 = ceil(rdx + rdw);
+	r32 rdy1 = ceil(rdy + rdh);
+	rdx      = floor(rdx);
+	rdy      = floor(rdy);
+
+	r32 rsx1 = ceil(rsx + rsw);
+	r32 rsy1 = ceil(rsy + rsh);
+	rsx      = floor(rsx);
+	rsy      = floor(rsy);
+
+    i32 dx = (i32)rdx;
+    i32 dy = (i32)rdy;
+    i32 dw = (i32)(rdx1 - rdx);
+    i32 dh = (i32)(rdy1 - rdy);
+
+    i32 sx = (i32)rsx;
+    i32 sy = (i32)rsy;
+    i32 sw = (i32)(rsx1 - rsx);
+    i32 sh = (i32)(rsy1 - rsy);
+
+	// Adjust for starting offset for clipped initial rects
+	i32 sdx = (sw << 16) / dw;
+	i32 sdy = (sh << 16) / dh;
+
+	// Clip src rect to src bitmap
+	ClipRectToBmp(src, &sx, &sy, &sw, &sh);
+
+	i32 idx = dx, idy = dy;
+	ClipRectToBmp(dest, &dx, &dy, &dw, &dh);
+
+	if (dw == 0 || dh == 0 || sw == 0 || sh == 0)
+		return;
+
+	Assert(sx >= 0 && sy >= 0 && sw < src->width && sh < src->height);
+	Assert(dx >= 0 && dy >= 0 && dw < dest->width && dh < dest->height);
+
+	i32 curSy = sy << 16;
+	curSy += sdy * (dy - idy);
+
+	for (i32 y = 0; y < dh; y++, curSy += sdy)
+	{
+		i32 curSx = sx << 16;
+		curSx += sdx * (dx - idx);
+
+		u32* srcXelRow  = src->pixels + (curSy >> 16) * src->pitch;
+		u32* destXelRow = dest->pixels + (dy + y) * dest->pitch;
+		for (i32 x = 0; x < dw; x++, curSx += sdx)
+			destXelRow[x + dx] = srcXelRow[curSx >> 16];
+	}
+}
+
+internal void
+ReadBitmap(ThreadContext_s* thread, MemoryArena_s* memArena, Bitmap_s* result, const char* filename)
+{
+	size_t readSize;
+	u8*    fileData = (u8*)plat->ReadEntireFile(thread, filename, &readSize);
+	Assert(fileData);
+
+	const BmpFileHeader_s*  fileHeader = (BmpFileHeader_s*)fileData;
+	const BmpImageHeader_s* imgHeader  = (BmpImageHeader_s*)(fileData + sizeof(BmpFileHeader_s));
+	u8*                     srcXels    = nullptr;
+	u8*                     dstXels    = nullptr;
+
+	if (fileHeader->type != 0x4D42) // 'BM' in ASCII
+	{
+		printf("Bad bmp type: 0x%x\n", fileHeader->type);
+		goto end;
+	}
+	if (imgHeader->size < 40)
+	{
+		printf("Unexpected bmp header size: %d\n", imgHeader->size);
+		goto end;
+	}
+
+	CreateBitmap(memArena, result, imgHeader->width, imgHeader->height);
+	srcXels = fileData + fileHeader->pixelDataOffset;
+	dstXels = (u8*)result->pixels;
+
+	for (u32 idx = 0; idx < result->byteSize; idx += sizeof(u32))
+	{
+		dstXels[idx + 0] = srcXels[idx + 3];
+		dstXels[idx + 1] = srcXels[idx + 2];
+		dstXels[idx + 2] = srcXels[idx + 1];
+		dstXels[idx + 3] = srcXels[idx + 0];
+	}
+
+	printf("Read %s: %d x %d\n", filename, result->width, result->height);
+
+end:
+	plat->ReleaseFileBuffer(thread, fileData);
+}
+
 void
 Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 {
@@ -230,7 +442,7 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	UpdateGameState(input);
 
 	// Clear screen
-	DrawRectangle(screenBitmap, 0.0f, 0.0f, (r32)screenBitmap->width, (r32)screenBitmap->height, 0.0f, 0.0f, 1.0f);
+	// DrawRectangle(screenBitmap, 0.0f, 0.0f, (r32)screenBitmap->width, (r32)screenBitmap->height, 0.0f, 0.0f, 1.0f);
 
 	const r32 tilePixelWid = screenBitmap->width / (float)TILEMAP_WID;
 	const r32 tilePixelHgt = screenBitmap->height / (float)TILEMAP_HGT;
@@ -238,24 +450,53 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	const r32 playerOffsetPixelsX = g_game->playerPos.x.offset * tilePixelWid;
 	const r32 playerOffsetPixelsY = g_game->playerPos.y.offset * tilePixelHgt;
 
+	BltBmp(nullptr,
+	       screenBitmap,
+	       0,
+	       0,
+	       screenBitmap->width,
+	       screenBitmap->height,
+	       &g_game->testBitmaps[0],
+	       20,
+	       20,
+	       300,
+	       300);
+
 	for (i32 row = -1; row < TILEMAP_HGT + 1; row++)
 	{
 		for (i32 col = -1; col < TILEMAP_WID + 1; col++)
 		{
-            const r32 sx = col * tilePixelWid - playerOffsetPixelsX;
+			const r32 sx = col * tilePixelWid - playerOffsetPixelsX;
 			const r32 sy = row * tilePixelHgt - playerOffsetPixelsY;
 
-            WorldPos_s tileCoord = {};
-            tileCoord.x.tile = col + (g_game->playerPos.x.tile - TILEMAP_WID / 2);
-            tileCoord.y.tile = row + (g_game->playerPos.y.tile - TILEMAP_HGT / 2);
+			WorldPos_s tileCoord = {};
+			tileCoord.x.tile     = col + (g_game->playerPos.x.tile - TILEMAP_WID / 2);
+			tileCoord.y.tile     = row + (g_game->playerPos.y.tile - TILEMAP_HGT / 2);
 
-            u32 tileValue = GetTileValue(&g_game->world, &tileCoord);
-            if (tileValue == TILE_INVALID)
+			u32 tileValue = GetTileValue(&g_game->world, &tileCoord);
+#if 1
+			if (tileValue == TILE_INVALID)
 				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 1.0f, 0.2f, 0.2f);
 			else if (tileValue == TILE_EMPTY)
 				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 0.3f, 0.3f, 0.3f);
 			else
-				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 0.9f, 0.7f, 0.9f);
+				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, .8f, .8f, .8f);
+#else
+			if (tileValue == TILE_INVALID)
+				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 1.0f, 0.2f, 0.2f);
+			else if (tileValue != TILE_EMPTY)
+				BltBmp(nullptr,
+				       screenBitmap,
+				       sx,
+				       sy,
+				       tilePixelWid,
+				       tilePixelHgt,
+				       &g_game->testBitmaps[2],
+				       0,
+				       0,
+				       g_game->testBitmaps[2].width,
+				       g_game->testBitmaps[2].height);
+#endif
 		}
 	}
 

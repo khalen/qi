@@ -67,10 +67,21 @@ static_assert(sizeof(r64) == 8, "Bad size i64");
 #define TB(amt) (GB(amt) * 1024)
 
 template<typename T, size_t N>
-constexpr int
-countof(T (&)[N])
+constexpr int countof(T (&)[N])
 {
 	return N;
 }
+
+#if defined(_MSC_VER)
+#define BEGIN_PACKED_DEFS __pragma(pack(push)) __pragma(pack(1))
+
+#define END_PACKED_DEFS __pragma(pack(pop))
+
+#define PACKED
+#else
+#define BEGIN_PACKED_DEFS
+#define END_PACKED_DEFS
+#define PACKED __attribute__((packed))
+#endif
 
 #endif // #ifndef BASICTYPES_H
