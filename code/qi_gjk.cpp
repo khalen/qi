@@ -107,20 +107,6 @@ OriginDistAndNormalToSegment(BarySeg_s* bary, const v2& a, const v2& b, v2* norm
 	return dist;
 }
 
-static inline bool
-DoSimplexSegment(Simplex_s* simplex, v2* dir)
-{
-	const v2 b = simplex->pts[1].pt;
-	const v2 a = simplex->pts[0].pt;
-
-	BarySeg_s barySeg;
-	OriginDistAndNormalToSegment(&barySeg, a, b, dir);
-
-	Assert(barySeg.v >= 0.0f);
-
-	return false;
-}
-
 // Compute the barycentric coordinates of the origin in triangle a, b, c
 static inline bool
 OriginBaryTri(Bary3_s* out, const v2& a, const v2& b, const v2& c)
@@ -183,6 +169,21 @@ FindOriginVoronoiRegion(const v2& a, const v2& b, const v2& c)
 
 	Assert(0);
 	return TriReg_ABC;
+}
+
+#if 0
+static inline bool
+DoSimplexSegment(Simplex_s* simplex, v2* dir)
+{
+	const v2 b = simplex->pts[1].pt;
+	const v2 a = simplex->pts[0].pt;
+
+	BarySeg_s barySeg;
+	OriginDistAndNormalToSegment(&barySeg, a, b, dir);
+
+	Assert(barySeg.v >= 0.0f);
+
+	return false;
 }
 
 static inline bool
@@ -278,6 +279,54 @@ DoSimplexTriangle(Simplex_s* simplex, v2* dir)
 
 	return false;
 }
+#else
+static inline bool
+DoSimplexSegment(Simplex_s* simplex, v2* dir)
+{
+    const v2& b = simplex->pts[0].pt;
+    const v2& a = simplex->pts[1].pt;
+    const v2 a0 = -a;
+    v2 ab = b - a;
+    *dir = VTriple(ab, a0, ab);
+    if (dir->lenSq() < Q_R32_EPSILON)
+        *dir = ab.perp();
+
+    return false;
+}
+
+
+static inline bool
+DoSimplexTriangle(Simplex_s* simplex, v2* dir)
+{
+    const v2& c = simplex->pts[0].pt;
+    const v2& b = simplex->pts[1].pt;
+    const v2& a = simplex->pts[2].pt;
+    const v2 a0 = -a;
+    v2 ab = b - a;
+    v2 ac = c - a;
+
+    v2 acPerp = VTriple(ab, ac, ac);
+
+    if (acPerp.dot(a0) >= 0.0f)
+    {
+        *dir = acPerp;
+    }
+    else
+    {
+        v2 abPerp = VTriple(ac, ab, ab);
+        if (abPerp.dot(a0) < 0.0f)
+            return true;
+
+        simplex->pts[0] = simplex->pts[1];
+        *dir = abPerp;
+    }
+
+    simplex->pts[1] = simplex->pts[2];
+    simplex->numPts = 2;
+
+    return false;
+}
+#endif
 
 static bool
 DoSimplex(Simplex_s* simplex, v2* dir)

@@ -319,9 +319,8 @@ UpdateGameState(Bitmap_s* screen, Input_s* input)
 
 	bool collided = false;
 
-	// EllipseShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
-	BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
-	AddDebugShape(&plrCollideShape, 1.0f, 0.0f, 1.0f);
+	// BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
+	// AddDebugShape(&plrCollideShape, 1.0f, 0.0f, 1.0f);
 
 	for (i32 y = tileMinY; y <= tileMaxY; y++)
 	{
@@ -333,6 +332,8 @@ UpdateGameState(Bitmap_s* screen, Input_s* input)
 				continue;
 
 			GjkResult_s result;
+            // EllipseShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
+            BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
 			BoxShape_s  tileShape(V2((r32)x * TILE_SIZE_METERS_X, (r32)y * TILE_SIZE_METERS_Y),
                                  V2(TILE_SIZE_METERS_X / 2, TILE_SIZE_METERS_Y / 2));
 			AddDebugShape(&tileShape, 1.0f, 1.0f, 0.0f);
@@ -340,6 +341,9 @@ UpdateGameState(Bitmap_s* screen, Input_s* input)
 			if (Qi_Gjk(&result, &plrCollideShape, &tileShape))
 			{
 				collided = true;
+                AddSubtileOffset(&newPlrPos, result.penetrationNormal * result.penetrationDepth);
+                g_game->dPlayerPos += -result.penetrationNormal * g_game->dPlayerPos.dot(result.penetrationNormal);
+
                 MakeSimplexShapes(&gjkResulta, &gjkResultb, &result);
                 AddDebugShape(&gjkResulta, 0.0f, 1.0f, 0.0f);
                 AddDebugShape(&gjkResultb, 0.0f, 1.0f, 0.5f);
@@ -353,8 +357,7 @@ UpdateGameState(Bitmap_s* screen, Input_s* input)
 		}
 	}
 
-	if (!collided)
-		g_game->playerPos = newPlrPos;
+	g_game->playerPos = newPlrPos;
 
 	// Offset camera half a tile since we want it to be centered in a screen
 	g_game->cameraPos.x.offset = g_game->cameraPos.y.offset = -0.5f;
