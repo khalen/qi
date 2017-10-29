@@ -14,19 +14,32 @@
 #define GAME_DLL_NAME "qi.dll"
 
 #define TARGET_FPS 30.0
+
 #define GAME_IDEAL_RES_X 1920
 #define GAME_IDEAL_RES_Y 1080
+
+#define TILE_IDEAL_RES_X 60
+#define TILE_IDEAL_RES_Y 60
+
 #define GAME_DOWNRES_FACTOR 2
 
 #define GAME_RES_X (GAME_IDEAL_RES_X / GAME_DOWNRES_FACTOR)
 #define GAME_RES_Y (GAME_IDEAL_RES_Y / GAME_DOWNRES_FACTOR)
 
+#define TILE_RES_X (TILE_IDEAL_RES_X / GAME_DOWNRES_FACTOR)
+#define TILE_RES_Y (TILE_IDEAL_RES_Y / GAME_DOWNRES_FACTOR)
+
+#define BASE_SCREEN_TILES_X (GAME_RES_X / TILE_RES_X)
+#define BASE_SCREEN_TILES_Y (GAME_RES_Y / TILE_RES_Y)
+
+#define SCREEN_SCALE 1.0f
+
 struct Rect_s
 {
-	i32 left;
-	i32 top;
-	i32 width;
-	i32 height;
+	r32 left;
+	r32 top;
+	r32 width;
+	r32 height;
 };
 
 struct Bitmap_s
@@ -55,14 +68,14 @@ struct Trigger_s
 {
 	r32    reading;
 	r32    __Pad0;
-	Vec2_s minMax;
+	v2 minMax;
 };
 
 #define ANALOG_DEADZONE 0.1f
 struct Analog_s
 {
 	Trigger_s trigger;
-	Vec2_s    dir;
+	v2    dir;
 };
 
 struct Controller_s
@@ -91,7 +104,7 @@ struct Controller_s
 	};
 
 	union {
-#define BUTTON_COUNT 15
+#define BUTTON_COUNT 17
 		Button_s buttons[BUTTON_COUNT];
 
 		struct
@@ -115,6 +128,9 @@ struct Controller_s
 			Button_s leftMouse;
 			Button_s middleMouse;
 			Button_s rightMouse;
+
+            Button_s leftStickButton;
+            Button_s rightStickButton;
 		};
 	};
 };
@@ -123,7 +139,7 @@ struct Input_s
 {
 	Time_t       dT;
 	Controller_s controllers[CONTROLLER_MAX_COUNT];
-	Vec2_s       mouse;
+	v2       mouse;
 };
 
 struct Memory_s

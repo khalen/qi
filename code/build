@@ -5,7 +5,7 @@ BUILD_DIR=~/work/build
 DATA_DIR=~/work/qi/data
 THIRDPARTY=~/work/qi/thirdparty
 
-SOURCES_QI="$SOURCE_DIR/qi.cpp $SOURCE_DIR/qi_debug.cpp $SOURCE_DIR/qi_sound.cpp $SOURCE_DIR/qi_math.cpp $SOURCE_DIR/qi_tile.cpp $SOURCE_DIR/qi_profile.cpp"
+SOURCES_QI="$SOURCE_DIR/qi.cpp $SOURCE_DIR/qi_debug.cpp $SOURCE_DIR/qi_sound.cpp $SOURCE_DIR/qi_math.cpp $SOURCE_DIR/qi_tile.cpp $SOURCE_DIR/qi_profile.cpp $SOURCE_DIR/qi_gjk.cpp"
 SOURCES_MAIN="$SOURCE_DIR/osx_qi.mm $SOURCE_DIR/qi_ogl.cpp"
 
 pushd $BUILD_DIR

@@ -95,6 +95,32 @@
             "1.0", 
             "-o", 
             "/Users/jon/work/build/qi.dylib", 
+            "../qi/code/qi_gjk.cpp"
+        ], 
+        "directory": "/Users/jon/work/build", 
+        "file": "../qi/code/qi_gjk.cpp"
+    }, 
+    {
+        "arguments": [
+            "c++", 
+            "-c", 
+            "-std=c++17", 
+            "-fms-extensions", 
+            "-fvisibility=hidden", 
+            "-fvisibility-inlines-hidden", 
+            "-g", 
+            "-DQI_DEV_BUILD=1", 
+            "-DQI_OSX_BUILD=1", 
+            "-DQI_PROFILE_BUILD=1", 
+            "-DQI_DEV_DATA_DIR=\"/Users/jon/work/qi/data\"", 
+            "-I/Users/jon/work/qi/thirdparty/include", 
+            "-dynamiclib", 
+            "-current_version", 
+            "1.0", 
+            "-compatibility_version", 
+            "1.0", 
+            "-o", 
+            "/Users/jon/work/build/qi.dylib", 
             "../qi/code/qi_tile.cpp"
         ], 
         "directory": "/Users/jon/work/build", 

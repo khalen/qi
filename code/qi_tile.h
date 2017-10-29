@@ -72,7 +72,13 @@ struct World_s
 
 void SetTileValue(MemoryArena_s* tileArena, World_s* world, const WorldPos_s* pos, const u32 value);
 u32  GetTileValue(World_s* world, const WorldPos_s* pos);
-void AddSubtileOffset(WorldPos_s* pos, const Vec2_s offset);
+u32  GetTileValue(World_s* world, i32 tileX, i32 tileY);
+void AddSubtileOffset(WorldPos_s* pos, const v2 offset);
+void WorldPosSub(WorldPos_s* dest, const WorldPos_s* a, const WorldPos_s* b);
+
+v2 WorldPosToMeters(WorldPos_s* worldPos);
+v2 MetersToScreenPixels(const v2& posMeters);
+v2 WorldPosToScreenPixels(WorldPos_s* pos);
 
 #define __QI_TILE_H
 #endif // #ifndef __QI_TILE_H

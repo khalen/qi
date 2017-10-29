@@ -25,6 +25,7 @@ void
 Qi_Assert_Handler(const char* msg, const char* file, const int line)
 {
 #if HAS(OSX_BUILD)
+	asm("int $3");
 #else
 	__debugbreak();
 #endif

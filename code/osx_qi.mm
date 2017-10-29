@@ -516,18 +516,18 @@ EndRecording()
 static void
 ProcessKeyboardStick(Analog_s* analog, r32 valueX, r32 valueY, bool isDown)
 {
-	Vec2_s incDir;
+	v2 incDir;
 	incDir.x = isDown ? valueX : -valueX;
 	incDir.y = isDown ? valueY : -valueY;
 
 	// This is gross
-	Vec2_s oldDir = analog->dir;
+	v2 oldDir = analog->dir;
 	oldDir.x      = oldDir.x < 0.0f ? -1.0f : oldDir.x > 0.0f ? 1.0f : 0.0f;
 	oldDir.y      = oldDir.y < 0.0f ? -1.0f : oldDir.y > 0.0f ? 1.0f : 0.0f;
 
-	Vec2Add(&analog->dir, &oldDir, &incDir);
-	Vec2Normalize(&analog->dir);
-	analog->trigger.reading  = Vec2Length(&analog->dir);
+    VAdd(&analog->dir, &oldDir, &incDir);
+    VNormalize(&analog->dir);
+    analog->trigger.reading  = VLength(&analog->dir);
 	analog->trigger.minMax.x = analog->trigger.minMax.y = analog->trigger.reading;
 }
 
@@ -547,8 +547,11 @@ Osx_HandleKeyEvent(NSEvent* event, Input_s* newInput)
 	unichar vkCode        = [[event charactersIgnoringModifiers] characterAtIndex:0];
 	i32     modifierFlags = [event modifierFlags];
 	bool    commandKey    = (modifierFlags & NSEventModifierFlagCommand) != 0;
+	bool    shiftKey    = (modifierFlags & NSEventModifierFlagShift) != 0;
 	// bool    controlKey    = (modifierFlags & NSEventModifierFlagControl) != 0;
 	// bool    alternateKey  = (modifierFlags & NSEventModifierFlagAlternate) != 0;
+
+    ProcessKeyboardButton(&kbdController->leftStickButton, shiftKey);
 
 	if (vkCode == 'w')
 	{
