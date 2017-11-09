@@ -519,7 +519,6 @@ ClipRectToBmp(const Bitmap_s* bmp, i32* bx, i32* by, i32* bw, i32* bh)
 	*bh = by1 - *by;
 }
 
-#if 1
 static inline void
 BlendPixel(u32& dest, const u32 src)
 {
@@ -535,28 +534,7 @@ BlendPixel(u32& dest, const u32 src)
 	const u64 GRB = destGRB + dGRB;
 	dest          = (u32)(GRB & 0xFF00FF) | (u32)((GRB & 0xFF00000000ull) >> 24);
 }
-#else
-static inline void
-BlendPixel(u32& dest, const u32 src)
-{
-	const r32 a  = (src >> 24) / 255.0f;
-	const r32 ia = 1.0f - a;
 
-	const r32 sr = (r32)(src & 0xFF0000 >> 16);
-	const r32 sg = (r32)(src & 0x00FF00 >> 8);
-	const r32 sb = (r32)(src & 0x0000FF >> 0);
-
-	const r32 dr = (r32)(dest & 0xFF0000 >> 16);
-	const r32 dg = (r32)(dest & 0x00FF00 >> 8);
-	const r32 db = (r32)(dest & 0x0000FF >> 0);
-
-	const u32 br = (u32)((dr * ia + sr * a) + 0.5f);
-	const u32 bg = (u32)((dg * ia + sg * a) + 0.5f);
-	const u32 bb = (u32)((db * ia + sb * a) + 0.5f);
-
-	dest = (br << 16) | (bg << 8) | bb;
-}
-#endif
 
 internal void
 BltBmpFixed(ThreadContext_s* thread, Bitmap_s* dest, i32 dx, i32 dy, const Bitmap_s* src)

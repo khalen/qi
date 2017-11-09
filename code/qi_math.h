@@ -33,6 +33,7 @@ struct v2
 	};
 
 	r32 dot(const v2& b) const { return x * b.x + y * b.y; }
+
 	v2  perp() const
 	{
 		v2 result;
@@ -40,8 +41,10 @@ struct v2
 		result.y = -x;
 		return result;
 	}
+
 	r32 lenSq() const { return x * x + y * y; }
 	r32 len() const { return sqrtf(lenSq()); }
+
 	v2  normal() const
 	{
 		v2        result;
