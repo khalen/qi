@@ -378,28 +378,5 @@ Qi_PackColor(const Color_s* c)
 	return ((u32)adj.x << 24) | ((u32)adj.y << 16) | ((u32)adj.z << 8) | ((u32)adj.w);
 }
 
-template<typename T>
-static inline T
-Min(const T& a, const T& b)
-{
-	return a < b ? a : b;
-}
-
-template<typename T>
-static inline T
-Max(const T& a, const T& b)
-{
-	return a > b ? a : b;
-}
-
-template<typename T>
-static inline void
-Swap(T& a, T& b)
-{
-	T tmp = a;
-	a     = b;
-	b     = tmp;
-}
-
 #define __QI_MATH_H
 #endif

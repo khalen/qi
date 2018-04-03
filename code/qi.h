@@ -142,27 +142,6 @@ struct Input_s
 	v2       mouse;
 };
 
-struct Memory_s
-{
-	size_t permanentSize;
-	u8*    permanentStorage;
-	u8*    permanentPos;
-
-	size_t transientSize;
-	u8*    transientStorage;
-	u8*    transientPos;
-};
-
-struct MemoryArena_s
-{
-	u8*    base;
-	size_t size;
-	size_t curOffset;
-};
-
-void MemoryArena_Init( MemoryArena_s* arena, const size_t size );
-u8* MemoryArena_Alloc( MemoryArena_s* arena, const size_t size );
-
 struct SubSystem_s;
 typedef void Qi_Init_SubSystem_f(const SubSystem_s* sys, bool isReInit);
 
@@ -176,32 +155,12 @@ struct SubSystem_s
 
 #define MAX_SUBSYSTEMS 16
 
-void* Qim_AllocRaw(Memory_s* memory, const size_t size);
-template<typename T>
-T*
-Qim_New(Memory_s* memory)
-{
-	void* buf = Qim_AllocRaw(memory, sizeof(T));
-	Assert(buf != nullptr);
-	memset(buf, 0, sizeof(T));
-	return reinterpret_cast<T*>(buf);
-}
-
-void* Qim_TransientAllocRaw(Memory_s* memory, const size_t size);
-template<typename T>
-T*
-Qim_TransientNew(Memory_s* memory)
-{
-	void* buf = Qim_TransientAllocRaw(memory, sizeof(T));
-	Assert(buf != nullptr);
-	memset(buf, 0, sizeof(T));
-	return reinterpret_cast<T*>(buf);
-}
-
 struct ThreadContext_s
 {
 	int dummy;
 };
+
+struct Memory_s;
 
 // Game / Platform Linkage
 struct PlatFuncs_s;

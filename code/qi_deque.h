@@ -9,8 +9,9 @@
 template<typename T, int size = QI_DEFAULT_DEQUE_SIZE>
 struct Deque
 {
-	T   store[size];
 	i32 front, back;
+    i32 __pad[2];
+	T   store[size];
 
 	static Deque<T, size>* Make(void* mem);
 

@@ -7,6 +7,7 @@
 #include "basictypes.h"
 
 #include "qi.h"
+#include "qi_memory.h"
 #include "qi_tile.h"
 #include <stdio.h>
 
@@ -37,7 +38,7 @@ SetTileValue(MemoryArena_s* tileArena, World_s* world, const WorldPos_s* pos, co
 	Assert(chunk);
 
 	if (chunk->tiles == nullptr)
-		chunk->tiles = (u32*)MemoryArena_Alloc(tileArena, TILE_CHUNK_DIM * TILE_CHUNK_DIM * sizeof(u32));
+		chunk->tiles = (u32*)MA_Alloc(tileArena, TILE_CHUNK_DIM * TILE_CHUNK_DIM * sizeof(u32));
 
 	Assert(chunk->tiles);
 

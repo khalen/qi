@@ -7,9 +7,11 @@
 #include "basictypes.h"
 
 #include "qi.h"
+#include "qi_memory.h"
 #include "qi_tile.h"
 #include "qi_math.h"
 #include "qi_gjk.h"
+#include "qi_util.h"
 #include <stdio.h>
 
 #define ROOM_WID BASE_SCREEN_TILES_X
@@ -48,7 +50,7 @@ struct GameGlobals_s
 GameGlobals_s* g_game;
 
 void*
-Qim_AllocRaw(Memory_s* memory, const size_t size)
+M_AllocRaw(Memory_s* memory, const size_t size)
 {
 	size_t allocSize = (size + 15) & ~0xFull;
 	Assert(memory && ((uintptr_t)memory->permanentPos & 0xF) == 0
@@ -62,19 +64,19 @@ template<typename T>
 T*
 GameAllocate()
 {
-	return Qim_New<T>(g_game->memory);
+	return M_New<T>(g_game->memory);
 }
 
 void
-MemoryArena_Init(MemoryArena_s* arena, const size_t size)
+MA_Init(MemoryArena_s* arena, const size_t size)
 {
 	arena->size      = size;
 	arena->curOffset = 0;
-	arena->base      = (u8*)Qim_AllocRaw(g_game->memory, size);
+	arena->base      = (u8*)M_AllocRaw(g_game->memory, size);
 }
 
 u8*
-MemoryArena_Alloc(MemoryArena_s* arena, const size_t size)
+MA_Alloc(MemoryArena_s* arena, const size_t size)
 {
 	Assert(arena && arena->curOffset + size <= arena->size);
 	u8* mem = arena->base + arena->curOffset;
@@ -86,7 +88,7 @@ template<typename T>
 T*
 MemoryArena_PushStruct(MemoryArena_s* arena)
 {
-	T* newT = (T*)MemoryArena_Alloc(arena, sizeof(T));
+	T* newT = (T*)MA_Alloc(arena, sizeof(T));
 	return newT;
 }
 
@@ -100,7 +102,7 @@ CreateBitmap(MemoryArena_s* arena, Bitmap_s* result, const u32 width, const u32 
 	result->height   = height;
 	result->pitch    = width;
 	result->byteSize = width * height * sizeof(u32);
-	result->pixels   = (u32*)MemoryArena_Alloc(arena, result->byteSize);
+	result->pixels   = (u32*)MA_Alloc(arena, result->byteSize);
 }
 
 static void InitGameGlobals(const SubSystem_s*, bool);
@@ -115,7 +117,7 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 	if (isReInit)
 		return;
 
-	MemoryArena_Init(&g_game->tileArena, MB(32));
+	MA_Init(&g_game->tileArena, MB(32));
 
 	g_game->playerPos.x.tile = 10;
 	g_game->playerPos.y.tile = 10;
@@ -175,11 +177,13 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][2], "test/test_hero_left_torso.bmp");
 }
 
+#if 0
 internal void
 PV(const char* msg, const v2& v)
 {
 	printf("%s %f %f\n", msg, v.x, v.y);
 }
+#endif
 
 #define MAX_DEBUG_SHAPES 50
 PolyShape_s debugShapes[MAX_DEBUG_SHAPES];
@@ -404,7 +408,7 @@ InitGameSystems(Memory_s* memory)
 		*sys                   = *s_subSystems[i];
 
 		if (curMemPtr == nullptr)
-			sys->globalPtr = Qim_AllocRaw(memory, sys->globalSize);
+			sys->globalPtr = M_AllocRaw(memory, sys->globalSize);
 		else
 			sys->globalPtr = curMemPtr;
 

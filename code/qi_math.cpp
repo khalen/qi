@@ -7,5 +7,6 @@
 #include "basictypes.h"
 #include "qi.h"
 #include "qi_math.h"
+#include "qi_vecmath_internal.h"
 
 

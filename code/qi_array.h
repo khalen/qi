@@ -14,8 +14,9 @@
 template<typename T, int SIZE = QI_DEFAULT_ARRAY_SIZE>
 struct Array
 {
-	T   store[SIZE];
 	u32 front;
+    u32 __pad[3];
+	T   store[SIZE];
 
 	static Array<T, SIZE>* Make(void* mem);
 

@@ -1,7 +1,9 @@
 #include "basictypes.h"
 #include "qi.h"
+#include "qi_memory.h"
 #include "qi_sound.h"
 #include "qi_debug.h"
+
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -336,7 +338,7 @@ InitGameGlobals()
 			pastLastSlash = g.gameAppPath + i + 1;
 	*pastLastSlash = 0;
 
-	MakeGameEXERelativePath(g.gameDylibPath, "qi.dylib");
+	MakeGameEXERelativePath(g.gameDylibPath, "libqi_game.dylib");
 	MakeGameEXERelativePath(g.gameRecordBasePath, "qi_");
 
 	Osx_LoadGameDylib();

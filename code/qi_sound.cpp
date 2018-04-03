@@ -9,6 +9,7 @@
 #include "qi_sound.h"
 #include "qi.h"
 #include "qi_math.h"
+#include "qi_memory.h"
 
 #include <math.h>
 #include <string.h>
@@ -45,9 +46,9 @@ Qis_MakeSoundBuffer(Memory_s* memory, const int numSamples, const int channels, 
 	u32    sampleBufBytes = numSamples * channels * sizeof(i16);
 	size_t totalBytes     = sizeof(SoundBuffer_s) + sampleBufBytes;
 
-	u8* mem = (u8*)Qim_AllocRaw(memory, totalBytes);
+	u8* mem = (u8*)M_AllocRaw(memory, totalBytes);
 
-	SoundBuffer_s* buffer  = (SoundBuffer_s*)Qim_AllocRaw(memory, totalBytes);
+	SoundBuffer_s* buffer  = (SoundBuffer_s*)M_AllocRaw(memory, totalBytes);
 	buffer->numSamples     = numSamples;
 	buffer->channels       = channels;
 	buffer->bytesPerSample = channels * sizeof(i16);
