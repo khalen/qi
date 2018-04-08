@@ -10,7 +10,6 @@
 
 #include <stdio.h>
 
-static_assert(sizeof(SVector<R32ScalarTraits, IdxList<0, 1, 2, 3>>) == sizeof(r32) * 4, "skjrhg");
 static_assert(sizeof(Vector4) == sizeof(r32) * 4, "Bad size");
 
 int main(int, char**)

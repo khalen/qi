@@ -60,16 +60,21 @@ template<typename Traits, typename IdxsA, typename IdxsB> auto operator- (SVecto
 template<typename Traits, typename IdxsA, typename IdxsB> auto operator* (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b);
 template<typename Traits, typename IdxsA, typename IdxsB> auto operator/ (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b);
 
-template <typename Traits, typename Idxs>
+template <typename Base, typename Idxs>
 struct SVector
 {
-    using Traits = Traits;
+    typedef typename Base::Traits Traits;
     using ScalarType = typename Traits::Type;
+    using VectorType = Base;
     using IndicesType = Idxs;
+
     constexpr static const size_t Rank = IndicesType::Rank;
     constexpr static const size_t Indices = IndicesType::Indices;
 
-    ScalarType data[Rank];
+    template <typename IdxsOther>
+    using SubVec = SVector<Traits, IdxsOther>;
+
+    using Base::data;
 
     SVector(std::initializer_list<ScalarType> Inits)
         {
@@ -87,7 +92,7 @@ struct SVector
 	}
 
 	template<typename IdxsOther>
-    SVector(SVector<Traits, IdxsOther> const& other)
+    SVector(SubVec<IdxsOther> const& other)
 	{
         const size_t RankOther = IdxsOther::Rank;
 		if constexpr (RankOther >= Rank)
@@ -111,7 +116,7 @@ struct SVector
 	}
 
     template<typename IdxsOther>
-    SVector& operator=( SVector<Traits, IdxsOther>const &other )
+    SVector& operator=( SubVec<IdxsOther> const &other )
 	{
         const size_t RankOther = IdxsOther::Rank;
 
@@ -137,7 +142,7 @@ struct SVector
 	}
 
     template<typename IdxsOther>
-    SVector const& operator=( SVector<Traits, IdxsOther>const &other ) const
+    SVector const& operator=( SubVec<IdxsOther> const &other ) const
 	{
         const size_t RankOther = IdxsOther::Rank;
 
@@ -164,9 +169,9 @@ struct SVector
 	inline ScalarType const& operator[](const size_t idx) const { return at(idx); }
 
     template<typename IdxsOther, typename = std::enable_if<(IdxsOther::Rank > 1), void>>
-    operator SVector<Traits, IdxsOther> const () const
+    operator SubVec<IdxsOther> const () const
 	{
-		return SVector<Traits, IdxsOther>(*this);
+		return SubVec<IdxsOther>(*this);
 	}
 
 	template<typename = std::enable_if<Rank == 1, void>>
@@ -179,13 +184,13 @@ struct SVector
     template <typename = std::enable_if< Rank == 2, void >>
     inline auto perp() const
 	{
-        return SVector<Traits, MakeIdxList<2>::Type>(at(1), -at(0));
+        return SubVec<MakeIdxList<2>::Type>(at(1), -at(0));
 	}
 
     template <typename IdxsOther, typename = std::enable_if< Rank == 3, void >>
-    inline auto cross(SVector<Traits, IdxsOther>const& b) const
+    inline auto cross(SubVec<IdxsOther>const& b) const
 	{
-		return SVector<Traits, MakeIdxList<3>::Type>(
+		return SubVec<MakeIdxList<3>::Type>(
             at(1) * b.at(2) - at(2) * b.at(1),
             at(2) * b.at(0) - at(0) * b.at(2),
             at(0) * b.at(1) - at(1) * b.at(0)
@@ -194,7 +199,7 @@ struct SVector
 
 	// Math
     template<typename IdxsOther>
-	friend inline SVector& operator+=(SVector& a, SVector<Traits, IdxsOther> const& b)
+	friend inline SVector& operator+=(SVector& a, SubVec<IdxsOther> const& b)
 	{
         const size_t RankOther = IdxsOther::Rank;
 
@@ -205,7 +210,7 @@ struct SVector
 	}
 
     template<typename IdxsOther>
-	friend inline SVector& operator+(SVector& a, SVector<Traits, IdxsOther> const& b)
+	friend inline SVector& operator+(SVector& a, SubVec<IdxsOther> const& b)
     {
         SVector rval(a);
         return a += b;
@@ -220,7 +225,7 @@ struct SVector
 	}
 
     template<typename IdxsOther>
-	friend inline SVector& operator-=(SVector& a, SVector<Traits, IdxsOther> const& b)
+	friend inline SVector& operator-=(SVector& a, SubVec<IdxsOther> const& b)
 	{
         const size_t RankOther = IdxsOther::Rank;
 		for (size_t i = 0; i < (Rank <= RankOther ? Rank : RankOther); i++)
@@ -238,7 +243,7 @@ struct SVector
 	}
 
     template<typename IdxsOther>
-	friend inline SVector& operator*=(SVector& a, SVector<Traits, IdxsOther> const& b)
+	friend inline SVector& operator*=(SVector& a, SubVec<IdxsOther> const& b)
 	{
         const size_t RankOther = IdxsOther::Rank;
 		for (size_t i = 0; i < (Rank <= RankOther ? Rank : RankOther); i++)
@@ -256,7 +261,7 @@ struct SVector
 	}
 
     template<typename IdxsOther>
-	friend inline SVector& operator/=(SVector& a, SVector<Traits, IdxsOther> const& b)
+	friend inline SVector& operator/=(SVector& a, SubVec<IdxsOther> const& b)
 	{
         const size_t RankOther = IdxsOther::Rank;
 		for (size_t i = 0; i < (Rank <= RankOther ? Rank : RankOther); i++)
@@ -306,6 +311,11 @@ struct SVector
         SVector rval(*this);
 		return rval.normalize();
 	}
+
+    template<typename Idxs>
+    operator SubVec<Idxs>() {
+        return SubVec<Idxs>(*this);
+    }
 };
 
 template<typename Traits, typename IdxsA, typename IdxsB>
@@ -328,9 +338,10 @@ auto operator+ (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b
 }
 
 template<typename Traits, typename Idxs>
-auto operator+ (SVector<Traits, Idxs> const& a, typename Traits::Type const& b)
+auto
+operator+(SVector<Traits, Idxs> const& a, typename Traits::Type const& b)
 {
-    const size_t RankA = Idxs::Rank;
+	const size_t RankA = Idxs::Rank;
     SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
 
     return rval += b;
@@ -351,12 +362,12 @@ auto operator- (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b
     const size_t RankA = IdxsA::Rank;
     const size_t RankB = IdxsB::Rank;
     if constexpr(RankA >= RankB)
-	{
-		SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
-		rval -= b;
-		return rval;
-	}
-	else
+                {
+                    SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
+                    rval -= b;
+                    return rval;
+                }
+    else
     {
         SVector<Traits, typename MakeIdxList<RankB>::Type> rval(a);
         rval -= b;
@@ -365,9 +376,10 @@ auto operator- (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b
 }
 
 template<typename Traits, typename Idxs>
-auto operator- (SVector<Traits, Idxs> const& a, typename Traits::Type const& b)
+auto
+operator-(SVector<Traits, Idxs> const& a, typename Traits::Type const& b)
 {
-    const size_t RankA = Idxs::Rank;
+	const size_t RankA = Idxs::Rank;
     SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
 
     return rval -= b;
@@ -388,12 +400,12 @@ auto operator* (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b
     const size_t RankA = IdxsA::Rank;
     const size_t RankB = IdxsB::Rank;
     if constexpr(RankA >= RankB)
-	{
-		SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
-		rval *= b;
-		return rval;
-	}
-	else
+                {
+                    SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
+                    rval *= b;
+                    return rval;
+                }
+    else
     {
         SVector<Traits, typename MakeIdxList<RankB>::Type> rval(a);
         rval *= b;
@@ -402,9 +414,10 @@ auto operator* (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b
 }
 
 template<typename Traits, typename Idxs>
-auto operator* (SVector<Traits, Idxs> const& a, typename Traits::Type const& b)
+auto
+operator*(SVector<Traits, Idxs> const& a, typename Traits::Type const& b)
 {
-    const size_t RankA = Idxs::Rank;
+	const size_t RankA = Idxs::Rank;
     SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
 
     return rval *= b;
@@ -425,12 +438,12 @@ auto operator/ (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b
     const size_t RankA = IdxsA::Rank;
     const size_t RankB = IdxsB::Rank;
     if constexpr(RankA >= RankB)
-	{
-		SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
-		rval /= b;
-		return rval;
-	}
-	else
+                {
+                    SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
+                    rval /= b;
+                    return rval;
+                }
+    else
     {
         SVector<Traits, typename MakeIdxList<RankB>::Type> rval(a);
         rval /= b;
@@ -439,9 +452,10 @@ auto operator/ (SVector<Traits, IdxsA> const& a, SVector<Traits, IdxsB> const& b
 }
 
 template<typename Traits, typename Idxs>
-auto operator/ (SVector<Traits, Idxs> const& a, typename Traits::Type const& b)
+auto
+operator/(SVector<Traits, Idxs> const& a, typename Traits::Type const& b)
 {
-    const size_t RankA = Idxs::Rank;
+	const size_t RankA = Idxs::Rank;
     SVector<Traits, typename MakeIdxList<RankA>::Type> rval(a);
 
     return rval /= b;
