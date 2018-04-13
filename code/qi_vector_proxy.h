@@ -25,7 +25,7 @@ class IndexedVectorProxy
 	using DataType   = DataType;
     using IndicesType = Idxs;
 
-	VectorType Decay()
+	VectorType Decay() const
 	{
 		VectorType result;
 		for (size_t i = 0; i < Rank; i++)
@@ -38,12 +38,13 @@ class IndexedVectorProxy
 	operator VectorType() const { return Decay(); }
 
     // Assignment only if possible
-    IndexedVectorProxy& operator=(std::enable_if_t<IsAssignable, VectorType> const& vec)
+    IndexedVectorProxy& operator=(std::conditional_t<IsAssignable, VectorType, OperationNotAvailable>const& vec)
 	{
 		for (size_t i = 0; i < Rank; i++)
 		{
 			data[Idxs::Indices[i]] = vec.at(i);
 		}
+        return *this;
 	}
 
     template<typename T>

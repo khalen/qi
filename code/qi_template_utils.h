@@ -93,7 +93,10 @@ struct AreAllUnique<Head, Tail>
 };
 
 template <typename T>
-struct RemoveReferenceCV : std::remove_cv< typename std::remove_reference<T>::type > {};
+struct RemoveReferenceCV
+{
+    using Type = typename std::remove_cv< typename std::remove_reference<T>::type >::type;
+};
 
 // Allow conditional overloads based on whether or not a template argument has a Type parameter
 template <typename T>
@@ -120,6 +123,14 @@ using BoolConstant = ValueConstant<bool, Constant>;
 
 struct TrueConstant : BoolConstant<true> {};
 struct FalseConstant : BoolConstant<false> {};
+
+template<typename T, typename U>
+struct IsSame : FalseConstant
+{};
+
+template<typename T>
+struct IsSame<T, T> : TrueConstant
+{};
 
 template<size_t S0, size_t S1>
 struct IsGreater : BoolConstant<(S0 > S1)> {};
@@ -151,6 +162,19 @@ struct Every<Predicate, Head>
 {
     constexpr static bool Value = Predicate<Head>::Value;
 };
+
+struct OperationNotAvailable {};
+
+template <typename T>
+inline auto Decay(T&& t) -> decltype( t.Decay() ) { return t.Decay(); }
+
+inline Nothing Decay(Nothing) { return Nothing(); }
+
+template <typename T>
+inline std::enable_if_t< std::is_scalar_v< std::remove_reference_t<T> >, T > Decay(T&& t)
+{
+    return t;
+}
 
 #define __QI_TEMPLATE_UTILS_H
 #endif // #ifndef __QI_TEMPLATE_UTILS_H

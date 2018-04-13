@@ -8,14 +8,14 @@
 
 #include "qi_template_utils.h"
 
-template<size_t Rank, template<typename> class SubVectorGen, typename DataType>
+template<size_t Rank, template<size_t...> class SubVectorGen, typename DataType>
 struct VectorBase;
 
-template<template<typename> class SubVectorGen, typename DataType>
+template<template<size_t... Idxs> class SubVectorGen, typename DataType>
 struct VectorBase<1, SubVectorGen, DataType>
 {
 	template<size_t... Idxs>
-	using SubVector = typename SubVectorGen<IdxList<Idxs...>>::Type;
+	using SubVector = typename SubVectorGen<Idxs...>::Type;
 
 	union {
 		DataType data;
@@ -38,11 +38,11 @@ struct VectorBase<1, SubVectorGen, DataType>
 	};
 };
 
-template<template<typename> class SubVectorGen, typename DataType>
+template<template<size_t... Idxs> class SubVectorGen, typename DataType>
 struct VectorBase<2, SubVectorGen, DataType>
 {
 	template<size_t... Idxs>
-	using SubVector = typename SubVectorGen<IdxList<Idxs...>>::Type;
+	using SubVector = typename SubVectorGen<Idxs...>::Type;
 
 	union {
 		DataType data;
@@ -95,11 +95,11 @@ struct VectorBase<2, SubVectorGen, DataType>
 	};
 };
 
-template<template<typename> class SubVectorGen, typename DataType>
+template<template<size_t...> class SubVectorGen, typename DataType>
 struct VectorBase<3, SubVectorGen, DataType>
 {
 	template<size_t... Idxs>
-	using SubVector = typename SubVectorGen<IdxList<Idxs...>>::Type;
+	using SubVector = typename SubVectorGen<Idxs...>::Type;
 
 	union {
 		DataType data;
@@ -244,11 +244,11 @@ struct VectorBase<3, SubVectorGen, DataType>
 	};
 };
 
-template<template<typename> class SubVectorGen, typename DataType>
+template<template<size_t...> class SubVectorGen, typename DataType>
 struct VectorBase<4, SubVectorGen, DataType>
 {
 	template<size_t... Idxs>
-	using SubVector = typename SubVectorGen<IdxList<Idxs...>>::Type;
+	using SubVector = typename SubVectorGen<Idxs...>::Type;
 
 	union {
 		DataType data;

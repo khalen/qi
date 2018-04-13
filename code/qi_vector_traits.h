@@ -67,14 +67,19 @@ struct GetVectorType<Head> : std::conditional_t<HasVectorTypeImpl<Head>::Value,
                                                 Nothing>
 {};
 
-template<typename Vector, typename = TrueConstant>
-struct GetVectorRank;
+template<typename Vector, typename = void>
+struct GetVectorRank : SizeConstant<1>
+{};
 
 template<typename Vector>
-struct GetVectorRank<Vector, BoolConstant<IsGreater<GetVectorType<Vector>::Rank, 0>::Value>>
-    : SizeConstant<GetVectorType<Vector>::Rank>
+struct GetVectorRank<Vector, decltype(Vector::Rank, void())> : SizeConstant<Vector::Rank>
+{};
+
+template<typename Vector>
+constexpr size_t GetVectorRankFn()
 {
-};
+    return GetVectorRank<Vector>::Value;
+}
 
 template<bool AllHaveRanks, typename... VectorTypes>
 struct GetTotalRankHelper {};
