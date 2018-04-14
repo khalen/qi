@@ -50,64 +50,61 @@ struct VectorFunctions : public Base
 
 	friend ScalarType distance(VectorArgType v0, VectorArgType v1) { return length(v1 - v0); }
 
-    friend VectorType min(VectorArgType v, ScalarArgType s)
-        {
-            VectorType result{};
-            for(size_t i = 0; i < Rank; i++)
-                result[i] = min(v[i], s);
-            return result;
-        }
-    friend VectorType min(VectorArgType v, VectorArgType s)
-        {
-            VectorType result{};
-            for(size_t i = 0; i < Rank; i++)
-                result[i] = min(v[i], s[i]);
-            return result;
-        }
-
-    friend VectorType clamp(VectorArgType v, ScalarArgType a, ScalarArgType b)
-        {
-            VectorType result{};
-            for(size_t i = 0; i < Rank; i++)
-                result[i] = max(min(v[i], b), a);
-            return result;
-        }
-    friend VectorType clamp(VectorArgType v, VectorArgType a, VectorArgType b)
-        {
-            VectorType result{};
-            for(size_t i = 0; i < Rank; i++)
-                result[i] = max(min(v[i], b[i]), a[i]);
-            return result;
-        }
-
-    friend VectorType floor(VectorArgType v)
-        {
-            VectorType result{};
-            for(size_t i = 0; i < Rank; i++)
-                result[i] = floor(v[i]);
-            return result;
-        }
-
-    friend VectorType ceil(VectorArgType v)
-        {
-            VectorType result{};
-            for(size_t i = 0; i < Rank; i++)
-                result[i] = ceil(v[i]);
-            return result;
-        }
-
-    friend VectorType fract(VectorArgType v)
-        {
-            VectorType result{};
-            for(size_t i = 0; i < Rank; i++)
-                result[i] = fract(v[i]);
-            return result;
-        }
-
-	friend VectorType saturate(VectorArgType v)
+	friend VectorType min(VectorArgType v, ScalarArgType s)
 	{
-		return clamp(v, 0, 1);
+		VectorType result{};
+		for (size_t i = 0; i < Rank; i++)
+			result[i] = min(v[i], s);
+		return result;
 	}
+	friend VectorType min(VectorArgType v, VectorArgType s)
+	{
+		VectorType result{};
+		for (size_t i = 0; i < Rank; i++)
+			result[i] = min(v[i], s[i]);
+		return result;
+	}
+
+	friend VectorType clamp(VectorArgType v, ScalarArgType a, ScalarArgType b)
+	{
+		VectorType result{};
+		for (size_t i = 0; i < Rank; i++)
+			result[i] = max(min(v[i], b), a);
+		return result;
+	}
+	friend VectorType clamp(VectorArgType v, VectorArgType a, VectorArgType b)
+	{
+		VectorType result{};
+		for (size_t i = 0; i < Rank; i++)
+			result[i] = max(min(v[i], b[i]), a[i]);
+		return result;
+	}
+
+	friend VectorType floor(VectorArgType v)
+	{
+		VectorType result{};
+		for (size_t i = 0; i < Rank; i++)
+			result[i] = floor(v[i]);
+		return result;
+	}
+
+	friend VectorType ceil(VectorArgType v)
+	{
+		VectorType result{};
+		for (size_t i = 0; i < Rank; i++)
+			result[i] = ceil(v[i]);
+		return result;
+	}
+
+	friend VectorType fract(VectorArgType v)
+	{
+		VectorType result{};
+		for (size_t i = 0; i < Rank; i++)
+			result[i] = fract(v[i]);
+		return result;
+	}
+
+	friend VectorType saturate(VectorArgType v) { return clamp(v, 0, 1); }
 
 	friend VectorType step(ScalarArgType edge, VectorArgType v)
 	{
