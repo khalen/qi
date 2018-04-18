@@ -346,7 +346,7 @@ InitGameGlobals()
 	// Assert(g.game && g.game->sound);
 	Assert(g.game);
 #if HAS(DEV_BUILD) || HAS(PROF_BUILD)
-	Assert(g.game->debug);
+	//Assert(g.game->debug);
 #endif
 
 	g.frameBuffer.width = GAME_RES_X;

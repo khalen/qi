@@ -12,6 +12,7 @@
 #include "qi_math.h"
 #include "qi_gjk.h"
 #include "qi_util.h"
+#include "qi_noise.h"
 #include <stdio.h>
 
 #define ROOM_WID BASE_SCREEN_TILES_X
@@ -45,6 +46,8 @@ struct GameGlobals_s
 	Bitmap_s testBitmaps[5];
 	Bitmap_s playerBmps[4][3];
 	i32      playerFacingIdx;
+
+    BuddyAllocator_s* testAlloc;
 };
 
 GameGlobals_s* g_game;
@@ -57,6 +60,17 @@ M_AllocRaw(Memory_s* memory, const size_t size)
 	       && (memory->permanentSize - (size_t)(memory->permanentPos - memory->permanentStorage) > allocSize));
 	void* result = memory->permanentPos;
 	memory->permanentPos += allocSize;
+	return result;
+}
+
+void*
+M_TransientAllocRaw(Memory_s* memory, const size_t size)
+{
+	size_t allocSize = (size + 15) & ~0xFull;
+	Assert(memory && ((uintptr_t)memory->transientPos & 0xF) == 0
+	       && (memory->transientSize - (size_t)(memory->transientPos - memory->transientStorage) > allocSize));
+	void* result = memory->transientPos;
+	memory->transientPos += allocSize;
 	return result;
 }
 
@@ -118,6 +132,14 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 		return;
 
 	MA_Init(&g_game->tileArena, MB(32));
+
+    g_game->testAlloc = BA_Init(g_game->memory, 130000, 16, false);
+    void* memTest1 = BA_Alloc(g_game->testAlloc, 100);
+    void* memTest2 = BA_Alloc(g_game->testAlloc, 300);
+    void* memTest3 = BA_Alloc(g_game->testAlloc, 16);
+    BA_Free(g_game->testAlloc, memTest2);
+    BA_Free(g_game->testAlloc, memTest1);
+    BA_Free(g_game->testAlloc, memTest3);
 
 	g_game->playerPos.x.tile = 10;
 	g_game->playerPos.y.tile = 10;
@@ -396,6 +418,8 @@ internal SubSystem_s* s_subSystems[] = {
 internal void
 InitGameSystems(Memory_s* memory)
 {
+    NoiseGenerator::InitGradients();
+
 	g_game         = (GameGlobals_s*)memory->permanentStorage;
 	g_game->memory = memory;
 
@@ -730,6 +754,8 @@ end:
 void
 Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 {
+    static NoiseGenerator noise(1234);
+
 	g_game->screenWid = screenBitmap->width;
 	g_game->screenHgt = screenBitmap->height;
 
@@ -748,8 +774,24 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	const r32 cameraOffsetPixelsX = g_game->cameraPos.x.offset * tilePixelWid;
 	const r32 cameraOffsetPixelsY = g_game->cameraPos.y.offset * tilePixelHgt;
 
+    #if 0
 	for (i32 i = 4; i >= 0; i--)
 		BltBmpFixed(nullptr, screenBitmap, 0, 0, &g_game->testBitmaps[i]);
+    #else
+
+    for (i32 j = 0; j < screenBitmap->height; j++)
+    {
+        for (i32 i = 0; i < screenBitmap->width; i++)
+        {
+            // const r32 col = noise.Perlin2D(Vector2(i, j), 500.0f) * 0.5f + 0.5f;
+            const r32 col = noise.Smoothed2D(Vector2(i, j), 50.0f) * 0.5f + 0.5f;
+            //const r32 col = noise.Smoothed(i, 100.0f) * 0.5f + 0.5f;
+            //const r32 col = noise.GetReal(i);
+            //printf("%f\n", col);
+            PlotPt(screenBitmap, i, j, PackColor(col, col, col));
+        }
+    }
+    #endif
 
 	for (i32 row = -1; row < numScreenTilesY + 1; row++)
 	{
@@ -763,7 +805,7 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 			tileCoord.y.tile     = row + g_game->cameraPos.y.tile - numScreenTilesY / 2;
 
 			u32 tileValue = GetTileValue(&g_game->world, &tileCoord);
-#if 1
+#if 0
 			if (tileCoord.x.tile == g_game->playerPos.x.tile && tileCoord.y.tile == g_game->playerPos.y.tile)
 				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 0.1f, 0.1f, 0.1f);
 			else if (tileValue == TILE_INVALID)

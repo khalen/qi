@@ -61,12 +61,17 @@ struct MemLink_s
 struct BuddyAllocator_s
 {
     size_t size;
+    size_t actualSize;
+    size_t freeSize;
     size_t levels;
+    size_t minSizeShift;
+    u8* basePtr;
     u8* freeBits;
     u8* splitBits;
 };
+static_assert((sizeof(BuddyAllocator_s) & (sizeof(MemLink_s) - 1)) == 0, "Bad buddy allocator struct size");
 
-BuddyAllocator_s* BA_Init(Memory_s* memory, const size_t size, const bool isTransient = false);
+BuddyAllocator_s* BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, const bool isTransient = false);
 void* BA_Alloc(BuddyAllocator_s* allocator, const size_t size);
 void* BA_Realloc(BuddyAllocator_s* allocator, const size_t newSize);
 void* BA_Calloc(BuddyAllocator_s* allocator, const size_t size);

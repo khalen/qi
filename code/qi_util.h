@@ -60,10 +60,17 @@ NextLowerPow2(const T vi)
 }
 
 template <typename T>
-static constexpr inline const i32
+inline const i32
 BitScanRight(const T v)
 {
-    return (i32)(v & ~(v - 1));
+    return ffs(v);
+}
+
+template <>
+inline const i32
+BitScanRight<u64>(const u64 v)
+{
+    return ffsll(v);
 }
 
 #define __QI_UTIL_H

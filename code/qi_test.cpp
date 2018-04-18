@@ -7,6 +7,7 @@
 #include "basictypes.h"
 
 #include "qi_vector.h"
+#include "qi_noise.h"
 
 #include <stdio.h>
 
