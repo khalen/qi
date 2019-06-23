@@ -8,6 +8,7 @@
 
 #include "qi_vector.h"
 #include "qi_noise.h"
+#include "qi_lexer.h"
 
 #include <stdio.h>
 
@@ -18,6 +19,68 @@ static_assert(GetVectorRank<Vector4>::Value == 4, "Rank test fail");
 static_assert(GetVectorRank<Vector2>::Value == 2, "Rank test fail");
 static_assert(GetVectorRank<float>::Value == 1, "Rank test fail");
 static_assert(HasType<RemoveReferenceCV<GetVectorType<Vector4>>>::Value == true, "HasType fail");
+
+void
+Qi_Assert_Handler(const char* msg, const char* file, const int line)
+{
+#if HAS(OSX_BUILD)
+	asm("int $3");
+#else
+	__debugbreak();
+#endif
+}
+
+void testLex()
+{
+    char tokenBuf[1024];
+    char fileBuf[65536];
+
+    memset(fileBuf, 0, sizeof(fileBuf));
+    FILE* f = fopen("../qi/data/sample.qid", "r");
+
+    fseek(f, 0, SEEK_END);
+    size_t len = ftell(f);
+
+    fseek(f, 0, SEEK_SET);
+    fread(fileBuf, 1, len, f);
+    fclose(f);
+
+    Lexer lex;
+    Lex_Init(&lex, fileBuf, len, tokenBuf, sizeof(tokenBuf));
+    LexerToken t = TOK_EOF;
+
+    do
+    {
+        t = Lex_GetNextToken(&lex);
+        switch(t)
+        {
+        case TOK_EOF:
+            printf("EOF\n");
+            return;
+        case TOK_ERROR:
+            printf("ERROR: %s ", lex.errorMsg);
+            return;
+        case TOK_SYMBOL:
+            printf("SYM: %s ", Lex_GetTokenText(&lex));
+            break;
+        case TOK_STRING:
+            printf("STR: %s ", Lex_GetTokenText(&lex));
+            break;
+        case TOK_NUMBER:
+            printf("NUM: %s ", Lex_GetTokenText(&lex));
+            break;
+        case TOK_NEWLINE:
+            printf("NL\n");
+            break;
+        case TOK_SPACE:
+            printf("  ");
+            break;
+        default:
+            printf("C: %c", (char)t);
+            break;
+        }
+    } while(t != TOK_EOF);
+}
 
 int main(int, char**)
 {
@@ -56,4 +119,6 @@ int main(int, char**)
     Vector3 tb(cross(ta.xyz, tc));
 
 	printf("tb: %f %f %f %f\n", tb[0], tb[1], tb[2], tb[3]);
+
+    testLex();
 }

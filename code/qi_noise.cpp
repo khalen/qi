@@ -102,6 +102,57 @@ NoiseGenerator::Perlin2D(const Vector2& unscaledCoords, r32 scale)
 	return xValL + yweight * (xValU - xValL);
 }
 
+static const r32 SkewFactor = 0.5f * (sqrtf(3.0f) - 1.0f);
+static const r32 UnskewFactor = (3.0f - sqrtf(3.0f)) / 6.0f;
+static const Vector2 LowerCorner1Step{-1.0f + UnskewFactor, UnskewFactor};
+static const Vector2 UpperCorner1Step{UnskewFactor, -1.0f + UnskewFactor};
+static const Vector2 Corner2Step{-1.0f + 2.0f * UnskewFactor, -1.0f + 2.0f * UnskewFactor};
+
+r32
+NoiseGenerator::Simplex2D(const Vector2& unscaledCoords, r32 scale)
+{
+	const Vector2 coords  = unscaledCoords / scale;
+    const r32 skew = (coords.x + coords.y) * SkewFactor;
+    const IVector2 iCoords(floor(coords.x + skew), floor(coords.y + skew));
+    const IVector2 iCoords1 = iCoords + 1;
+
+    r32 unSkew = (iCoords.x + iCoords.y) * UnskewFactor;
+    const Vector2 cellOrigin = Vector2(iCoords.x, iCoords.y) - unSkew;
+
+    const Vector2 corner0 = coords - cellOrigin;
+    const Vector2 corner2 = corner0 + Corner2Step;
+
+    const bool isLower = corner0.x > corner0.y;
+    const Vector2 corner1Step = (isLower ? LowerCorner1Step : UpperCorner1Step);
+    const Vector2 corner1 = corner0 + corner1Step;
+
+    const u32 noise0 = Get2D(iCoords.x, iCoords.y);
+    const u32 noise1 = isLower ? Get2D(iCoords1.x, iCoords.y) : Get2D(iCoords.x, iCoords1.y);
+    const u32 noise2 = Get2D(iCoords1.x, iCoords1.y);
+
+    const Vector2 grad0 = GradientTable[noise0 & GradientMask];
+    const Vector2 grad1 = GradientTable[noise1 & GradientMask];
+    const Vector2 grad2 = GradientTable[noise2 & GradientMask];
+
+    const r32 dot0 = dot(grad0, corner0);
+    const r32 dot1 = dot(grad1, corner1);
+    const r32 dot2 = dot(grad2, corner2);
+
+    const r32 t0 = 0.5f - corner0.x * corner0.x - corner0.y * corner0.y;
+    const r32 t1 = 0.5f - corner1.x * corner1.x - corner1.y * corner1.y;
+    const r32 t2 = 0.5f - corner2.x * corner2.x - corner2.y * corner2.y;
+
+    const r32 dn0 = t0 * t0 * t0 * t0 * dot0;
+    const r32 dn1 = t1 * t1 * t1 * t1 * dot1;
+    const r32 dn2 = t2 * t2 * t2 * t2 * dot2;
+
+    const r32 val0 = t0 < 0.0f ? 0.0f : dn0;
+    const r32 val1 = t1 < 0.0f ? 0.0f : dn1;
+    const r32 val2 = t2 < 0.0f ? 0.0f : dn2;
+
+    return 70.0f * (val0 + val1 + val2);
+}
+
 void NoiseGenerator::DumpAndClearStats()
 {
     printf("Grad stats:\n");

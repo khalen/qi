@@ -107,6 +107,10 @@ class NoiseGenerator
     r32 Perlin2D(r32 xCoord, r32 yCoord, r32 scale);
     r32 Perlin2D(const Vector2& coords, r32 scale);
 
+    r32 Simplex(r32 xCoord, r32 scale);
+    r32 Simplex2D(r32 xCoord, r32 yCoord, r32 scale);
+    r32 Simplex2D(const Vector2& coords, r32 scale);
+
     static void DumpAndClearStats();
 };
 

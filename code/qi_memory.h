@@ -60,14 +60,14 @@ struct MemLink_s
 
 struct BuddyAllocator_s
 {
+    u8* basePtr;
     size_t size;
     size_t actualSize;
     size_t freeSize;
-    size_t levels;
+    size_t maxLevel;
     size_t minSizeShift;
-    u8* basePtr;
-    u8* freeBits;
-    u8* splitBits;
+    size_t freeBitsOffset;
+    size_t splitBitsOffset;
 };
 static_assert((sizeof(BuddyAllocator_s) & (sizeof(MemLink_s) - 1)) == 0, "Bad buddy allocator struct size");
 
@@ -76,6 +76,7 @@ void* BA_Alloc(BuddyAllocator_s* allocator, const size_t size);
 void* BA_Realloc(BuddyAllocator_s* allocator, const size_t newSize);
 void* BA_Calloc(BuddyAllocator_s* allocator, const size_t size);
 void BA_Free(BuddyAllocator_s* allocator, void* block);
+size_t BA_DumpInfo(BuddyAllocator_s* allocator);
 
 #define __QI_MEMORY_H
 #endif // #ifndef __QI_MEMORY_H

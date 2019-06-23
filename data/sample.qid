@@ -1,0 +1,15 @@
+// Comments are preceded by //
+// Outer braces elided, : is a synonym for =
+Value1 = 1.0e32  // Float
+Value2 = 5    // Int
+Value3 = 500l // Int64
+Value4 = "This is a test"
+Value5 = "
+  Arbitrarily formatted
+     text with spaces and newliens
+         preserved verbatim
+"
+Value6 = IdentifiersAreSymbolsNotStrings
+Value7 = `Embedded spaces in a symbol`
+Value8 = [ array, of, symbols, or, "arbitrary", `other values` ]
+Value9 = { SubValue1 = { SubSubValue1 = Arbitrary, SubSubValue2 = Nesting, SubSubValue3 = [ 1 2 3 4 5 ] } }
