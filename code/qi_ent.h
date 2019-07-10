@@ -6,6 +6,8 @@
 // Basic entity and entity manager defs
 //
 
+#include "basictypes.h"
+
 #define QI_ENT_INDEX_BITS 24
 #define QI_ENT_INDEX_MASK ((1 << (u32)QI_ENT_INDEX_BITS) - 1)
 

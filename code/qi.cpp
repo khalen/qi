@@ -233,7 +233,7 @@ u32 numDebugShapes;
 static inline void
 PlotPt(Bitmap_s* bitmap, i32 x, i32 y, u32 rgba)
 {
-	if (x < 0 || x >= bitmap->width || y < 0 || y >= bitmap->height)
+	if (x < 0 || x >= (i32)bitmap->width || y < 0 || y >= (i32)bitmap->height)
 		return;
 
 	*(bitmap->pixels + x + bitmap->pitch * y) = rgba;
@@ -601,11 +601,11 @@ BltBmpFixed(ThreadContext_s* thread, Bitmap_s* dest, i32 dx, i32 dy, const Bitma
 		sy += dy;
 		dy = 0;
 	}
-	if (dx + sw >= dest->width)
+	if (dx + sw >= (i32)dest->width)
 	{
 		sw -= (dx + sw - dest->width);
 	}
-	if (dy + sh >= dest->height)
+	if (dy + sh >= (i32)dest->height)
 	{
 		sh -= (dy + sh - dest->height);
 	}
@@ -797,9 +797,9 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 		BltBmpFixed(nullptr, screenBitmap, 0, 0, &g_game->testBitmaps[i]);
     #else
 
-    for (i32 j = 0; j < screenBitmap->height; j++)
+    for (i32 j = 0; j < (i32)screenBitmap->height; j++)
     {
-        for (i32 i = 0; i < screenBitmap->width; i++)
+        for (i32 i = 0; i < (i32)screenBitmap->width; i++)
         {
             // const r32 col = noise.Perlin2D(Vector2(i, j), 500.0f) * 0.5f + 0.5f;
             // const r32 col = noise.Smoothed2D(Vector2(i, j), 50.0f) * 0.5f + 0.5f;

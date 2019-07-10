@@ -123,7 +123,7 @@ Lex_ReadStringUntil(Lexer* lex, LexerToken tok, char terminator)
 		}
 
 		*lex->curTokenChar++ = c;
-        c = Lex_GetNextChar(lex);
+		c = Lex_GetNextChar(lex);
 	}
 
     // Don't unget since we don't want the trailing terminator

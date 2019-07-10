@@ -34,15 +34,15 @@ struct Color_u
 	};
 
 	Color_u(const u32 color)
-	    : value(color)
+		: value(color)
 	{
 	}
 
 	Color_u(const u8 ia, const u8 ib, const u8 ig, const u8 ir)
-	    : a(ia)
-	    , b(ib)
-	    , g(ig)
-	    , r(ir)
+		: a(ia)
+		, b(ib)
+		, g(ig)
+		, r(ir)
 	{
 	}
 };

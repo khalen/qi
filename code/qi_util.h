@@ -6,33 +6,35 @@
 // General purpose utility functions
 //
 
+#include "basictypes.h"
+
 template<typename T, size_t N>
 constexpr int countof(T (&)[N])
 {
-	return N;
+    return N;
 }
 
 template<typename T>
 static inline void
 Swap(T& a, T& b)
 {
-	T tmp = a;
-	a     = b;
-	b     = tmp;
+    T tmp = a;
+    a     = b;
+    b     = tmp;
 }
 
 template<typename T>
 static inline T
 Min(const T& a, const T& b)
 {
-	return a < b ? a : b;
+    return a < b ? a : b;
 }
 
 template<typename T>
 static inline T
 Max(const T& a, const T& b)
 {
-	return a > b ? a : b;
+    return a > b ? a : b;
 }
 
 template <typename T>
@@ -60,14 +62,14 @@ NextLowerPow2(const T vi)
 }
 
 template <typename T>
-inline const i32
+inline i32
 BitScanRight(const T v)
 {
     return ffs(v);
 }
 
 template <>
-inline const i32
+inline i32
 BitScanRight<u64>(const u64 v)
 {
     return ffsll(v);

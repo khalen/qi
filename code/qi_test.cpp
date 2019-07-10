@@ -85,7 +85,6 @@ void testLex()
 int main(int, char**)
 {
 	Vector4 ta(1.0f, 0.0f, 0.0f, 4.0f);
-    #if 0
     Vector4 tb(ta.wzyx);
     Vector2 ba(ta.xy);
     Vector2 bb(ta.zw);
@@ -113,12 +112,6 @@ int main(int, char**)
     printf("te: %f %f %f %f\n", te[0], te[1], te[2], te[3]);
 
     IVector4 ia(8, 9, 10, 11);
-    #endif
-
-    Vector3 tc(0.0f, 1.0f, 0.0f);
-    Vector3 tb(cross(ta.xyz, tc));
-
-	printf("tb: %f %f %f %f\n", tb[0], tb[1], tb[2], tb[3]);
 
     testLex();
 }

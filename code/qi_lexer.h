@@ -6,6 +6,8 @@
 // Simple tokenizer / lexer
 //
 
+#include "basictypes.h"
+
 #define MAX_PUTBACK 32
 #define MAX_ERRMSG  512
 

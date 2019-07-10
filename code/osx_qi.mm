@@ -630,7 +630,7 @@ main(int argc, const char* argv[])
 // In dev builds, chdir into the hardcoded data directory to facilitate running the exe from
 // non distribution places
 #if HAS(DEV_BUILD)
-	chdir(QI_DEV_DATA_DIR);
+	chdir("/Users/jon/work/qi/data/");
 #endif
 
 	InitGameGlobals();

@@ -423,7 +423,7 @@ GetPenetrationDepthAndNormal(GjkResult_s* result, const GjkShape_s* shapeA, cons
 			break;
 		}
 
-		for (i32 moveIdx = spoly.numPoints - 1; moveIdx > index; moveIdx--)
+		for (u32 moveIdx = spoly.numPoints - 1; moveIdx > index; moveIdx--)
 			spoly.points[moveIdx + 1] = spoly.points[moveIdx];
 
 		spoly.points[index + 1] = newSupport;

@@ -292,38 +292,38 @@ BA_Alloc(BuddyAllocator_s* allocator, const size_t requestedSize)
 void*
 BA_Calloc(BuddyAllocator_s* allocator, const size_t requestedSize)
 {
-    void* block = BA_Alloc(allocator, requestedSize);
-    Assert(block);
-    memset(block, 0, requestedSize);
-    return block;
+	void* block = BA_Alloc(allocator, requestedSize);
+	Assert(block);
+	memset(block, 0, requestedSize);
+	return block;
 }
 
 void*
 BA_Realloc(BuddyAllocator_s* allocator, void* ptr, const size_t newSize)
 {
-    if (ptr == nullptr)
-        return BA_Alloc(allocator, newSize);
+	if (ptr == nullptr)
+		return BA_Alloc(allocator, newSize);
 
-    if (newSize == 0)
-    {
-        BA_Free(allocator, ptr);
-        return nullptr;
-    }
+	if (newSize == 0)
+	{
+		BA_Free(allocator, ptr);
+		return nullptr;
+	}
 
-    size_t level = findLevelForBlock(allocator, ptr);
-    size_t blockSize = blockSizeOfLevel(allocator->size, level);
+	size_t level = findLevelForBlock(allocator, ptr);
+	size_t blockSize = blockSizeOfLevel(allocator->size, level);
 
-    if (newSize <= blockSize)
-        return ptr;
+	if (newSize <= blockSize)
+		return ptr;
 
-    // Don't free before allocating the new buffer, since freeing will alter the existing block
-    void* newBlock = BA_Alloc(allocator, newSize);
-    Assert(newBlock);
+	// Don't free before allocating the new buffer, since freeing will alter the existing block
+	void* newBlock = BA_Alloc(allocator, newSize);
+	Assert(newBlock);
 
-    memmove(newBlock, ptr, blockSize);
-    BA_Free(allocator, ptr, blockSize);
+	memmove(newBlock, ptr, blockSize);
+	BA_Free(allocator, ptr, blockSize);
 
-    return newBlock;
+	return newBlock;
 }
 
 void
@@ -376,7 +376,7 @@ BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, con
 {
 	// Make sure requested smallest block size is large enough to hold our free list link structure
 	const size_t smallestBlock
-	    = (smallestBlockSize < sizeof(MemLink_s)) ? sizeof(MemLink_s) : NextHigherPow2(smallestBlockSize);
+		= (smallestBlockSize < sizeof(MemLink_s)) ? sizeof(MemLink_s) : NextHigherPow2(smallestBlockSize);
 
 	const size_t minSizeShift = BitScanRight(smallestBlock) - 1;
 
@@ -393,10 +393,10 @@ BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, con
 	size_t freeBitsBytes        = (1 << totalAllocatorLevels) / (sizeof(u8) * 8);
 	size_t splitBitsBytes       = (1 << totalAllocatorLevels) / (sizeof(u8) * 8);
 	size_t overheadBytes
-	    = sizeof(BuddyAllocator_s) + (totalAllocatorLevels + 1) * sizeof(MemLink_s*) + freeBitsBytes + splitBitsBytes;
+		= sizeof(BuddyAllocator_s) + (totalAllocatorLevels + 1) * sizeof(MemLink_s*) + freeBitsBytes + splitBitsBytes;
 
 	u8* allocatorMemory
-	    = isTransient ? (u8*)M_TransientAllocRaw(memory, actualSize) : (u8*)M_AllocRaw(memory, actualSize);
+		= isTransient ? (u8*)M_TransientAllocRaw(memory, actualSize) : (u8*)M_AllocRaw(memory, actualSize);
 	Assert(allocatorMemory);
 
 	// Set up allocator in temp location so allocation shenanigans do not stomp on its metadata
@@ -418,7 +418,7 @@ BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, con
 	allocator->splitBitsOffset = tempAllocatorMemory - ((u8*)allocator);
 	tempAllocatorMemory += splitBitsBytes;
 
-    Assert(tempAllocatorMemory - (u8*)allocator == overheadBytes);
+	Assert(tempAllocatorMemory - (u8*)allocator == overheadBytes);
 
 	initFreeLists(allocator, allocatorMemory);
 
@@ -436,13 +436,13 @@ BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, con
 	printf("Initial allocator of size %ld at %p before memcpy\n", actualSize, allocator);
 	BA_DumpInfo(allocator);
 
-    void* foo = BA_Alloc(allocator, smallestBlock);
+	void* foo = BA_Alloc(allocator, smallestBlock);
 	BA_DumpInfo(allocator);
-    BA_Free(allocator, foo);
+	BA_Free(allocator, foo);
 	BA_DumpInfo(allocator);
 #endif
 
-    // Copy allocator and initialized bit sets into its final location at the beginning of the actual memory arena
+	// Copy allocator and initialized bit sets into its final location at the beginning of the actual memory arena
 	memcpy(firstBlock, allocator, overheadBytes);
 
 #if 0
@@ -450,9 +450,9 @@ BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, con
 	printf("Init allocator of size %ld at %p\n", actualSize, allocator);
 	BA_DumpInfo(allocator);
 
-    foo = BA_Alloc(allocator, smallestBlock);
+	foo = BA_Alloc(allocator, smallestBlock);
 	BA_DumpInfo(allocator);
-    BA_Free(allocator, foo);
+	BA_Free(allocator, foo);
 	BA_DumpInfo(allocator);
 #endif
 

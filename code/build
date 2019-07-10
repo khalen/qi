@@ -20,7 +20,7 @@ DVERSION=1.0
 DEFINES="-DQI_DEV_BUILD=1 -DQI_OSX_BUILD=1 -DQI_PROFILE_BUILD=1 -DQI_DEV_DATA_DIR=\"$DATA_DIR\""
 OPTIMIZATIONS=-O3
 DEBUG=-g
-ALLBUILDOPTS="-std=c++17 -fms-extensions -fvisibility=hidden -fvisibility-inlines-hidden"
+ALLBUILDOPTS="-std=c++17 -Wno-deprecated-declarations -fms-extensions -fvisibility=hidden -fvisibility-inlines-hidden"
 
 # Fast profile build
 # DEFINES= "-DQI_FAST_BUILD=1 -DQI_OSX=1 -DQI_PROFILE_BUILD=1"
