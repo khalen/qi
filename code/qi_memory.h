@@ -71,6 +71,7 @@ struct BuddyAllocator_s
 };
 static_assert((sizeof(BuddyAllocator_s) & (sizeof(MemLink_s) - 1)) == 0, "Bad buddy allocator struct size");
 
+BuddyAllocator_s* BA_InitBuffer(u8* buffer, const size_t size, const size_t smallestBlockSize);
 BuddyAllocator_s* BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, const bool isTransient = false);
 void* BA_Alloc(BuddyAllocator_s* allocator, const size_t size);
 void* BA_Realloc(BuddyAllocator_s* allocator, const size_t newSize);

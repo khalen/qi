@@ -6,6 +6,8 @@
 // String hash table, useful for symbols or etc. Table is a contiguous block of memory that can be memcpy'd etc.
 //
 
+#include "basictypes.h"
+
 #define QI_ST_FULL -1
 #define QI_ST_HASH_FACTOR 2.0f
 

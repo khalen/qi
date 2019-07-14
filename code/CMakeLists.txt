@@ -12,7 +12,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Win32")
     set(WIN32 TRUE)
 endif()
 
-set(QI_DEFINES "-DQI_DEV_DATA_DIR=${DATA_DIR}")
+set(QI_DEFINES "-DQI_DEV_DATA_DIR=${DATA_DIR} -Wno-deprecated-declarations")
 set(QI_LINK_OPTS "")
 
 if (MACOSX)

@@ -29,25 +29,25 @@
 
 struct GameGlobals_s
 {
-	bool        isInitialized;
+	bool		isInitialized;
 	Memory_s*   memory;
 	SubSystem_s gameSubsystems[MAX_SUBSYSTEMS];
 
 	i32 screenWid;
 	i32 screenHgt;
 
-	World_s       world;
-	WorldPos_s    playerPos;
-	v2            dPlayerPos;
-	WorldPos_s    cameraPos;
+	World_s		  world;
+	WorldPos_s	playerPos;
+	v2			  dPlayerPos;
+	WorldPos_s	cameraPos;
 	MemoryArena_s tileArena;
 	MemoryArena_s assetArena;
 
 	Bitmap_s testBitmaps[5];
 	Bitmap_s playerBmps[4][3];
-	i32      playerFacingIdx;
+	i32		 playerFacingIdx;
 
-    BuddyAllocator_s* testAlloc;
+	BuddyAllocator_s* testAlloc;
 };
 
 GameGlobals_s* g_game;
@@ -57,7 +57,7 @@ M_AllocRaw(Memory_s* memory, const size_t size)
 {
 	size_t allocSize = (size + 15) & ~0xFull;
 	Assert(memory && ((uintptr_t)memory->permanentPos & 0xF) == 0
-	       && (memory->permanentSize - (size_t)(memory->permanentPos - memory->permanentStorage) > allocSize));
+		   && (memory->permanentSize - (size_t)(memory->permanentPos - memory->permanentStorage) > allocSize));
 	void* result = memory->permanentPos;
 	memory->permanentPos += allocSize;
 	return result;
@@ -68,7 +68,7 @@ M_TransientAllocRaw(Memory_s* memory, const size_t size)
 {
 	size_t allocSize = (size + 15) & ~0xFull;
 	Assert(memory && ((uintptr_t)memory->transientPos & 0xF) == 0
-	       && (memory->transientSize - (size_t)(memory->transientPos - memory->transientStorage) > allocSize));
+		   && (memory->transientSize - (size_t)(memory->transientPos - memory->transientStorage) > allocSize));
 	void* result = memory->transientPos;
 	memory->transientPos += allocSize;
 	return result;
@@ -84,9 +84,9 @@ GameAllocate()
 void
 MA_Init(MemoryArena_s* arena, const size_t size)
 {
-	arena->size      = size;
+	arena->size		 = size;
 	arena->curOffset = 0;
-	arena->base      = (u8*)M_AllocRaw(g_game->memory, size);
+	arena->base		 = (u8*)M_AllocRaw(g_game->memory, size);
 }
 
 u8*
@@ -112,9 +112,9 @@ void
 CreateBitmap(MemoryArena_s* arena, Bitmap_s* result, const u32 width, const u32 height)
 {
 	Assert(arena && result);
-	result->width    = width;
+	result->width	= width;
 	result->height   = height;
-	result->pitch    = width;
+	result->pitch	= width;
 	result->byteSize = width * height * sizeof(u32);
 	result->pixels   = (u32*)MA_Alloc(arena, result->byteSize);
 }
@@ -133,31 +133,31 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 
 	MA_Init(&g_game->tileArena, MB(32));
 
-    g_game->testAlloc = BA_Init(g_game->memory, 130000, 16, false);
+	g_game->testAlloc = BA_Init(g_game->memory, 130000, 16, false);
 
-    void* memTest0 = BA_Alloc(g_game->testAlloc, 16);
-    BA_DumpInfo(g_game->testAlloc);
+	void* memTest0 = BA_Alloc(g_game->testAlloc, 16);
+	BA_DumpInfo(g_game->testAlloc);
 
-    void* memTest1 = BA_Alloc(g_game->testAlloc, 100);
-    BA_DumpInfo(g_game->testAlloc);
+	void* memTest1 = BA_Alloc(g_game->testAlloc, 100);
+	BA_DumpInfo(g_game->testAlloc);
 
-    BA_Free(g_game->testAlloc, memTest1);
-    BA_DumpInfo(g_game->testAlloc);
+	BA_Free(g_game->testAlloc, memTest1);
+	BA_DumpInfo(g_game->testAlloc);
 
-    void* memTest2 = BA_Alloc(g_game->testAlloc, 300);
-    BA_DumpInfo(g_game->testAlloc);
+	void* memTest2 = BA_Alloc(g_game->testAlloc, 300);
+	BA_DumpInfo(g_game->testAlloc);
 
-    void* memTest3 = BA_Alloc(g_game->testAlloc, 16);
-    BA_DumpInfo(g_game->testAlloc);
+	void* memTest3 = BA_Alloc(g_game->testAlloc, 16);
+	BA_DumpInfo(g_game->testAlloc);
 
-    BA_Free(g_game->testAlloc, memTest2);
-    BA_DumpInfo(g_game->testAlloc);
+	BA_Free(g_game->testAlloc, memTest2);
+	BA_DumpInfo(g_game->testAlloc);
 
-    BA_Free(g_game->testAlloc, memTest3);
-    BA_DumpInfo(g_game->testAlloc);
+	BA_Free(g_game->testAlloc, memTest3);
+	BA_DumpInfo(g_game->testAlloc);
 
-    BA_Free(g_game->testAlloc, memTest0);
-    BA_DumpInfo(g_game->testAlloc);
+	BA_Free(g_game->testAlloc, memTest0);
+	BA_DumpInfo(g_game->testAlloc);
 
 	g_game->playerPos.x.tile = 10;
 	g_game->playerPos.y.tile = 10;
@@ -172,11 +172,11 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 				{
 					u32 value = TILE_EMPTY;
 					if ((tileX == 0 || tileX == (ROOM_WID - 1) || tileY == 0 || tileY == (ROOM_HGT - 1))
-					    && ((tileX != ROOM_WID / 2) && (tileY != ROOM_HGT / 2)))
+						&& ((tileX != ROOM_WID / 2) && (tileY != ROOM_HGT / 2)))
 						value = TILE_FULL;
 					WorldPos_s worldPos = {};
-					worldPos.x.tile     = scrX * ROOM_WID + tileX;
-					worldPos.y.tile     = scrY * ROOM_HGT + tileY;
+					worldPos.x.tile		= scrX * ROOM_WID + tileX;
+					worldPos.y.tile		= scrY * ROOM_HGT + tileY;
 					SetTileValue(&g_game->tileArena, &g_game->world, &worldPos, value);
 				}
 			}
@@ -187,8 +187,8 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 				i32 ryo = (rand() % (ROOM_HGT - 2)) + 1;
 
 				WorldPos_s worldPos = {};
-				worldPos.x.tile     = scrX * ROOM_WID + rxo;
-				worldPos.y.tile     = scrY * ROOM_HGT + ryo;
+				worldPos.x.tile		= scrX * ROOM_WID + rxo;
+				worldPos.y.tile		= scrY * ROOM_HGT + ryo;
 				SetTileValue(&g_game->tileArena, &g_game->world, &worldPos, TILE_FULL);
 			}
 		}
@@ -227,8 +227,8 @@ PV(const char* msg, const v2& v)
 
 #define MAX_DEBUG_SHAPES 50
 PolyShape_s debugShapes[MAX_DEBUG_SHAPES];
-u32 debugShapeColors[MAX_DEBUG_SHAPES];
-u32 numDebugShapes;
+u32			debugShapeColors[MAX_DEBUG_SHAPES];
+u32			numDebugShapes;
 
 static inline void
 PlotPt(Bitmap_s* bitmap, i32 x, i32 y, u32 rgba)
@@ -242,18 +242,18 @@ PlotPt(Bitmap_s* bitmap, i32 x, i32 y, u32 rgba)
 void
 DrawDebugLine(Bitmap_s* screen, v2& p0, v2& p1, u32 rgba)
 {
-	i32 x0   = p0.x + 0.5f;
-	i32 x1   = p1.x + 0.5f;
-	i32 y0   = p0.y + 0.5f;
-	i32 y1   = p1.y + 0.5f;
+	i32 x0 = p0.x + 0.5f;
+	i32 x1 = p1.x + 0.5f;
+	i32 y0 = p0.y + 0.5f;
+	i32 y1 = p1.y + 0.5f;
 
 	if (abs(x1 - x0) < abs(y1 - y0))
 	{
-        if (y1 < y0)
-        {
-            Swap(x1, x0);
-            Swap(y1, y0);
-        }
+		if (y1 < y0)
+		{
+			Swap(x1, x0);
+			Swap(y1, y0);
+		}
 		i32 dxdy = (y1 == y0) ? 0 : ((x1 - x0) * 0xFFFF) / (y1 - y0);
 		x0 <<= 16;
 		for (i32 y = y0; y < y1; y++)
@@ -264,11 +264,11 @@ DrawDebugLine(Bitmap_s* screen, v2& p0, v2& p1, u32 rgba)
 	}
 	else
 	{
-        if (x1 < x0)
-        {
-            Swap(x1, x0);
-            Swap(y1, y0);
-        }
+		if (x1 < x0)
+		{
+			Swap(x1, x0);
+			Swap(y1, y0);
+		}
 		i32 dydx = (x1 == x0) ? 0 : ((y1 - y0) * 0xFFFF) / (x1 - x0);
 		y0 <<= 16;
 		for (i32 x = x0; x < x1; x++)
@@ -282,15 +282,15 @@ DrawDebugLine(Bitmap_s* screen, v2& p0, v2& p1, u32 rgba)
 void
 DrawDebugPoly(Bitmap_s* screen, PolyShape_s* poly, u32 rgba)
 {
-    v2 halfScreen = V2(screen->width / 2.0f, screen->height / 2.0f);
+	v2 halfScreen   = V2(screen->width / 2.0f, screen->height / 2.0f);
 	v2 camPosMeters = WorldPosToMeters(&g_game->cameraPos);
 	for (u32 pi = 0; pi < poly->numPoints; pi++)
 	{
-		u32 pn          = (pi + 1) % poly->numPoints;
-		v2  p0Cam = MetersToScreenPixels(poly->points[pi] - camPosMeters);
-		v2  p1Cam = MetersToScreenPixels(poly->points[pn] - camPosMeters);
-        v2 p0CamScreen = p0Cam + halfScreen;
-        v2 p1CamScreen = p1Cam + halfScreen;
+		u32 pn			= (pi + 1) % poly->numPoints;
+		v2  p0Cam		= MetersToScreenPixels(poly->points[pi] - camPosMeters);
+		v2  p1Cam		= MetersToScreenPixels(poly->points[pn] - camPosMeters);
+		v2  p0CamScreen = p0Cam + halfScreen;
+		v2  p1CamScreen = p1Cam + halfScreen;
 		DrawDebugLine(screen, p0CamScreen, p1CamScreen, rgba);
 	}
 }
@@ -298,45 +298,45 @@ DrawDebugPoly(Bitmap_s* screen, PolyShape_s* poly, u32 rgba)
 void
 DrawDebugShapes(Bitmap_s* screen)
 {
-    for (u32 shape = 0; shape < numDebugShapes; shape++)
-        DrawDebugPoly(screen, &debugShapes[shape], debugShapeColors[shape]);
+	for (u32 shape = 0; shape < numDebugShapes; shape++)
+		DrawDebugPoly(screen, &debugShapes[shape], debugShapeColors[shape]);
 }
 
 void
 AddDebugShape(PolyShape_s* poly, r32 r, r32 g, r32 b)
 {
 	u32 rgba = ((u32)(r * 255.0f + 0.5f) << 16) | ((u32)(g * 255 + 0.5f) << 8) | (u32)(b * 255 + 0.5f);
-    debugShapes[numDebugShapes] = *poly;
-    debugShapeColors[numDebugShapes] = rgba;
-    numDebugShapes++;
+	debugShapes[numDebugShapes]		 = *poly;
+	debugShapeColors[numDebugShapes] = rgba;
+	numDebugShapes++;
 }
 
 void
 MakeSimplexShapes(PolyShape_s* shapea, PolyShape_s* shapeb, GjkResult_s* result)
 {
-    shapea->numPoints = shapeb->numPoints = result->simplex.numPts;
-    for (u32 i = 0; i < result->simplex.numPts; i++)
-    {
-        shapea->points[i] = result->simplex.pts[i].sa;
-        shapeb->points[i] = result->simplex.pts[i].sb;
-    }
+	shapea->numPoints = shapeb->numPoints = result->simplex.numPts;
+	for (u32 i = 0; i < result->simplex.numPts; i++)
+	{
+		shapea->points[i] = result->simplex.pts[i].sa;
+		shapeb->points[i] = result->simplex.pts[i].sb;
+	}
 }
 
 internal void
 UpdateGameState(Bitmap_s* screen, Input_s* input)
 {
-    numDebugShapes = 0;
+	numDebugShapes = 0;
 	Assert(g_game);
 
 	// Controller 0 left stick
-	Analog_s* ctr0        = &input->controllers[KBD].analogs[0];
+	Analog_s* ctr0		  = &input->controllers[KBD].analogs[0];
 	const r32 ddPlayerMag = 35.0f + (50.0f * input->controllers[KBD].leftStickButton.endedDown);
 
 	v2 ddPlayer = ctr0->dir * ctr0->trigger.reading * ddPlayerMag;
 	ddPlayer += -8.7 * g_game->dPlayerPos;
 
 	v2 playerOffset = {};
-	playerOffset    = (ddPlayer * 0.5f * input->dT * input->dT) + g_game->dPlayerPos * input->dT;
+	playerOffset	= (ddPlayer * 0.5f * input->dT * input->dT) + g_game->dPlayerPos * input->dT;
 
 	WorldPos_s oldPlrPos = g_game->playerPos;
 	WorldPos_s newPlrPos = g_game->playerPos;
@@ -376,28 +376,28 @@ UpdateGameState(Bitmap_s* screen, Input_s* input)
 				continue;
 
 			GjkResult_s result;
-            // EllipseShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
-            BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
-			BoxShape_s  tileShape(V2((r32)x * TILE_SIZE_METERS_X, (r32)y * TILE_SIZE_METERS_Y),
-                                 V2(TILE_SIZE_METERS_X / 2, TILE_SIZE_METERS_Y / 2));
+			// EllipseShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
+			BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
+			BoxShape_s tileShape(V2((r32)x * TILE_SIZE_METERS_X, (r32)y * TILE_SIZE_METERS_Y),
+								 V2(TILE_SIZE_METERS_X / 2, TILE_SIZE_METERS_Y / 2));
 			AddDebugShape(&tileShape, 1.0f, 1.0f, 0.0f);
-            PolyShape_s gjkResulta, gjkResultb;
+			PolyShape_s gjkResulta, gjkResultb;
 			if (Qi_Gjk(&result, &plrCollideShape, &tileShape))
 			{
 				collided = true;
-                AddSubtileOffset(&newPlrPos, result.penetrationNormal * result.penetrationDepth);
-                g_game->dPlayerPos += -result.penetrationNormal * g_game->dPlayerPos.dot(result.penetrationNormal);
+				AddSubtileOffset(&newPlrPos, result.penetrationNormal * result.penetrationDepth);
+				g_game->dPlayerPos += -result.penetrationNormal * g_game->dPlayerPos.dot(result.penetrationNormal);
 
-                MakeSimplexShapes(&gjkResulta, &gjkResultb, &result);
-                AddDebugShape(&gjkResulta, 0.0f, 1.0f, 0.0f);
-                AddDebugShape(&gjkResultb, 0.0f, 1.0f, 0.5f);
+				MakeSimplexShapes(&gjkResulta, &gjkResultb, &result);
+				AddDebugShape(&gjkResulta, 0.0f, 1.0f, 0.0f);
+				AddDebugShape(&gjkResultb, 0.0f, 1.0f, 0.5f);
 			}
-            else
-            {
-                MakeSimplexShapes(&gjkResulta, &gjkResultb, &result);
-                AddDebugShape(&gjkResulta, 0.0f, 1.0f, 1.0f);
-                AddDebugShape(&gjkResultb, 0.5f, 1.0f, 1.0f);
-            }
+			else
+			{
+				MakeSimplexShapes(&gjkResulta, &gjkResultb, &result);
+				AddDebugShape(&gjkResulta, 0.0f, 1.0f, 1.0f);
+				AddDebugShape(&gjkResultb, 0.5f, 1.0f, 1.0f);
+			}
 		}
 	}
 
@@ -405,7 +405,7 @@ UpdateGameState(Bitmap_s* screen, Input_s* input)
 
 	// Offset camera half a tile since we want it to be centered in a screen
 	g_game->cameraPos.x.offset = g_game->cameraPos.y.offset = -0.5f;
-	g_game->cameraPos.z.offset                              = 0.0f;
+	g_game->cameraPos.z.offset								= 0.0f;
 
 	i64 playerXScreen = (i64)floor((r64)g_game->playerPos.x.tile / SCREEN_NUM_TILES_X);
 	i64 playerYScreen = (i64)floor((r64)g_game->playerPos.y.tile / SCREEN_NUM_TILES_Y);
@@ -428,26 +428,26 @@ extern SubSystem_s SoundSubSystem;
 extern SubSystem_s DebugSubSystem;
 
 internal SubSystem_s* s_subSystems[] = {
-    &GameSubSystem,
-    &SoundSubSystem,
-    &DebugSubSystem,
+	&GameSubSystem,
+	&SoundSubSystem,
+	&DebugSubSystem,
 };
 
 internal void
 InitGameSystems(Memory_s* memory)
 {
-    NoiseGenerator::InitGradients();
+	NoiseGenerator::InitGradients();
 
-	g_game         = (GameGlobals_s*)memory->permanentStorage;
+	g_game		   = (GameGlobals_s*)memory->permanentStorage;
 	g_game->memory = memory;
 
 	bool isReload = g_game->isInitialized;
 
 	for (i32 i = 0; i < countof(s_subSystems); i++)
 	{
-		SubSystem_s* sys       = &g_game->gameSubsystems[i];
-		void*        curMemPtr = sys->globalPtr;
-		*sys                   = *s_subSystems[i];
+		SubSystem_s* sys	   = &g_game->gameSubsystems[i];
+		void*		 curMemPtr = sys->globalPtr;
+		*sys				   = *s_subSystems[i];
 
 		if (curMemPtr == nullptr)
 			sys->globalPtr = M_AllocRaw(memory, sys->globalSize);
@@ -578,9 +578,8 @@ BlendPixel(u32& dest, const u32 src)
 	dGRB >>= 8;
 
 	const u64 GRB = destGRB + dGRB;
-	dest          = (u32)(GRB & 0xFF00FF) | (u32)((GRB & 0xFF00000000ull) >> 24);
+	dest		  = (u32)(GRB & 0xFF00FF) | (u32)((GRB & 0xFF00000000ull) >> 24);
 }
-
 
 internal void
 BltBmpFixed(ThreadContext_s* thread, Bitmap_s* dest, i32 dx, i32 dy, const Bitmap_s* src)
@@ -622,26 +621,26 @@ BltBmpFixed(ThreadContext_s* thread, Bitmap_s* dest, i32 dx, i32 dy, const Bitma
 
 internal void
 BltBmpStretched(ThreadContext_s* thread,
-                Bitmap_s*        dest,
-                r32              rdx,
-                r32              rdy,
-                r32              rdw,
-                r32              rdh,
-                Bitmap_s*        src,
-                r32              rsx,
-                r32              rsy,
-                r32              rsw,
-                r32              rsh)
+				Bitmap_s*		 dest,
+				r32				 rdx,
+				r32				 rdy,
+				r32				 rdw,
+				r32				 rdh,
+				Bitmap_s*		 src,
+				r32				 rsx,
+				r32				 rsy,
+				r32				 rsw,
+				r32				 rsh)
 {
 	r32 rdx1 = ceil(rdx + rdw);
 	r32 rdy1 = ceil(rdy + rdh);
-	rdx      = floor(rdx);
-	rdy      = floor(rdy);
+	rdx		 = floor(rdx);
+	rdy		 = floor(rdy);
 
 	r32 rsx1 = ceil(rsx + rsw);
 	r32 rsy1 = ceil(rsy + rsh);
-	rsx      = floor(rsx);
-	rsy      = floor(rsy);
+	rsx		 = floor(rsx);
+	rsy		 = floor(rsy);
 
 	i32 dx = (i32)rdx;
 	i32 dy = (i32)rdy;
@@ -707,15 +706,15 @@ internal void
 ReadBitmap(ThreadContext_s* thread, MemoryArena_s* memArena, Bitmap_s* result, const char* filename)
 {
 	size_t readSize;
-	u8*    fileData = (u8*)plat->ReadEntireFile(thread, filename, &readSize);
+	u8*	fileData = (u8*)plat->ReadEntireFile(thread, filename, &readSize);
 	Assert(fileData);
 
 	const BmpFileHeader_s*  fileHeader = (BmpFileHeader_s*)fileData;
 	const BmpImageHeader_s* imgHeader  = (BmpImageHeader_s*)(fileData + sizeof(BmpFileHeader_s));
-	u32*                    srcXels    = nullptr;
-	u32*                    dstXels    = nullptr;
-	u32                     rMask, gMask, bMask, aMask;
-	u32                     rShift, gShift, bShift, aShift;
+	u32*					srcXels	= nullptr;
+	u32*					dstXels	= nullptr;
+	u32						rMask, gMask, bMask, aMask;
+	u32						rShift, gShift, bShift, aShift;
 
 	if (fileHeader->type != 0x4D42) // 'BM' in ASCII
 	{
@@ -772,7 +771,7 @@ end:
 void
 Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 {
-    static NoiseGenerator noise(1234);
+	static NoiseGenerator noise(1234);
 
 	g_game->screenWid = screenBitmap->width;
 	g_game->screenHgt = screenBitmap->height;
@@ -792,25 +791,25 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	const r32 cameraOffsetPixelsX = g_game->cameraPos.x.offset * tilePixelWid;
 	const r32 cameraOffsetPixelsY = g_game->cameraPos.y.offset * tilePixelHgt;
 
-    #if 0
+#if 0
 	for (i32 i = 4; i >= 0; i--)
 		BltBmpFixed(nullptr, screenBitmap, 0, 0, &g_game->testBitmaps[i]);
-    #else
+#else
 
-    for (i32 j = 0; j < (i32)screenBitmap->height; j++)
-    {
-        for (i32 i = 0; i < (i32)screenBitmap->width; i++)
-        {
-            // const r32 col = noise.Perlin2D(Vector2(i, j), 500.0f) * 0.5f + 0.5f;
-            // const r32 col = noise.Smoothed2D(Vector2(i, j), 50.0f) * 0.5f + 0.5f;
-            const r32 col = noise.Simplex2D(Vector2(i, j), 10.0f) * 0.5f + 0.5f;
-            //const r32 col = noise.Smoothed(i, 100.0f) * 0.5f + 0.5f;
-            //const r32 col = noise.GetReal(i);
-            //printf("%f\n", col);
-            PlotPt(screenBitmap, i, j, PackColor(col, col, col));
-        }
-    }
-    #endif
+	for (i32 j = 0; j < (i32)screenBitmap->height; j++)
+	{
+		for (i32 i = 0; i < (i32)screenBitmap->width; i++)
+		{
+			// const r32 col = noise.Perlin2D(Vector2(i, j), 500.0f) * 0.5f + 0.5f;
+			// const r32 col = noise.Smoothed2D(Vector2(i, j), 50.0f) * 0.5f + 0.5f;
+			const r32 col = noise.Simplex2D(Vector2(i, j), 80.0f) * 0.5f + 0.5f;
+			// const r32 col = noise.Smoothed(i, 100.0f) * 0.5f + 0.5f;
+			// const r32 col = noise.GetReal(i);
+			// printf("%f\n", col);
+			PlotPt(screenBitmap, i, j, PackColor(col, col, col));
+		}
+	}
+#endif
 
 	for (i32 row = -1; row < numScreenTilesY + 1; row++)
 	{
@@ -820,8 +819,8 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 			const r32 sy = row * tilePixelHgt - tilePixelHgt / 2 - cameraOffsetPixelsY;
 
 			WorldPos_s tileCoord = {};
-			tileCoord.x.tile     = col + g_game->cameraPos.x.tile - numScreenTilesX / 2;
-			tileCoord.y.tile     = row + g_game->cameraPos.y.tile - numScreenTilesY / 2;
+			tileCoord.x.tile	 = col + g_game->cameraPos.x.tile - numScreenTilesX / 2;
+			tileCoord.y.tile	 = row + g_game->cameraPos.y.tile - numScreenTilesY / 2;
 
 			u32 tileValue = GetTileValue(&g_game->world, &tileCoord);
 #if 0
@@ -838,16 +837,16 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 				DrawRectangle(screenBitmap, sx, sy, tilePixelWid, tilePixelHgt, 1.0f, 0.2f, 0.2f);
 			else if (tileValue != TILE_EMPTY)
 				BltBmpStretched(nullptr,
-				                screenBitmap,
-				                sx,
-				                sy,
-				                tilePixelWid,
-				                tilePixelHgt,
-				                &g_game->testBitmaps[1],
-				                0,
-				                0,
-				                g_game->testBitmaps[1].width,
-				                g_game->testBitmaps[1].height);
+								screenBitmap,
+								sx,
+								sy,
+								tilePixelWid,
+								tilePixelHgt,
+								&g_game->testBitmaps[1],
+								0,
+								0,
+								g_game->testBitmaps[1].width,
+								g_game->testBitmaps[1].height);
 #endif
 		}
 	}
@@ -868,13 +867,13 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 
 	DrawRectangle(screenBitmap, playerX, playerY, playerWid, playerHgt, playerR, playerG, playerB);
 	BltBmpStretchedFixed(
-	    nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][0]);
+		nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][0]);
 	BltBmpStretchedFixed(
-	    nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][1]);
+		nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][1]);
 	BltBmpStretchedFixed(
-	    nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][2]);
+		nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][2]);
 
-    DrawDebugShapes(screenBitmap);
+	DrawDebugShapes(screenBitmap);
 }
 
 const PlatFuncs_s* plat;
@@ -891,18 +890,15 @@ Qi_Init(const PlatFuncs_s* platFuncs, Memory_s* memory)
 }
 
 internal GameFuncs_s s_game = {
-    sound,
-    debug,
-    Qi_Init,
-    Qi_GameUpdateAndRender,
+	sound,
+	debug,
+	Qi_Init,
+	Qi_GameUpdateAndRender,
 };
 const GameFuncs_s* game = &s_game;
 
 // Interface to platform code
-extern "C" {
-PLAT_EXPORT const GameFuncs_s*
-                  Qi_GetGameFuncs()
+extern "C"
 {
-	return game;
-}
+	PLAT_EXPORT const GameFuncs_s* Qi_GetGameFuncs() { return game; }
 }

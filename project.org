@@ -93,6 +93,3 @@ This implies that the term $e^{k(o_i - r)}$ converges to 0 for all occluders. Th
 \end{equation*}
 
 1.4 meters = 1 tile
-
- bb
-

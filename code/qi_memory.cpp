@@ -372,22 +372,19 @@ initFreeLists(BuddyAllocator_s* allocator, u8* memStart)
 }
 
 BuddyAllocator_s*
-BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, const bool isTransient)
+BA_InitBuffer(u8* buffer, const size_t size, const size_t smallestBlockSize)
 {
-	// Make sure requested smallest block size is large enough to hold our free list link structure
-	const size_t smallestBlock
-		= (smallestBlockSize < sizeof(MemLink_s)) ? sizeof(MemLink_s) : NextHigherPow2(smallestBlockSize);
+	Assert(buffer);
 
-	const size_t minSizeShift = BitScanRight(smallestBlock) - 1;
-
-	// Round up actual size to a multiple of the smallest block size
-	size_t actualSize = (size + smallestBlock - 1) & ~(smallestBlock - 1);
+	const size_t smallestBlock = NextHigherPow2(smallestBlockSize);
+	Assert(smallestBlock >= sizeof(MemLink_s));
 
 	// Total bytes of overhead = size of buddy alloc structure + size of level free list ptrs + 1 bit per block for free
 	// bits + 1 bit per block except the smallest blocks for split bits
-	size_t totalAllocatorSize = NextHigherPow2(actualSize);
+	size_t totalAllocatorSize = NextHigherPow2(size);
 	Assert((totalAllocatorSize % smallestBlock) == 0);
 
+	const size_t minSizeShift = BitScanRight(smallestBlock) - 1;
 	size_t smallestBlockCount   = totalAllocatorSize >> minSizeShift;
 	size_t totalAllocatorLevels = BitScanRight(smallestBlockCount) - 1;
 	size_t freeBitsBytes        = (1 << totalAllocatorLevels) / (sizeof(u8) * 8);
@@ -395,19 +392,17 @@ BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, con
 	size_t overheadBytes
 		= sizeof(BuddyAllocator_s) + (totalAllocatorLevels + 1) * sizeof(MemLink_s*) + freeBitsBytes + splitBitsBytes;
 
-	u8* allocatorMemory
-		= isTransient ? (u8*)M_TransientAllocRaw(memory, actualSize) : (u8*)M_AllocRaw(memory, actualSize);
-	Assert(allocatorMemory);
+	u8* allocatorMemory = buffer;
 
 	// Set up allocator in temp location so allocation shenanigans do not stomp on its metadata
-	u8*               tempAllocatorMemory = allocatorMemory + actualSize - overheadBytes;
+	u8*               tempAllocatorMemory = allocatorMemory + size - overheadBytes;
 	BuddyAllocator_s* allocator           = (BuddyAllocator_s*)tempAllocatorMemory;
 	memset(allocator, 0, overheadBytes);
 
-	allocator->basePtr      = allocatorMemory - (totalAllocatorSize - actualSize);
+	allocator->basePtr      = allocatorMemory - (totalAllocatorSize - size);
 	allocator->size         = totalAllocatorSize;
-	allocator->actualSize   = actualSize;
-	allocator->freeSize     = actualSize - overheadBytes;
+	allocator->actualSize   = size;
+	allocator->freeSize     = size - overheadBytes;
 	allocator->minSizeShift = minSizeShift;
 	allocator->maxLevel     = totalAllocatorLevels;
 	tempAllocatorMemory += sizeof(BuddyAllocator_s) + (totalAllocatorLevels + 1) * sizeof(MemLink_s *);
@@ -432,31 +427,32 @@ BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, con
 	for (size_t i = 0; i < overheadBlocks - 1; i++)
 		BA_Alloc(allocator, smallestBlock);
 
-#if 0
-	printf("Initial allocator of size %ld at %p before memcpy\n", actualSize, allocator);
-	BA_DumpInfo(allocator);
-
-	void* foo = BA_Alloc(allocator, smallestBlock);
-	BA_DumpInfo(allocator);
-	BA_Free(allocator, foo);
-	BA_DumpInfo(allocator);
-#endif
-
 	// Copy allocator and initialized bit sets into its final location at the beginning of the actual memory arena
 	memcpy(firstBlock, allocator, overheadBytes);
 
-#if 0
-	allocator = (BuddyAllocator_s*)firstBlock;
-	printf("Init allocator of size %ld at %p\n", actualSize, allocator);
-	BA_DumpInfo(allocator);
-
-	foo = BA_Alloc(allocator, smallestBlock);
-	BA_DumpInfo(allocator);
-	BA_Free(allocator, foo);
-	BA_DumpInfo(allocator);
-#endif
-
 	return allocator;
+}
+
+BuddyAllocator_s*
+BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, const bool isTransient)
+{
+	// Make sure requested smallest block size is large enough to hold our free list link structure
+	const size_t smallestBlock
+		= (smallestBlockSize < sizeof(MemLink_s)) ? sizeof(MemLink_s) : NextHigherPow2(smallestBlockSize);
+
+	// Round up to actual size to a multiple of the smallest block size
+	size_t actualSize = (size + smallestBlock - 1) & ~(smallestBlock - 1);
+
+	// Total bytes of overhead = size of buddy alloc structure + size of level free list ptrs + 1 bit per block for free
+	// bits + 1 bit per block except the smallest blocks for split bits
+	size_t totalAllocatorSize = NextHigherPow2(actualSize);
+	Assert((totalAllocatorSize % smallestBlock) == 0);
+
+	u8* allocatorMemory
+		= isTransient ? (u8*)M_TransientAllocRaw(memory, actualSize) : (u8*)M_AllocRaw(memory, actualSize);
+	Assert(allocatorMemory);
+
+	return BA_InitBuffer(allocatorMemory, actualSize, smallestBlock);
 }
 
 size_t
