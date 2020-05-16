@@ -9,3 +9,8 @@ GTAGS
 *.o
 **/.DS_Store/*
 .DS_Store
+.clangd
+.ccls*
+compile_*
+/build/*
+

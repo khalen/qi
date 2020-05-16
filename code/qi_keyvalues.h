@@ -11,7 +11,7 @@
 
 enum KVType : u8
 {
-	NIL    = 0,
+	NIL	   = 0,
 	STRING = 0,
 	INT,
 	REAL,
@@ -26,26 +26,28 @@ typedef i64 IntValue;
 typedef r64 RealValue;
 
 #define KVR_SHIFT 3
-#define KVR_MASK  7
+#define KVR_MASK 7
 
-inline constexpr KVRef MakeKVRef(const u32 offset, const KVType type)
+inline constexpr KVRef
+MakeKVRef(const u32 offset, const KVType type)
 {
-    return (offset << KVR_SHIFT) | type;
+	return (offset << KVR_SHIFT) | type;
 }
 
-inline constexpr KVType KVRType(const KVRef ref)
+inline constexpr KVType
+KVRType(const KVRef ref)
 {
-    return (KVType) (ref & KVR_MASK);
+	return (KVType)(ref & KVR_MASK);
 }
 
-inline constexpr size_t KVROffset(const KVRef ref)
+inline constexpr size_t
+KVROffset(const KVRef ref)
 {
-    return (size_t) ref >> KVR_SHIFT;
+	return (size_t)ref >> KVR_SHIFT;
 }
 
-union Value
-{
-	KVRef     refv;
+union Value {
+	KVRef	  refv;
 	IntValue  intv;
 	RealValue realv;
 };
@@ -60,22 +62,21 @@ struct ValueArray
 {
 	IntValue len;
 	IntValue allocatedLen;
-	Value    values[];
+	Value	 values[];
 };
 
 struct KeyValues
 {
-    KVRef root;
-    :w
-}
+	KVRef root;
+};
 
-Value KV_GetValue(KeyValue* kv, u32 idx);
-Value KV_GetKey(KeyValue* kv, u32 idx);
-Value KV_GetValueForKey(KeyValue* kv, const char* key);
-Value KV_GetValueForKey(KeyValue* kv, i32 key);
-Value KV_GetValueForKey(KeyValues* kv, const Value key);
-i32 KV_CompareValues(const KeyValues* kva, const Value a, const KeyValues* kvb, const Value b);
-ValueType KV_GetValueType(const Value v);
+Value		KV_GetValue(KeyValue* kv, u32 idx);
+Value		KV_GetKey(KeyValue* kv, u32 idx);
+Value		KV_GetValueForKey(KeyValue* kv, const char* key);
+Value		KV_GetValueForKey(KeyValue* kv, i32 key);
+Value		KV_GetValueForKey(KeyValues* kv, const Value key);
+i32			KV_CompareValues(const KeyValues* kva, const Value a, const KeyValues* kvb, const Value b);
+KVType		KV_GetValueType(const Value v);
 const char* KV_GetValueAsString(const KeyValues* kva, const Value v);
 
 #define __QI_KEYVALUES_H

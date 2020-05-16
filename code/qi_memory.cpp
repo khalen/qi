@@ -9,7 +9,8 @@
 #include "qi.h"
 #include "qi_util.h"
 #include "qi_memory.h"
-#include "stdio.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 static inline size_t
 blockSizeOfLevel(const size_t totalSize, const u32 level)
@@ -74,7 +75,7 @@ isBlockIndexSplit(BuddyAllocator_s* allocator, const u32 idxInLevel, const u32 l
 	if (level == allocator->maxLevel)
 		return false;
 
-	const u32 idx     = blockIndex(idxInLevel, level);
+	const u32 idx	  = blockIndex(idxInLevel, level);
 	const u32 byteIdx = idx / 8;
 	const u32 bitIdx  = idx % 8;
 	return (*(getSplitBits(allocator) + byteIdx) & (1 << bitIdx)) != 0;
@@ -85,7 +86,7 @@ markSplitBlockIndex(BuddyAllocator_s* allocator, const u32 idxInLevel, const u32
 {
 	// Make sure we're not trying to split a leaf block
 	Assert(level < allocator->maxLevel);
-	const u32 idx     = blockIndex(idxInLevel, level);
+	const u32 idx	  = blockIndex(idxInLevel, level);
 	const u32 byteIdx = idx / 8;
 	const u32 bitIdx  = idx % 8;
 	Assert(!isBlockIndexSplit(allocator, idxInLevel, level));
@@ -97,7 +98,7 @@ markUnsplitBlockIndex(BuddyAllocator_s* allocator, const u32 idxInLevel, const u
 {
 	// Make sure we're not trying to split a leaf block
 	Assert(level < allocator->maxLevel);
-	const u32 idx     = blockIndex(idxInLevel, level);
+	const u32 idx	  = blockIndex(idxInLevel, level);
 	const u32 byteIdx = idx / 8;
 	const u32 bitIdx  = idx % 8;
 	Assert(isBlockIndexSplit(allocator, idxInLevel, level));
@@ -109,9 +110,9 @@ addFreeBlock(BuddyAllocator_s* allocator, void* block, const u32 level)
 {
 	Assert(isBlockIndexSplit(allocator, indexInLevel(allocator, block, level - 1), level - 1));
 	MemLink_s** levelFreeLists = getFreeLists(allocator);
-	MemLink_s*  memLink        = (MemLink_s*)block;
-	memLink->next              = levelFreeLists[level];
-	memLink->prev              = nullptr;
+	MemLink_s*	memLink		   = (MemLink_s*)block;
+	memLink->next			   = levelFreeLists[level];
+	memLink->prev			   = nullptr;
 
 	if (levelFreeLists[level] != nullptr)
 		levelFreeLists[level]->prev = memLink;
@@ -123,7 +124,7 @@ static inline void
 removeFreeBlock(BuddyAllocator_s* allocator, void* block, const u32 level)
 {
 	MemLink_s** levelFreeLists = getFreeLists(allocator);
-	MemLink_s*  memLink        = (MemLink_s*)block;
+	MemLink_s*	memLink		   = (MemLink_s*)block;
 
 	if (memLink == levelFreeLists[level])
 	{
@@ -143,7 +144,7 @@ removeFreeBlock(BuddyAllocator_s* allocator, void* block, const u32 level)
 static inline bool
 isBuddyAlsoFree(BuddyAllocator_s* allocator, const u32 idxInLevel, const u32 level)
 {
-	const u32 idx     = blockIndex(idxInLevel, level) >> 1;
+	const u32 idx	  = blockIndex(idxInLevel, level) >> 1;
 	const u32 byteIdx = idx / 8;
 	const u32 bitIdx  = idx % 8;
 	return (*(getFreeBits(allocator) + byteIdx) & (1 << bitIdx)) == 0;
@@ -152,7 +153,7 @@ isBuddyAlsoFree(BuddyAllocator_s* allocator, const u32 idxInLevel, const u32 lev
 static inline void
 markAllocatedBlockIndex(BuddyAllocator_s* allocator, const u32 idxInLevel, const u32 level)
 {
-	const u32 idx     = blockIndex(idxInLevel, level) >> 1;
+	const u32 idx	  = blockIndex(idxInLevel, level) >> 1;
 	const u32 byteIdx = idx / 8;
 	const u32 bitIdx  = idx % 8;
 	*(getFreeBits(allocator) + byteIdx) ^= (1 << bitIdx);
@@ -167,7 +168,7 @@ splitBlock(BuddyAllocator_s* allocator, void* block, const u32 level)
 	Assert(!isBlockIndexSplit(allocator, idxInLevel, level));
 	markSplitBlockIndex(allocator, idxInLevel, level);
 
-	u32*       blockBytes = (u32*)block;
+	u32*	   blockBytes = (u32*)block;
 	MemLink_s *linkA, *linkB;
 	linkA = (MemLink_s*)blockBytes;
 	linkB = (MemLink_s*)buddyPtr(allocator, blockBytes, level + 1);
@@ -189,7 +190,7 @@ allocBlockOfLevel(BuddyAllocator_s* allocator, const u32 level)
 	Assert(level <= allocator->maxLevel);
 
 	MemLink_s** levelFreeLists = getFreeLists(allocator);
-	MemLink_s*  freeBlock      = nullptr;
+	MemLink_s*	freeBlock	   = nullptr;
 
 	if (levelFreeLists[level] == nullptr)
 	{
@@ -199,7 +200,7 @@ allocBlockOfLevel(BuddyAllocator_s* allocator, const u32 level)
 	}
 	if (levelFreeLists[level] != nullptr)
 	{
-		freeBlock             = levelFreeLists[level];
+		freeBlock			  = levelFreeLists[level];
 		levelFreeLists[level] = freeBlock->next;
 		if (levelFreeLists[level])
 			levelFreeLists[level]->prev = nullptr;
@@ -235,11 +236,11 @@ freeBlockOfLevel(BuddyAllocator_s* allocator, void* block, const u32 level)
 
 	if (needsMerge)
 	{
-		const u32 leftBlockIdx  = idxInLevel & ~1;
+		const u32 leftBlockIdx	= idxInLevel & ~1;
 		const u32 rightBlockIdx = leftBlockIdx + 1;
-		void*     leftBlock     = ptrInLevel(allocator, leftBlockIdx, level);
-		void*     rightBlock    = ptrInLevel(allocator, rightBlockIdx, level);
-		void*     buddy         = (block == leftBlock) ? rightBlock : leftBlock;
+		void*	  leftBlock		= ptrInLevel(allocator, leftBlockIdx, level);
+		void*	  rightBlock	= ptrInLevel(allocator, rightBlockIdx, level);
+		void*	  buddy			= (block == leftBlock) ? rightBlock : leftBlock;
 
 		const u32 parentLevel = level - 1;
 		Assert(!isBlockIndexSplit(allocator, leftBlockIdx, level));
@@ -310,7 +311,7 @@ BA_Realloc(BuddyAllocator_s* allocator, void* ptr, const size_t newSize)
 		return nullptr;
 	}
 
-	size_t level = findLevelForBlock(allocator, ptr);
+	size_t level	 = findLevelForBlock(allocator, ptr);
 	size_t blockSize = blockSizeOfLevel(allocator->size, level);
 
 	if (newSize <= blockSize)
@@ -384,28 +385,28 @@ BA_InitBuffer(u8* buffer, const size_t size, const size_t smallestBlockSize)
 	size_t totalAllocatorSize = NextHigherPow2(size);
 	Assert((totalAllocatorSize % smallestBlock) == 0);
 
-	const size_t minSizeShift = BitScanRight(smallestBlock) - 1;
-	size_t smallestBlockCount   = totalAllocatorSize >> minSizeShift;
-	size_t totalAllocatorLevels = BitScanRight(smallestBlockCount) - 1;
-	size_t freeBitsBytes        = (1 << totalAllocatorLevels) / (sizeof(u8) * 8);
-	size_t splitBitsBytes       = (1 << totalAllocatorLevels) / (sizeof(u8) * 8);
-	size_t overheadBytes
+	const size_t minSizeShift		  = BitScanRight(smallestBlock) - 1;
+	size_t		 smallestBlockCount	  = totalAllocatorSize >> minSizeShift;
+	size_t		 totalAllocatorLevels = BitScanRight(smallestBlockCount) - 1;
+	size_t		 freeBitsBytes		  = (1 << totalAllocatorLevels) / (sizeof(u8) * 8);
+	size_t		 splitBitsBytes		  = (1 << totalAllocatorLevels) / (sizeof(u8) * 8);
+	size_t		 overheadBytes
 		= sizeof(BuddyAllocator_s) + (totalAllocatorLevels + 1) * sizeof(MemLink_s*) + freeBitsBytes + splitBitsBytes;
 
 	u8* allocatorMemory = buffer;
 
 	// Set up allocator in temp location so allocation shenanigans do not stomp on its metadata
-	u8*               tempAllocatorMemory = allocatorMemory + size - overheadBytes;
-	BuddyAllocator_s* allocator           = (BuddyAllocator_s*)tempAllocatorMemory;
+	u8*				  tempAllocatorMemory = allocatorMemory + size - overheadBytes;
+	BuddyAllocator_s* allocator			  = (BuddyAllocator_s*)tempAllocatorMemory;
 	memset(allocator, 0, overheadBytes);
 
-	allocator->basePtr      = allocatorMemory - (totalAllocatorSize - size);
-	allocator->size         = totalAllocatorSize;
-	allocator->actualSize   = size;
-	allocator->freeSize     = size - overheadBytes;
+	allocator->basePtr		= allocatorMemory - (totalAllocatorSize - size);
+	allocator->size			= totalAllocatorSize;
+	allocator->actualSize	= size;
+	allocator->freeSize		= size - overheadBytes;
 	allocator->minSizeShift = minSizeShift;
-	allocator->maxLevel     = totalAllocatorLevels;
-	tempAllocatorMemory += sizeof(BuddyAllocator_s) + (totalAllocatorLevels + 1) * sizeof(MemLink_s *);
+	allocator->maxLevel		= totalAllocatorLevels;
+	tempAllocatorMemory += sizeof(BuddyAllocator_s) + (totalAllocatorLevels + 1) * sizeof(MemLink_s*);
 
 	allocator->freeBitsOffset = tempAllocatorMemory - ((u8*)allocator);
 	tempAllocatorMemory += freeBitsBytes;
@@ -413,7 +414,7 @@ BA_InitBuffer(u8* buffer, const size_t size, const size_t smallestBlockSize)
 	allocator->splitBitsOffset = tempAllocatorMemory - ((u8*)allocator);
 	tempAllocatorMemory += splitBitsBytes;
 
-	Assert(tempAllocatorMemory - (u8*)allocator == overheadBytes);
+	Assert(tempAllocatorMemory - (u8*)allocator == (ssize_t)overheadBytes);
 
 	initFreeLists(allocator, allocatorMemory);
 
@@ -460,7 +461,7 @@ BA_DumpInfo(BuddyAllocator_s* allocator)
 {
 	printf("Allocator info:\n");
 	MemLink_s** freeLists = getFreeLists(allocator);
-	size_t      totalFree = 0;
+	size_t		totalFree = 0;
 	for (size_t i = 0; i <= allocator->maxLevel; i++)
 	{
 		size_t bSize = blockSizeOfLevel(allocator->size, i);

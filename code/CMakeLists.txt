@@ -3,8 +3,13 @@ project(qi)
 
 set(CMAKE_CXX_STANDARD 17)
 
+IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  SET(CMAKE_INSTALL_PREFIX "/Users/jon/work/qi" CACHE PATH "Install Path" FORCE)
+ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+
 set(DATA_DIR "\"~/work/qi/data\"")
 set(THIRDPARTY "~/work/qi/thirdparty")
+set(IMGUI "~/work/qi/thirdparty/imgui")
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(MACOSX TRUE)
@@ -26,8 +31,7 @@ if (MACOSX)
   endif()
 
   set(QI_DEFINES "${QI_DEFINES} -DQI_OSX_BUILD=1 -fms-extensions -fvisibility=hidden -fvisibility-inlines-hidden")
-  set(QI_LINK_OPTS "-framework Cocoa")
-  set(QI_EXTRA_SRCS osx_qi.mm qi_ogl.cpp)
+  set(QI_EXTRA_SRCS qi_ogl.cpp sdl_qi.cpp)
 
   link_directories(${THIRDPARTY}/lib/osx)
 
@@ -38,10 +42,17 @@ elseif(WIN32)
 
 endif()
 
-include_directories(. ${THIRDPARTY}/include)
+include_directories(. ${THIRDPARTY}/include ${THIRDPARTY}/imgui)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${QI_DEFINES}")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${QI_LINK_OPTS}")
+execute_process(COMMAND "sdl2-config" "--cflags" OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE SDL_CFLAGS)
+execute_process(COMMAND "sdl2-config" "--static-libs" OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE SDL_LDFLAGS)
+message(STATUS "SDL CFlags: ${SDL_CFLAGS}")
+message(STATUS "SDL LDFlags: ${SDL_LDFLAGS}")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${QI_DEFINES} ${SDL_CFLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${QI_LINK_OPTS} ${SDL_LDFLAGS}")
+
+file(GLOB IMGUI_SRCS ${THIRDPARTY}/imgui/*.cpp ${THIRDPARTY}/imgui.*.h)
 
 add_library(${PROJECT_NAME}_game
 
@@ -79,6 +90,7 @@ add_library(${PROJECT_NAME}_game
   qi_sound.cpp
   qi_sound.h
   qi_stringtable.cpp
+
   qi_stringtable.h
   qi_template_utils.h
   qi_tile.cpp
@@ -93,6 +105,8 @@ add_library(${PROJECT_NAME}_game
   qi_vector_scalar_support.h
   qi_vector_swizzle.h
   qi_vector_traits.h
+
+  ${IMGUI_SRCS}
 )
 
 add_executable(${PROJECT_NAME}

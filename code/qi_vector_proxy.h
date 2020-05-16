@@ -10,10 +10,10 @@
 #include <utility>
 
 // Idxs is the IdxList containing our indices to use, with possible repeats.
-template <typename VecType, typename DataType, typename Idxs>
+template <typename VecType, typename IDataType, typename Idxs>
 class IndexedVectorProxy
 {
-    DataType data;
+    IDataType data;
 
   public:
     constexpr static const size_t Rank = Idxs::Rank;
@@ -22,7 +22,7 @@ class IndexedVectorProxy
     constexpr static bool IsAssignable = HasAllUniqueIndices<Idxs>();
 
 	using VectorType = VecType;
-	using DataType   = DataType;
+	using DataType   = IDataType;
     using IndicesType = Idxs;
 
 	VectorType Decay() const

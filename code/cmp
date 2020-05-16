@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+cmake -GNinja -H. -DCMAKE_BUILD_TYPE=Profile -B../build/Profile

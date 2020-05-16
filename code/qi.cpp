@@ -802,7 +802,7 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 		{
 			// const r32 col = noise.Perlin2D(Vector2(i, j), 500.0f) * 0.5f + 0.5f;
 			// const r32 col = noise.Smoothed2D(Vector2(i, j), 50.0f) * 0.5f + 0.5f;
-			const r32 col = noise.Simplex2D(Vector2(i, j), 80.0f) * 0.5f + 0.5f;
+			const r32 col = noise.Simplex2D(Vector2(i, j), 10.0f) * 0.5f + 0.5f;
 			// const r32 col = noise.Smoothed(i, 100.0f) * 0.5f + 0.5f;
 			// const r32 col = noise.GetReal(i);
 			// printf("%f\n", col);
@@ -891,7 +891,9 @@ Qi_Init(const PlatFuncs_s* platFuncs, Memory_s* memory)
 
 internal GameFuncs_s s_game = {
 	sound,
+#if HAS(DEV_BUILD)
 	debug,
+#endif
 	Qi_Init,
 	Qi_GameUpdateAndRender,
 };

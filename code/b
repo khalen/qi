@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+build='Debug'
+if [ -n "$1" ]
+then
+    build="$1"
+fi
+
+ninja -C "../build/$build"
+cmake --install "../build/$build"

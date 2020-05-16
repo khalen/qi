@@ -160,7 +160,7 @@ QiOgl_BitmapToTexture(GLuint tex, const Bitmap_s* bitmap)
 	CheckGL();
 }
 
-#define FR() ((float)rand()) / RAND_MAX
+#define FR() ((float)rand()) / (float)RAND_MAX
 void
 QiOgl_Clear()
 {

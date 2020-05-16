@@ -16,20 +16,20 @@
 
 struct Empty {};
 
-template<typename ScalarType, size_t Size>
-class Vector : public VectorHelper<ScalarType, Size>::BaseType,
+template<typename IScalarType, size_t Size>
+class Vector : public VectorHelper<IScalarType, Size>::BaseType,
                public VectorFunctions<
-                   std::conditional_t<Size == 1, Nothing, CommonBinaryOps<Vector<ScalarType, Size>, ScalarType>>,
-                   Vector<ScalarType, Size>,
-                   ScalarType,
+                   std::conditional_t<Size == 1, Nothing, CommonBinaryOps<Vector<IScalarType, Size>, IScalarType>>,
+                   Vector<IScalarType, Size>,
+                   IScalarType,
                    Size,
-                   Vector<ScalarType, Size> const&,
-                   ScalarType const&>
+                   Vector<IScalarType, Size> const&,
+                   IScalarType const&>
 {
 	static_assert(Size >= 1, "Size must be >= 1");
 
   public:
-	using BaseType = typename VectorHelper<ScalarType, Size>::BaseType;
+	using BaseType = typename VectorHelper<IScalarType, Size>::BaseType;
 	using BaseType::data;
 
 	using InternalScalarType     = std::remove_reference_t<decltype(std::declval<BaseType>().data[0])>;
@@ -37,7 +37,7 @@ class Vector : public VectorHelper<ScalarType, Size>::BaseType,
 
 	using VectorType    = Vector;
 	using VectorArgType = Vector const&;
-	using ScalarType    = ScalarType;
+	using ScalarType    = IScalarType;
 	using ScalarArgType = ScalarType const&;
 
 	using AreScalarTypesSame = IsSame<ScalarType, InternalScalarType>;

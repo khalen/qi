@@ -33,13 +33,13 @@ struct CommonVectorTypeFallback
   private:
     using CommonScalarType = typename std::common_type_t<ScalarType1, ScalarType2>;
 
-    static_assert(std::is_same_v<CommonScalarType, ScalarType1> || std::is_same_v<CommonScalarType, ScalarType2>,
+    static_assert(std::is_same<CommonScalarType, ScalarType1>::value || std::is_same<CommonScalarType, ScalarType2>::value,
                   "Error: Common scalar type between two vectors must be the scalar type of one or the other vector");
 
 public:
   using Type = typename std::conditional_t<
 	  Size1 == Size2,
-	  std::conditional_t<std::is_same_v<CommonScalarType, ScalarType1>, VectorType1, VectorType2>,
+      std::conditional_t<std::is_same<CommonScalarType, ScalarType1>::value, VectorType1, VectorType2>,
 	  std::conditional_t<Size2 == 1, VectorType1, VectorType2>>;
 };
 
