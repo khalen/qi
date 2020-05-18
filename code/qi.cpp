@@ -52,28 +52,6 @@ struct GameGlobals_s
 
 GameGlobals_s* g_game;
 
-void*
-M_AllocRaw(Memory_s* memory, const size_t size)
-{
-	size_t allocSize = (size + 15) & ~0xFull;
-	Assert(memory && ((uintptr_t)memory->permanentPos & 0xF) == 0
-		   && (memory->permanentSize - (size_t)(memory->permanentPos - memory->permanentStorage) > allocSize));
-	void* result = memory->permanentPos;
-	memory->permanentPos += allocSize;
-	return result;
-}
-
-void*
-M_TransientAllocRaw(Memory_s* memory, const size_t size)
-{
-	size_t allocSize = (size + 15) & ~0xFull;
-	Assert(memory && ((uintptr_t)memory->transientPos & 0xF) == 0
-		   && (memory->transientSize - (size_t)(memory->transientPos - memory->transientStorage) > allocSize));
-	void* result = memory->transientPos;
-	memory->transientPos += allocSize;
-	return result;
-}
-
 template<typename T>
 T*
 GameAllocate()

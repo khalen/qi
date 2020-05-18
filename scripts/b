@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+build='Profile'
+if [ -n "$1" ]
+then
+    build="$1"
+fi
+
+cmake --build /Users/jon/work/qi/build --config $build --target install

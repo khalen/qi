@@ -17,9 +17,12 @@
 #define ASSERT_HANDLER_FUNC
 #endif
 extern void Qi_Assert_Handler(const char*, const char*, const int) ASSERT_HANDLER_FUNC;
-#define Assert(foo) \
-	if (!(foo))     \
-        Qi_Assert_Handler(#foo, __FILE__, __LINE__);
+#define Assert(foo)                                      \
+	do                                                   \
+	{                                                    \
+		if (!(foo))                                      \
+			Qi_Assert_Handler(#foo, __FILE__, __LINE__); \
+	} while (0)
 #endif
 
 #if HAS(DEV_BUILD) || HAS(PROF_BUILD)
@@ -35,4 +38,3 @@ struct DebugFuncs_s
 
 #define __QI_DEBUG_H
 #endif // #ifndef __QI_DEBUG_H
-

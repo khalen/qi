@@ -13,4 +13,4 @@ GTAGS
 .ccls*
 compile_*
 /build/*
-
+/bin/*

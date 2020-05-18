@@ -17,48 +17,45 @@
 #define HAS(test)  (1 % ((test) / 2))
 #define WHEN(test) (2 + (test) * 2)
 
-#if defined(QI_DEV_BUILD)
+#if defined(QI_DEV_BUILD) && QI_DEV_BUILD == 1
 #define DEV_BUILD HAS_X
 #else
 #define DEV_BUILD HAS__
 #endif
 
-#if defined(QI_FAST_BUILD)
-#define FAST_BUILD HAS_X
-#else
-#define FAST_BUILD HAS__
-#endif
-
-#if defined(QI_PROFILE_BUILD)
+#if defined(QI_PROFILE_BUILD) && QI_PROFILE_BUILD == 1
 #define PROF_BUILD HAS_X
 #else
 #define PROF_BUILD HAS__
 #endif
 
-#if defined(QI_OSX_BUILD)
+#if defined(QI_OSX_BUILD) && QI_OSX_BUILD == 1
 #define OSX_BUILD HAS_X
 #define WIN32_BUILD HAS__
-#elif defined(QI_WIN32_BUILD)
+#else // Assume WIN32
 #define OSX_BUILD HAS__
 #define WIN32_BUILD HAS_X
-#else
-#error Undefined platform! Add platform to has.h
 #endif
 
+#if defined(QI_RELEASE_BUILD) && QI_RELEASE_BUILD == 1
+#define RELEASE_BUILD HAS_X
+#else
+#define RELEASE_BUILD HAS__
+#endif
 
-#define RELEASE_BUILD WHEN(!HAS(DEV_BUILD) && HAS(FAST_BUILD))
+#define OPTIMIZED_BUILD WHEN(HAS(PROF_BUILD) || HAS(RELEASE_BUILD))
+#define DEBUG_BUILD WHEN(HAS(DEV_BUILD) && !HAS(OPTIMIZED_BUILD))
+
+#if !HAS(OPTIMIZED_BUILD)
+#warn "Unoptimized build enabled, things will be slow"
+#endif
 
 #if HAS(RELEASE_BUILD) && !defined(__clang__)
 #pragma message "RELEASE_BUILD enabled"
-#else
+#endif
 
 #if HAS(DEV_BUILD) && !defined(__clang__)
 #pragma message("DEV_BUILD enabled")
-#endif
-
-#if HAS(FAST_BUILD) && !defined(__clang__)
-#pragma message("FAST_BUILD enabled")
-#endif
 #endif
 
 // TODO(plat): Find a better place for this

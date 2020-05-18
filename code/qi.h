@@ -55,35 +55,37 @@ struct Bitmap_s
 };
 
 #define CONTROLLER_MAX_COUNT 5
-#define KBD (CONTROLLER_MAX_COUNT - 1)
+#define KBD					 (CONTROLLER_MAX_COUNT - 1)
 
 struct Button_s
 {
 	bool endedDown;
-	int  halfTransitionCount;
+	int	 halfTransitionCount;
 };
 
 #define TRIGGER_DEADZONE 0.1f
 struct Trigger_s
 {
-	r32    reading;
-	r32    __Pad0;
-	v2 minMax;
+	r32 reading;
+	r32 __Pad0;
+	v2	minMax;
 };
 
 #define ANALOG_DEADZONE 0.1f
 struct Analog_s
 {
 	Trigger_s trigger;
-	v2    dir;
+	v2		  dir;
 };
 
 struct Controller_s
 {
 	bool isAnalog;
 	bool isConnected;
+	bool __pad[2];
 
-	union {
+	union
+	{
 #define ANALOG_COUNT 2
 		Analog_s analogs[ANALOG_COUNT];
 		struct
@@ -93,7 +95,8 @@ struct Controller_s
 		};
 	};
 
-	union {
+	union
+	{
 #define TRIGGER_COUNT 2
 		Trigger_s triggers[TRIGGER_COUNT];
 		struct
@@ -103,8 +106,9 @@ struct Controller_s
 		};
 	};
 
-	union {
-#define BUTTON_COUNT 17
+	union
+	{
+#define BUTTON_COUNT 15
 		Button_s buttons[BUTTON_COUNT];
 
 		struct
@@ -125,21 +129,39 @@ struct Controller_s
 			Button_s leftShoulder;
 			Button_s rightShoulder;
 
-			Button_s leftMouse;
-			Button_s middleMouse;
-			Button_s rightMouse;
+			Button_s leftStickButton;
+			Button_s rightStickButton;
+			Button_s pightStickButton;
 
-            Button_s leftStickButton;
-            Button_s rightStickButton;
+			Button_s padButton;
+		};
+	};
+};
+
+struct Mouse_s
+{
+	union
+	{
+#define MOUSE_BUTTON_COUNT 5
+		v2 pos;
+		Button_s buttons[MOUSE_BUTTON_COUNT];
+
+		struct
+		{
+			Button_s leftButton;
+			Button_s middleButton;
+			Button_s rightButton;
+			Button_s x1Button;
+			Button_s x2Button;
 		};
 	};
 };
 
 struct Input_s
 {
-	Time_t       dT;
+	Time_t		 dT;
 	Controller_s controllers[CONTROLLER_MAX_COUNT];
-	v2       mouse;
+	Mouse_s		 mouse;
 };
 
 struct SubSystem_s;
@@ -147,10 +169,10 @@ typedef void Qi_Init_SubSystem_f(const SubSystem_s* sys, bool isReInit);
 
 struct SubSystem_s
 {
-	const char*          name;
+	const char*			 name;
 	Qi_Init_SubSystem_f* initFunc;
-	size_t               globalSize;
-	void*                globalPtr;
+	size_t				 globalSize;
+	void*				 globalPtr;
 };
 
 #define MAX_SUBSYSTEMS 16
@@ -183,7 +205,7 @@ struct GameFuncs_s
 	const DebugFuncs_s* debug;
 #endif
 
-	Qi_Init_f*                Init;
+	Qi_Init_f*				  Init;
 	Qi_GameUpdateAndRender_f* UpdateAndRender;
 };
 
@@ -191,14 +213,14 @@ struct GameFuncs_s
 typedef void* QiPlat_ReadEntireFile_f(ThreadContext_s* tc, const char* fileName, size_t* fileSize);
 typedef bool  QiPlat_WriteEntireFile_f(ThreadContext_s* tc, const char* fileName, const void* ptr, const size_t size);
 typedef void  QiPlat_ReleaseFileBuffer_f(ThreadContext_s* tc, void* buffer);
-typedef r64   QiPlat_WallSeconds_f(ThreadContext_s* tc);
+typedef r64	  QiPlat_WallSeconds_f(ThreadContext_s* tc);
 
 struct PlatFuncs_s
 {
-	QiPlat_ReadEntireFile_f*    ReadEntireFile;
-	QiPlat_WriteEntireFile_f*   WriteEntireFile;
+	QiPlat_ReadEntireFile_f*	ReadEntireFile;
+	QiPlat_WriteEntireFile_f*	WriteEntireFile;
 	QiPlat_ReleaseFileBuffer_f* ReleaseFileBuffer;
-	QiPlat_WallSeconds_f*       WallSeconds;
+	QiPlat_WallSeconds_f*		WallSeconds;
 };
 
 extern const PlatFuncs_s*  plat;

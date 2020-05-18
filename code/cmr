@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-cmake -GNinja -H. -DCMAKE_BUILD_TYPE=Release -B../build/Release

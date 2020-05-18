@@ -1,3 +1,6 @@
+#include "SDL_clipboard.h"
+#include "SDL_mouse.h"
+#include "SDL_stdinc.h"
 #include "basictypes.h"
 #include "qi.h"
 #include "qi_memory.h"
@@ -25,6 +28,8 @@
 #include "SDL_events.h"
 #include "SDL_scancode.h"
 #include "SDL_video.h"
+
+#include "imgui.h"
 
 #define internal static
 
@@ -63,6 +68,21 @@ struct Globals_s
 	r64 timeConversionFactor;
 
 	ThreadContext_s thread;
+
+	bool mouseDown[MOUSE_BUTTON_COUNT];
+
+	// Heaps for SDL and ImGUI
+	static const size_t sdlHeapSize   = 4*1024*1024;
+	static const size_t imGuiHeapSize = 4*1024*1024;
+
+	BuddyAllocator_s* sdlAllocator;
+	BuddyAllocator_s* imGuiAllocator;
+
+	// IMGUI
+	SDL_Cursor* mouseCursors[ImGuiMouseCursor_COUNT];
+	SDL_Window* window;
+	char*		clipboardTextData;
+	ImGuiContext* imGuiContext;
 } g;
 
 #define NOTE_UNUSED(x) ((void)x);
@@ -75,6 +95,37 @@ Qi_Assert_Handler(const char* msg, const char* file, const int line)
 #else
 	__debugbreak();
 #endif
+}
+
+// Probably a much less dnry way to do this, but
+static void* SdlMalloc(size_t size)
+{
+	return BA_Alloc(g.sdlAllocator, size);
+}
+
+static void* SdlCalloc(size_t num, size_t size)
+{
+	return BA_Calloc(g.sdlAllocator, num * size);
+}
+
+static void* SdlRealloc(void* mem, size_t newSize)
+{
+	return BA_Realloc(g.sdlAllocator, mem, newSize);
+}
+
+static void SdlFree(void* mem)
+{
+	BA_Free(g.sdlAllocator, mem);
+}
+
+static void* ImGuiMalloc(size_t size, void*)
+{
+	return BA_Alloc(g.imGuiAllocator, size);
+}
+
+static void ImGuiFree(void* mem, void*)
+{
+	return BA_Free(g.imGuiAllocator, mem);
 }
 
 static char*
@@ -222,6 +273,71 @@ OS_ReleaseFileBuffer(ThreadContext_s*, void* buffer)
 	free(buffer);
 }
 
+static const char* ImGuiGetClipboardText(void*)
+{
+	if (g.clipboardTextData)
+		SDL_free(g.clipboardTextData);
+	SDL_GetClipboardText();
+	g.clipboardTextData = SDL_GetClipboardText();
+	return g.clipboardTextData;
+}
+
+static void ImGuiSetClipboardText(void*, const char* text)
+{
+	SDL_SetClipboardText(text);
+}
+
+static void
+InitImGui(SDL_Window* window)
+{
+	g.window = window;
+
+	ImGuiIO& io = ImGui::GetIO();
+
+	io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
+	io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos; // We can honor io.WantSetMousePos requests (optional, rarely used)
+	io.BackendPlatformName = "QI Engine";
+
+	// Keyboard mapping. ImGui will use those indices to peek into the io.KeysDown[] array.
+	io.KeyMap[ImGuiKey_Tab]			= SDL_SCANCODE_TAB;
+	io.KeyMap[ImGuiKey_LeftArrow]	= SDL_SCANCODE_LEFT;
+	io.KeyMap[ImGuiKey_RightArrow]	= SDL_SCANCODE_RIGHT;
+	io.KeyMap[ImGuiKey_UpArrow]		= SDL_SCANCODE_UP;
+	io.KeyMap[ImGuiKey_DownArrow]	= SDL_SCANCODE_DOWN;
+	io.KeyMap[ImGuiKey_PageUp]		= SDL_SCANCODE_PAGEUP;
+	io.KeyMap[ImGuiKey_PageDown]	= SDL_SCANCODE_PAGEDOWN;
+	io.KeyMap[ImGuiKey_Home]		= SDL_SCANCODE_HOME;
+	io.KeyMap[ImGuiKey_End]			= SDL_SCANCODE_END;
+	io.KeyMap[ImGuiKey_Insert]		= SDL_SCANCODE_INSERT;
+	io.KeyMap[ImGuiKey_Delete]		= SDL_SCANCODE_DELETE;
+	io.KeyMap[ImGuiKey_Backspace]	= SDL_SCANCODE_BACKSPACE;
+	io.KeyMap[ImGuiKey_Space]		= SDL_SCANCODE_SPACE;
+	io.KeyMap[ImGuiKey_Enter]		= SDL_SCANCODE_RETURN;
+	io.KeyMap[ImGuiKey_Escape]		= SDL_SCANCODE_ESCAPE;
+	io.KeyMap[ImGuiKey_KeyPadEnter] = SDL_SCANCODE_KP_ENTER;
+	io.KeyMap[ImGuiKey_A]			= SDL_SCANCODE_A;
+	io.KeyMap[ImGuiKey_C]			= SDL_SCANCODE_C;
+	io.KeyMap[ImGuiKey_V]			= SDL_SCANCODE_V;
+	io.KeyMap[ImGuiKey_X]			= SDL_SCANCODE_X;
+	io.KeyMap[ImGuiKey_Y]			= SDL_SCANCODE_Y;
+	io.KeyMap[ImGuiKey_Z]			= SDL_SCANCODE_Z;
+
+	io.SetClipboardTextFn = ImGuiSetClipboardText;
+	io.GetClipboardTextFn = ImGuiGetClipboardText;
+	io.ClipboardUserData  = nullptr;
+
+	// Load mouse cursors
+	g.mouseCursors[ImGuiMouseCursor_Arrow]		= SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+	g.mouseCursors[ImGuiMouseCursor_TextInput]	= SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
+	g.mouseCursors[ImGuiMouseCursor_ResizeAll]	= SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
+	g.mouseCursors[ImGuiMouseCursor_ResizeNS]	= SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
+	g.mouseCursors[ImGuiMouseCursor_ResizeEW]	= SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+	g.mouseCursors[ImGuiMouseCursor_ResizeNESW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENESW);
+	g.mouseCursors[ImGuiMouseCursor_ResizeNWSE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
+	g.mouseCursors[ImGuiMouseCursor_Hand]		= SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
+	g.mouseCursors[ImGuiMouseCursor_NotAllowed] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NO);
+}
+
 static void
 InitGameGlobals()
 {
@@ -259,6 +375,13 @@ InitGameGlobals()
 	}
 	Assert(g.memory.transientStorage != nullptr);
 	g.memory.transientPos = g.memory.transientStorage;
+
+	// Set up heaps for SDL and ImGUI
+	void* heapBase = M_AllocRaw(&g.memory, g.sdlHeapSize);
+	g.sdlAllocator = BA_InitBuffer((u8 *)heapBase, g.sdlHeapSize, 32);
+
+	heapBase = M_AllocRaw(&g.memory, g.imGuiHeapSize);
+	g.imGuiAllocator = BA_InitBuffer((u8 *)heapBase, g.imGuiHeapSize, 32);
 
 	// Set up module path
 	pid_t pid = getpid();
@@ -467,10 +590,91 @@ ProcessKeyboardStick(Analog_s* analog, r32 valueX, r32 valueY, bool isDown)
 }
 
 static void
-ProcessKeyboardButton(Button_s* button, bool isDown)
+ProcessButton(Button_s* button, bool isDown)
 {
 	button->halfTransitionCount++;
 	button->endedDown = isDown;
+}
+
+static void
+HandleMiscEvent(SDL_Event*, Input_s*)
+{
+}
+
+static void
+HandleMouseEvent(SDL_Event* event, Input_s* newInput)
+{
+	// Handle IMGui stuff
+	ImGuiIO& io = ImGui::GetIO();
+
+	switch(event->type)
+	{
+	case SDL_MOUSEWHEEL:
+		if (event->wheel.x > 0) io.MouseWheelH += 1.0f;
+		if (event->wheel.x < 0) io.MouseWheelH -= 1.0f;
+		if (event->wheel.y > 0) io.MouseWheel += 1.0f;
+		if (event->wheel.y < 0) io.MouseWheel -= 1.0f;
+		break;
+	case SDL_MOUSEBUTTONDOWN:
+		Assert(event->button.button - 1 >= 0 && event->button.button - 1 < MOUSE_BUTTON_COUNT);
+		g.mouseDown[event->button.button - 1] = true;
+		break;
+	case SDL_MOUSEBUTTONUP:
+		Assert(event->button.button - 1 >= 0 && event->button.button - 1 < MOUSE_BUTTON_COUNT);
+		g.mouseDown[event->button.button - 1] = false;
+		break;
+	}
+
+	if (io.WantCaptureMouse)
+		return;
+
+	// Handle our stuff
+	switch(event->type)
+	{
+	case SDL_MOUSEBUTTONDOWN:
+		ProcessButton(&newInput->mouse.buttons[event->button.button - 1], true);
+		break;
+	case SDL_MOUSEBUTTONUP:
+		ProcessButton(&newInput->mouse.buttons[event->button.button - 1], false);
+		break;
+	}
+}
+
+static void
+UpdateMousePosAndButtons(Input_s* newInput)
+{
+	ImGuiIO& io = ImGui::GetIO();
+
+	int mx, my;
+	u32 buttons = SDL_GetMouseState(&mx, &my);
+	for (int i = 0; i < IM_ARRAYSIZE(io.MouseDown); i++)
+	{
+		io.MouseDown[i] = g.mouseDown[i] || (buttons & SDL_BUTTON(i + 1));
+		g.mouseDown[i] = false;
+	}
+
+	io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
+	if (SDL_GetWindowFlags(g.window) & SDL_WINDOW_INPUT_FOCUS)
+		io.MousePos = ImVec2((float)mx, (float)my);
+}
+
+static void
+UdpateMouseCursor()
+{
+	ImGuiIO& io = ImGui::GetIO();
+	if (io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange)
+		return;
+
+	ImGuiMouseCursor imguiCursor = ImGui::GetMouseCursor();
+	if (io.MouseDrawCursor || imguiCursor == ImGuiMouseCursor_None)
+	{
+		SDL_ShowCursor(SDL_FALSE);
+	}
+	else
+	{
+		SDL_SetCursor(g.mouseCursors[imguiCursor] ? g.mouseCursors[imguiCursor] : g.mouseCursors[ImGuiMouseCursor_Arrow]);
+		SDL_ShowCursor(SDL_TRUE);
+	}
 }
 
 static void
@@ -479,15 +683,36 @@ HandleKeyEvent(SDL_Event* event, Input_s* newInput)
 	bool		  isDown		= (event->key.type == SDL_KEYDOWN);
 	Controller_s* kbdController = &newInput->controllers[KBD];
 
-	const Uint8* keyState	= SDL_GetKeyboardState(nullptr);
 	SDL_Keycode	 vkCode		= event->key.keysym.sym;
-	bool		 commandKey = keyState[SDL_SCANCODE_LGUI];
-	bool		 shiftKey	= keyState[SDL_SCANCODE_LSHIFT];
 
-	// bool    controlKey    = (modifierFlags & NSEventModifierFlagControl) != 0;
-	// bool    alternateKey  = (modifierFlags & NSEventModifierFlagAlternate) != 0;
+	const int modState	 = SDL_GetModState();
+	bool	  commandKey = (modState & KMOD_GUI);
+	bool	  shiftKey	 = (modState & KMOD_SHIFT);
+	bool	  altKey	 = (modState & KMOD_ALT);
+	bool	  ctrlKey	 = (modState & KMOD_CTRL);
 
-	ProcessKeyboardButton(&kbdController->leftStickButton, shiftKey);
+	// Handle all IMGUI stuff
+	ImGuiIO& io = ImGui::GetIO();
+
+	if (event->type == SDL_TEXTINPUT)
+	{
+		io.AddInputCharactersUTF8(event->text.text);
+		return;
+	}
+
+	const int key	   = event->key.keysym.scancode;
+	Assert(key >= 0 && key < IM_ARRAYSIZE(io.KeysDown));
+
+	io.KeysDown[key] = isDown;
+	io.KeyShift		 = shiftKey;
+	io.KeyCtrl		 = ctrlKey;
+	io.KeyAlt		 = altKey;
+	io.KeySuper		 = commandKey;
+
+	if (io.WantCaptureKeyboard)
+		return;
+
+	ProcessButton(&kbdController->leftStickButton, shiftKey);
 
 	if (vkCode == SDLK_w)
 	{
@@ -510,27 +735,27 @@ HandleKeyEvent(SDL_Event* event, Input_s* newInput)
 		if (isDown && commandKey)
 			g.gameRunning = false;
 		else
-			ProcessKeyboardButton(&kbdController->leftShoulder, isDown);
+			ProcessButton(&kbdController->leftShoulder, isDown);
 	}
 	else if (vkCode == SDLK_e)
 	{
-		ProcessKeyboardButton(&kbdController->rightShoulder, isDown);
+		ProcessButton(&kbdController->rightShoulder, isDown);
 	}
 	else if (vkCode == SDLK_UP)
 	{
-		ProcessKeyboardButton(&kbdController->upButton, isDown);
+		ProcessButton(&kbdController->upButton, isDown);
 	}
 	else if (vkCode == SDLK_RIGHT)
 	{
-		ProcessKeyboardButton(&kbdController->rightButton, isDown);
+		ProcessButton(&kbdController->rightButton, isDown);
 	}
 	else if (vkCode == SDLK_DOWN)
 	{
-		ProcessKeyboardButton(&kbdController->downButton, isDown);
+		ProcessButton(&kbdController->downButton, isDown);
 	}
 	else if (vkCode == SDLK_LEFT)
 	{
-		ProcessKeyboardButton(&kbdController->leftButton, isDown);
+		ProcessButton(&kbdController->leftButton, isDown);
 	}
 	else if (vkCode == SDLK_ESCAPE)
 	{
@@ -569,10 +794,7 @@ main(int argc, const char* argv[])
 
 	InitGameGlobals();
 
-	r64 secs = WallSeconds();
-	usleep(1000 * 1000);
-	r64 oneSec = WallSeconds() - secs;
-	printf("Onesec: %g\n", oneSec);
+	SDL_SetMemoryFunctions(SdlMalloc, SdlCalloc, SdlRealloc, SdlFree);
 
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Init(SDL_INIT_TIMER);
@@ -595,6 +817,11 @@ main(int argc, const char* argv[])
 	QiOgl_Init();
 	SDL_GL_MakeCurrent(window, context);
 
+	r64 secs = WallSeconds();
+	usleep(1000 * 1000);
+	r64 oneSec = WallSeconds() - secs;
+	printf("Onesec: %g\n", oneSec);
+
 	r64 frameStart = WallSeconds();
 	g.gameRunning  = true;
 
@@ -611,21 +838,17 @@ main(int argc, const char* argv[])
 		for (int analog = 0; analog < ANALOG_COUNT; analog++)
 			kbdController->analogs[analog] = oldController->analogs[analog];
 
-		// SampleXInputControllers(&newInput, &g.inputState);
-
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
-			switch (event.type)
-			{
-			case SDL_KEYDOWN:
-			case SDL_KEYUP:
+			if (event.type >= SDL_KEYDOWN && event.type < SDL_MOUSEMOTION)
 				HandleKeyEvent(&event, &newInput);
-				break;
-			default:
-				break;
-				// Ignore
-			}
+			else if (event.type >= SDL_MOUSEMOTION && event.type < SDL_JOYAXISMOTION)
+				HandleMouseEvent(&event, &newInput);
+			else if (event.type >= SDL_CONTROLLERAXISMOTION && event.type < SDL_FINGERDOWN)
+				HandleMouseEvent(&event, &newInput);
+			else
+				HandleMiscEvent(&event, &newInput);
 		}
 
 		g.inputState = newInput;

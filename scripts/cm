@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+cmake -G"Ninja Multi-Config" -H/Users/jon/work/qi/code -B/Users/jon/work/qi/build -DCMAKE_CONFIGURATION_TYPES="Debug;Profile;RelWithDebugInfo;Release"

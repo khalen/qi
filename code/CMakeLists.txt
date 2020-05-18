@@ -1,63 +1,79 @@
-cmake_minimum_required(VERSION 3.14)
-project(qi)
+cmake_minimum_required(VERSION 3.17)
+
+project(qi CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
-IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  SET(CMAKE_INSTALL_PREFIX "/Users/jon/work/qi" CACHE PATH "Install Path" FORCE)
-ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+set(MACOSX $<PLATFORM_ID:Darwin>)
+set(WIN32 $<PLATFORM_ID:Win32>)
 
-set(DATA_DIR "\"~/work/qi/data\"")
-set(THIRDPARTY "~/work/qi/thirdparty")
-set(IMGUI "~/work/qi/thirdparty/imgui")
+set(BIN_DIR "${CMAKE_SOURCE_DIR}/../bin")
+set(DATA_DIR "${CMAKE_SOURCE_DIR}/../data")
+set(THIRDPARTY "${CMAKE_SOURCE_DIR}/../thirdparty")
+set(IMGUI "${THIRDPARTY}/imgui")
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(MACOSX TRUE)
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "Win32")
-    set(WIN32 TRUE)
-endif()
+set(IS_OPTIMIZED $<OR:$<CONFIG:Profile>,$<CONFIG:Release>,$<CONFIG:RelWithDebugInfo>>)
+set(HAS_DEBUG_INFO $<OR:$<CONFIG:Profile>,$<CONFIG:Debug>,$<CONFIG:RelWithDebugInfo>>)
+set(IS_PROFILE $<CONFIG:Profile>)
+set(IS_RELEASE $<CONFIG:Release>)
+set(IS_DEV $<NOT:${IS_RELEASE}>)
+set(IS_CLANG $<CXX_COMPILER_ID:Clang>)
 
-set(QI_DEFINES "-DQI_DEV_DATA_DIR=${DATA_DIR} -Wno-deprecated-declarations")
-set(QI_LINK_OPTS "")
-
-if (MACOSX)
-
-  if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(QI_DEFINES "${QI_DEFINES} -g -DQI_DEV_BUILD=1 -DQI_PROFILE_BUILD=1")
-  elseif(CMAKE_BUILD_TYPE MATCHES "Profile")
-    set(QI_DEFINES "${QI_DEFINES} -O3 -g -DQI_DEV_BUILD=1 -DQI_PROFILE_BUILD=1")
-  elseif(CMAKE_BUILD_TYPE MATCHES "RelWithDebugInfo")
-    set(QI_DEFINES "${QI_DEFINES} -O3 -g")
-  endif()
-
-  set(QI_DEFINES "${QI_DEFINES} -DQI_OSX_BUILD=1 -fms-extensions -fvisibility=hidden -fvisibility-inlines-hidden")
-  set(QI_EXTRA_SRCS qi_ogl.cpp sdl_qi.cpp)
-
-  link_directories(${THIRDPARTY}/lib/osx)
-
-elseif(WIN32)
-
-  set(QI_DEFINES "${QI_DEFINES} -DQI_WIN32_BUILD=1")
-  link_directories(${THIRDPARTY}/lib/x64)
-
-endif()
-
-include_directories(. ${THIRDPARTY}/include ${THIRDPARTY}/imgui)
+set(CONFIG_EXTENSION $<$<CONFIG:Debug>:_d>$<$<CONFIG:Profile>:_p>$<$<CONFIG:RelWithDebugInfo>:_r>)
 
 execute_process(COMMAND "sdl2-config" "--cflags" OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE SDL_CFLAGS)
+separate_arguments(SDL_CFLAGS)
+
 execute_process(COMMAND "sdl2-config" "--static-libs" OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE SDL_LDFLAGS)
-message(STATUS "SDL CFlags: ${SDL_CFLAGS}")
-message(STATUS "SDL LDFlags: ${SDL_LDFLAGS}")
+separate_arguments(SDL_LDFLAGS)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${QI_DEFINES} ${SDL_CFLAGS}")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${QI_LINK_OPTS} ${SDL_LDFLAGS}")
+message("SDL_CFLAGS: ${SDL_CFLAGS}")
+message("SDL_LDFLAGS: ${SDL_LDFLAGS}")
 
-file(GLOB IMGUI_SRCS ${THIRDPARTY}/imgui/*.cpp ${THIRDPARTY}/imgui.*.h)
+add_compile_definitions(
+  QI_DEV_DATA_DIR="${DATA_DIR}"
+  QI_DEV_BUILD=${IS_DEV}
+  QI_PROFILE_BUILD=${IS_PROFILE}
+  QI_RELEASE_BUILD=${IS_RELEASE}
+  QI_WIN32_BUILD=${WIN32}
+  QI_OSX_BUILD=${MACOSX}
+  QI_COMPILER_CLANG=${IS_CLANG}
+  )
 
-add_library(${PROJECT_NAME}_game
+add_compile_options(
+    $<${IS_OPTIMIZED}:-O3>
+    $<${HAS_DEBUG_INFO}:-g>
+    $<${IS_CLANG}:-fms-extensions>
+    $<${IS_CLANG}:-fvisibility=hidden>
+    $<${IS_CLANG}:-fvisibility-inlines-hidden>
+    )
 
-  SHARED
+  include_directories(. ${THIRDPARTY}/include ${THIRDPARTY}/imgui ${PROJECT_BINARY_DIR})
 
+add_link_options(${SDL_LDFLAGS})
+
+# Define targets
+add_library(${PROJECT_NAME}_game SHARED "")
+add_executable(${PROJECT_NAME}_test "")
+
+add_compile_options(${SDL_CFLAGS})
+add_executable(${PROJECT_NAME} "")
+
+set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME ${PROJECT_NAME}${CONFIG_EXTENSION})
+set_target_properties(${PROJECT_NAME}_game PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_game${CONFIG_EXTENSION})
+set_target_properties(${PROJECT_NAME}_test PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_test${CONFIG_EXTENSION})
+
+# Common definitions
+
+set(QI_EXE_SRCS qi_memory.cpp qi_ogl.cpp sdl_qi.cpp)
+
+link_directories($<{MACOSX}:${THIRDPARTY}/lib/osx>)
+link_directories($<{WIN32}:${THIRDPARTY}/lib/x64>)
+
+file(GLOB IMGUI_SRCS ${IMGUI}/*.cpp ${IMGUI}/*.h)
+message("IMGUI_SRCS: ${IMGUI_SRCS}")
+
+target_sources(${PROJECT_NAME}_game PRIVATE
   basictypes.h
   has.h
   qi.cpp
@@ -107,17 +123,24 @@ add_library(${PROJECT_NAME}_game
   qi_vector_traits.h
 
   ${IMGUI_SRCS}
-)
+  )
 
-add_executable(${PROJECT_NAME}
-  ${QI_EXTRA_SRCS}
-)
+target_sources(${PROJECT_NAME} PRIVATE
+  ${QI_EXE_SRCS}
+  ${IMGUI_SRCS}
+  )
 
-target_link_libraries(${PROJECT_NAME} glad)
-target_link_libraries(${PROJECT_NAME}_game glad)
+find_library(GLAD_LIB_PATH glad PATHS "../thirdparty/lib" PATH_SUFFIXES "osx")
+target_link_libraries(${PROJECT_NAME} ${GLAD_LIB_PATH})
+target_link_libraries(${PROJECT_NAME}_game ${GLAD_LIB_PATH})
 
-add_executable(${PROJECT_NAME}_test
+target_sources(${PROJECT_NAME}_test PRIVATE
     qi_test.cpp
     qi_noise.cpp
     qi_lexer.cpp
 )
+
+install(
+  TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_game ${PROJECT_NAME}_test
+  DESTINATION "${CMAKE_SOURCE_DIR}/../bin"
+  )
