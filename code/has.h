@@ -46,10 +46,6 @@
 #define OPTIMIZED_BUILD WHEN(HAS(PROF_BUILD) || HAS(RELEASE_BUILD))
 #define DEBUG_BUILD WHEN(HAS(DEV_BUILD) && !HAS(OPTIMIZED_BUILD))
 
-#if !HAS(OPTIMIZED_BUILD)
-#warn "Unoptimized build enabled, things will be slow"
-#endif
-
 #if HAS(RELEASE_BUILD) && !defined(__clang__)
 #pragma message "RELEASE_BUILD enabled"
 #endif

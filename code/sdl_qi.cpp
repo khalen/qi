@@ -72,8 +72,8 @@ struct Globals_s
 	bool mouseDown[MOUSE_BUTTON_COUNT];
 
 	// Heaps for SDL and ImGUI
-	static const size_t sdlHeapSize   = 4*1024*1024;
-	static const size_t imGuiHeapSize = 4*1024*1024;
+	static const size_t sdlHeapSize   = 150000;
+	static const size_t imGuiHeapSize = 150000;
 
 	BuddyAllocator_s* sdlAllocator;
 	BuddyAllocator_s* imGuiAllocator;
@@ -273,6 +273,13 @@ OS_ReleaseFileBuffer(ThreadContext_s*, void* buffer)
 	free(buffer);
 }
 
+static void
+OS_SetupMainExeLibraries()
+{
+	ImGui::SetCurrentContext(g.imGuiContext);
+	// ImGui::SetAllocatorFunctions(ImGuiMalloc, ImGuiFree);
+}
+
 static const char* ImGuiGetClipboardText(void*)
 {
 	if (g.clipboardTextData)
@@ -291,6 +298,12 @@ static void
 InitImGui(SDL_Window* window)
 {
 	g.window = window;
+
+	if (g.imGuiContext == nullptr)
+	{
+		g.imGuiContext = ImGui::CreateContext();
+		ImGui::SetCurrentContext(g.imGuiContext);
+	}
 
 	ImGuiIO& io = ImGui::GetIO();
 
@@ -377,11 +390,10 @@ InitGameGlobals()
 	g.memory.transientPos = g.memory.transientStorage;
 
 	// Set up heaps for SDL and ImGUI
-	void* heapBase = M_AllocRaw(&g.memory, g.sdlHeapSize);
-	g.sdlAllocator = BA_InitBuffer((u8 *)heapBase, g.sdlHeapSize, 32);
-
-	heapBase = M_AllocRaw(&g.memory, g.imGuiHeapSize);
-	g.imGuiAllocator = BA_InitBuffer((u8 *)heapBase, g.imGuiHeapSize, 32);
+#if 0
+	g.sdlAllocator = BA_Init(&g.memory, g.sdlHeapSize, 16, false);
+	g.imGuiAllocator = BA_Init(&g.memory, g.imGuiHeapSize, 16, false);
+#endif
 
 	// Set up module path
 	pid_t pid = getpid();
@@ -394,7 +406,19 @@ InitGameGlobals()
 			pastLastSlash = g.gameAppPath + i + 1;
 	*pastLastSlash = 0;
 
-	MakeGameEXERelativePath(g.gameDylibPath, "libqi_game.dylib");
+	const char* gameLibSuffix = "";
+
+#if HAS(DEBUG_BUILD)
+	gameLibSuffix = "_d";
+#elif HAS(OPTIMIZED_BUILD) && HAS(DEV_BUILD)
+	gameLibSuffix = "_p";
+#elif HAS(OPTIMIZED_BUILD) && !HAS(RELEASE_BUILD)
+	gameLibSuffix = "_r";
+#endif
+
+	char gameDylibName[PATH_MAX];
+	sprintf(gameDylibName, "libqi_game%s.dylib", gameLibSuffix);
+	MakeGameEXERelativePath(g.gameDylibPath, gameDylibName);
 	MakeGameEXERelativePath(g.gameRecordBasePath, "qi_");
 
 	OS_LoadGameDll();
@@ -652,6 +676,10 @@ UpdateMousePosAndButtons(Input_s* newInput)
 		io.MouseDown[i] = g.mouseDown[i] || (buttons & SDL_BUTTON(i + 1));
 		g.mouseDown[i] = false;
 	}
+	// Because SDL mouse 1 is middle click and ImGui mouse 1 is right click
+	bool argh = io.MouseDown[2];
+	io.MouseDown[2] = io.MouseDown[1];
+	io.MouseDown[1] = argh;
 
 	io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
 	if (SDL_GetWindowFlags(g.window) & SDL_WINDOW_INPUT_FOCUS)
@@ -659,7 +687,7 @@ UpdateMousePosAndButtons(Input_s* newInput)
 }
 
 static void
-UdpateMouseCursor()
+UpdateMouseCursor()
 {
 	ImGuiIO& io = ImGui::GetIO();
 	if (io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange)
@@ -783,6 +811,28 @@ HandleKeyEvent(SDL_Event* event, Input_s* newInput)
 	}
 }
 
+void UpdateImGui(Input_s* newInput)
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Setup display size (every frame to accommodate for window resizing)
+    int w, h;
+    int displayWidth, displayHeight;
+    SDL_GetWindowSize(g.window, &w, &h);
+    SDL_GL_GetDrawableSize(g.window, &displayWidth, &displayHeight);
+    io.DisplaySize = ImVec2((float)w, (float)h);
+    if (w > 0 && h > 0)
+        io.DisplayFramebufferScale = ImVec2((float)displayWidth / w, (float)displayHeight / h);
+
+    // Setup time step (we don't use SDL_GetTicks() because it is using millisecond resolution)
+    static Uint64 frequency = SDL_GetPerformanceFrequency();
+    Uint64 current_time = SDL_GetPerformanceCounter();
+    io.DeltaTime = g.inputState.dT;
+
+    UpdateMousePosAndButtons(newInput);
+    UpdateMouseCursor();
+}
+
 int
 main(int argc, const char* argv[])
 {
@@ -794,7 +844,7 @@ main(int argc, const char* argv[])
 
 	InitGameGlobals();
 
-	SDL_SetMemoryFunctions(SdlMalloc, SdlCalloc, SdlRealloc, SdlFree);
+	// SDL_SetMemoryFunctions(SdlMalloc, SdlCalloc, SdlRealloc, SdlFree);
 
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_Init(SDL_INIT_TIMER);
@@ -814,6 +864,11 @@ main(int argc, const char* argv[])
 	SDL_Window* window = SDL_CreateWindow("QI", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GAME_RES_X, GAME_RES_Y, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 	SDL_GLContext context = SDL_GL_CreateContext(window);
 
+	g.window = window;
+	InitImGui(window);
+
+    ImGui::StyleColorsDark();
+
 	QiOgl_Init();
 	SDL_GL_MakeCurrent(window, context);
 
@@ -824,6 +879,8 @@ main(int argc, const char* argv[])
 
 	r64 frameStart = WallSeconds();
 	g.gameRunning  = true;
+
+	bool showDemoWindow = false;
 
 	while (g.gameRunning)
 	{
@@ -862,8 +919,13 @@ main(int argc, const char* argv[])
 			PlaybackInput(&g.inputState);
 
 		const r64 secondsPerFrame = 1.0 / TARGET_FPS;
-
 		g.inputState.dT = (Time_t)secondsPerFrame;
+
+        UpdateImGui(&g.inputState);
+
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow(&showDemoWindow);
+
 		g.game->UpdateAndRender(&g.thread, &g.inputState, &g.frameBuffer);
 
 		r64 frameElapsed    = WallSeconds() - frameStart;
@@ -896,6 +958,9 @@ main(int argc, const char* argv[])
 		frameStart = WallSeconds();
 		QiOgl_Clear();
 		QiOgl_BlitBufferToScreen(&g.frameBuffer);
+		ImGui::EndFrame();
+		ImGui::Render();
+		QiOgl_DrawImGui(ImGui::GetDrawData());
 		SDL_GL_SwapWindow(window);
 	}
 
@@ -912,5 +977,6 @@ static PlatFuncs_s s_plat = {
 	OS_WriteEntireFile,
 	OS_ReleaseFileBuffer,
 	OS_WallSeconds,
+	OS_SetupMainExeLibraries,
 };
 const PlatFuncs_s* plat = &s_plat;

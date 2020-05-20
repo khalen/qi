@@ -21,7 +21,7 @@
 #define TILE_IDEAL_RES_X 60
 #define TILE_IDEAL_RES_Y 60
 
-#define GAME_DOWNRES_FACTOR 2
+#define GAME_DOWNRES_FACTOR 1
 
 #define GAME_RES_X (GAME_IDEAL_RES_X / GAME_DOWNRES_FACTOR)
 #define GAME_RES_Y (GAME_IDEAL_RES_Y / GAME_DOWNRES_FACTOR)
@@ -214,13 +214,15 @@ typedef void* QiPlat_ReadEntireFile_f(ThreadContext_s* tc, const char* fileName,
 typedef bool  QiPlat_WriteEntireFile_f(ThreadContext_s* tc, const char* fileName, const void* ptr, const size_t size);
 typedef void  QiPlat_ReleaseFileBuffer_f(ThreadContext_s* tc, void* buffer);
 typedef r64	  QiPlat_WallSeconds_f(ThreadContext_s* tc);
+typedef void QiPlat_SetupMainExeLibraries_f();
 
 struct PlatFuncs_s
 {
-	QiPlat_ReadEntireFile_f*	ReadEntireFile;
-	QiPlat_WriteEntireFile_f*	WriteEntireFile;
-	QiPlat_ReleaseFileBuffer_f* ReleaseFileBuffer;
-	QiPlat_WallSeconds_f*		WallSeconds;
+	QiPlat_ReadEntireFile_f*		ReadEntireFile;
+	QiPlat_WriteEntireFile_f*		WriteEntireFile;
+	QiPlat_ReleaseFileBuffer_f*		ReleaseFileBuffer;
+	QiPlat_WallSeconds_f*			WallSeconds;
+	QiPlat_SetupMainExeLibraries_f* SetupMainExeLibraries;
 };
 
 extern const PlatFuncs_s*  plat;

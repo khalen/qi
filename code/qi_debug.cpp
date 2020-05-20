@@ -45,9 +45,11 @@ QiDebug_Init(const SubSystem_s* sys, bool isReinit)
 }
 
 internal DebugFuncs_s s_debug = {
+#if HAS(PROF_BUILD)
     Qid_DrawBars,
     Qid_DrawProfileBox,
     Qid_DrawTicks,
+#endif
 };
 const DebugFuncs_s* debug = &s_debug;
 #endif

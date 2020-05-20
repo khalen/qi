@@ -28,7 +28,7 @@ GetChunk(World_s* world, const i32 tileX, const i32 tileY)
 TileChunk_s*
 GetChunk(World_s* world, const WorldPos_s* pos)
 {
-    return GetChunk(world, pos->x.tile, pos->y.tile);
+	return GetChunk(world, pos->x.tile, pos->y.tile);
 }
 
 void
@@ -59,64 +59,65 @@ GetTileValue(World_s* world, const i32 iTileX, const i32 iTileY)
 	const u32 tileX = iTileX & TILE_CHUNK_MASK;
 	const u32 tileY = iTileY & TILE_CHUNK_MASK;
 	Assert(tileX < TILE_CHUNK_DIM && tileY < TILE_CHUNK_DIM);
-    return chunk->tiles[tileX + tileY * TILE_CHUNK_DIM];
+	return chunk->tiles[tileX + tileY * TILE_CHUNK_DIM];
 }
 
 u32
 GetTileValue(World_s* world, const WorldPos_s* pos)
 {
-    return GetTileValue(world, pos->x.tile, pos->y.tile);
+	return GetTileValue(world, pos->x.tile, pos->y.tile);
 }
 
-void NormalizePos(WorldPos_s* pos)
+void
+NormalizePos(WorldPos_s* pos)
 {
-    i32 xTileAdd = (i32)roundf(pos->x.offset);
+	i32 xTileAdd = (i32)roundf(pos->x.offset);
 	pos->x.tile += xTileAdd;
-    pos->x.offset -= (r32)xTileAdd;
+	pos->x.offset -= (r32)xTileAdd;
 
-    i32 yTileAdd = (i32)roundf(pos->y.offset);
+	i32 yTileAdd = (i32)roundf(pos->y.offset);
 	pos->y.tile += yTileAdd;
-    pos->y.offset -= (r32)yTileAdd;
+	pos->y.offset -= (r32)yTileAdd;
 }
 
 void
 AddSubtileOffset(WorldPos_s* pos, const v2 offset)
 {
-    pos->x.offset += offset.x;
-    pos->y.offset += offset.y;
-    NormalizePos(pos);
+	pos->x.offset += offset.x;
+	pos->y.offset += offset.y;
+	NormalizePos(pos);
 }
 
 void
 WorldPosSub(WorldPos_s* dest, const WorldPos_s* a, const WorldPos_s* b)
 {
-    for (i32 c = 0; c < 3; c++)
-    {
-        dest->coords[c].tile = a->coords[c].tile - b->coords[c].tile;
-        dest->coords[c].offset = a->coords[c].offset - b->coords[c].offset;
-    }
+	for (i32 c = 0; c < 3; c++)
+	{
+		dest->coords[c].tile   = a->coords[c].tile - b->coords[c].tile;
+		dest->coords[c].offset = a->coords[c].offset - b->coords[c].offset;
+	}
 }
 
 v2
 WorldPosToMeters(WorldPos_s* pos)
 {
-    return V2((pos->x.tile + pos->x.offset) * TILE_SIZE_METERS_X, (pos->y.tile + pos->y.offset) * TILE_SIZE_METERS_Y);
+	return V2((pos->x.tile + pos->x.offset) * TILE_SIZE_METERS_X, (pos->y.tile + pos->y.offset) * TILE_SIZE_METERS_Y);
 }
 
 v2
 MetersToScreenPixels(const v2& posMeters)
 {
-	const r32 tilePixelWid = TILE_RES_X / SCREEN_SCALE;
-	const r32 tilePixelHgt = TILE_RES_Y / SCREEN_SCALE;
-    const r32 metersToXelsWid = tilePixelWid / TILE_SIZE_METERS_X;
+	const r32 tilePixelWid	  = TILE_RES_X / SCREEN_SCALE;
+	const r32 tilePixelHgt	  = TILE_RES_Y / SCREEN_SCALE;
+	const r32 metersToXelsWid = tilePixelWid / TILE_SIZE_METERS_X;
 	const r32 metersToXelsHgt = tilePixelHgt / TILE_SIZE_METERS_Y;
 
-    return V2(posMeters.x * metersToXelsWid, posMeters.y * metersToXelsHgt);
+	return V2(posMeters.x * metersToXelsWid, posMeters.y * metersToXelsHgt);
 }
 
 v2
 WorldPosToScreenPixels(WorldPos_s* pos)
 {
-    const v2 meters = WorldPosToMeters(pos);
-    return MetersToScreenPixels(meters);
+	const v2 meters = WorldPosToMeters(pos);
+	return MetersToScreenPixels(meters);
 }

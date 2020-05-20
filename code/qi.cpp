@@ -68,8 +68,10 @@ MA_Init(MemoryArena_s* arena, const size_t size)
 }
 
 u8*
-MA_Alloc(MemoryArena_s* arena, const size_t size)
+MA_Alloc(MemoryArena_s* arena, const size_t reqSize)
 {
+	const size_t size = (reqSize + 15) & ~0xFull;
+
 	Assert(arena && arena->curOffset + size <= arena->size);
 	u8* mem = arena->base + arena->curOffset;
 	arena->curOffset += size;
@@ -110,32 +112,6 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 		return;
 
 	MA_Init(&g_game->tileArena, MB(32));
-
-	g_game->testAlloc = BA_Init(g_game->memory, 130000, 16, false);
-
-	void* memTest0 = BA_Alloc(g_game->testAlloc, 16);
-	BA_DumpInfo(g_game->testAlloc);
-
-	void* memTest1 = BA_Alloc(g_game->testAlloc, 100);
-	BA_DumpInfo(g_game->testAlloc);
-
-	BA_Free(g_game->testAlloc, memTest1);
-	BA_DumpInfo(g_game->testAlloc);
-
-	void* memTest2 = BA_Alloc(g_game->testAlloc, 300);
-	BA_DumpInfo(g_game->testAlloc);
-
-	void* memTest3 = BA_Alloc(g_game->testAlloc, 16);
-	BA_DumpInfo(g_game->testAlloc);
-
-	BA_Free(g_game->testAlloc, memTest2);
-	BA_DumpInfo(g_game->testAlloc);
-
-	BA_Free(g_game->testAlloc, memTest3);
-	BA_DumpInfo(g_game->testAlloc);
-
-	BA_Free(g_game->testAlloc, memTest0);
-	BA_DumpInfo(g_game->testAlloc);
 
 	g_game->playerPos.x.tile = 10;
 	g_game->playerPos.y.tile = 10;
@@ -769,11 +745,11 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	const r32 cameraOffsetPixelsX = g_game->cameraPos.x.offset * tilePixelWid;
 	const r32 cameraOffsetPixelsY = g_game->cameraPos.y.offset * tilePixelHgt;
 
-#if 0
+#if 1
 	for (i32 i = 4; i >= 0; i--)
-		BltBmpFixed(nullptr, screenBitmap, 0, 0, &g_game->testBitmaps[i]);
-#else
+		BltBmpStretchedFixed(nullptr, screenBitmap, 0, 0, screenBitmap->width, screenBitmap->height, &g_game->testBitmaps[i]);
 
+#else
 	for (i32 j = 0; j < (i32)screenBitmap->height; j++)
 	{
 		for (i32 i = 0; i < (i32)screenBitmap->width; i++)
@@ -862,6 +838,7 @@ Qi_Init(const PlatFuncs_s* platFuncs, Memory_s* memory)
 
 	if (g_game == nullptr)
 	{
+		plat->SetupMainExeLibraries();
 		InitGameSystems(memory);
 		Assert(g_game && g_game->isInitialized);
 	}
