@@ -14,6 +14,7 @@
 #include "qi_util.h"
 #include "qi_noise.h"
 #include <stdio.h>
+#include <imgui.h>
 
 #define ROOM_WID BASE_SCREEN_TILES_X
 #define ROOM_HGT BASE_SCREEN_TILES_Y
@@ -745,9 +746,19 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 	const r32 cameraOffsetPixelsX = g_game->cameraPos.x.offset * tilePixelWid;
 	const r32 cameraOffsetPixelsY = g_game->cameraPos.y.offset * tilePixelHgt;
 
+	static bool debugOpen = false;
+	static bool drawBG = true;
+
+	if (ImGui::Begin("Debug", &debugOpen))
+	{
+		ImGui::Checkbox("Draw background", &drawBG);
+	}
+	ImGui::End();
+
 #if 1
-	for (i32 i = 4; i >= 0; i--)
-		BltBmpStretchedFixed(nullptr, screenBitmap, 0, 0, screenBitmap->width, screenBitmap->height, &g_game->testBitmaps[i]);
+	if (drawBG)
+		for (i32 i = 4; i >= 0; i--)
+			BltBmpStretchedFixed(nullptr, screenBitmap, 0, 0, screenBitmap->width, screenBitmap->height, &g_game->testBitmaps[i]);
 
 #else
 	for (i32 j = 0; j < (i32)screenBitmap->height; j++)
@@ -835,10 +846,11 @@ void
 Qi_Init(const PlatFuncs_s* platFuncs, Memory_s* memory)
 {
 	plat = platFuncs;
+	plat->SetupMainExeLibraries();
+	ImGui::SetCurrentContext(plat->GetGuiContext());
 
 	if (g_game == nullptr)
 	{
-		plat->SetupMainExeLibraries();
 		InitGameSystems(memory);
 		Assert(g_game && g_game->isInitialized);
 	}

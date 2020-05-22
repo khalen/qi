@@ -280,6 +280,12 @@ OS_SetupMainExeLibraries()
 	// ImGui::SetAllocatorFunctions(ImGuiMalloc, ImGuiFree);
 }
 
+static ImGuiContext*
+OS_GetGuiContext()
+{
+	return g.imGuiContext;
+}
+
 static const char* ImGuiGetClipboardText(void*)
 {
 	if (g.clipboardTextData)
@@ -416,8 +422,7 @@ InitGameGlobals()
 	gameLibSuffix = "_r";
 #endif
 
-	char gameDylibName[PATH_MAX];
-	sprintf(gameDylibName, "libqi_game%s.dylib", gameLibSuffix);
+	const char* gameDylibName = "libqi_game.dylib";
 	MakeGameEXERelativePath(g.gameDylibPath, gameDylibName);
 	MakeGameEXERelativePath(g.gameRecordBasePath, "qi_");
 
@@ -842,8 +847,6 @@ main(int argc, const char* argv[])
 	chdir("/Users/jon/work/qi/data/");
 #endif
 
-	InitGameGlobals();
-
 	// SDL_SetMemoryFunctions(SdlMalloc, SdlCalloc, SdlRealloc, SdlFree);
 
 	SDL_Init(SDL_INIT_VIDEO);
@@ -866,8 +869,9 @@ main(int argc, const char* argv[])
 
 	g.window = window;
 	InitImGui(window);
+	InitGameGlobals();
 
-    ImGui::StyleColorsDark();
+	ImGui::StyleColorsLight();
 
 	QiOgl_Init();
 	SDL_GL_MakeCurrent(window, context);
@@ -978,5 +982,6 @@ static PlatFuncs_s s_plat = {
 	OS_ReleaseFileBuffer,
 	OS_WallSeconds,
 	OS_SetupMainExeLibraries,
+	OS_GetGuiContext,
 };
 const PlatFuncs_s* plat = &s_plat;

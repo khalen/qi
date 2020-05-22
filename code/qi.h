@@ -215,6 +215,8 @@ typedef bool  QiPlat_WriteEntireFile_f(ThreadContext_s* tc, const char* fileName
 typedef void  QiPlat_ReleaseFileBuffer_f(ThreadContext_s* tc, void* buffer);
 typedef r64	  QiPlat_WallSeconds_f(ThreadContext_s* tc);
 typedef void QiPlat_SetupMainExeLibraries_f();
+class ImGuiContext;
+typedef ImGuiContext* QiPlat_GetGuiContext();
 
 struct PlatFuncs_s
 {
@@ -223,6 +225,7 @@ struct PlatFuncs_s
 	QiPlat_ReleaseFileBuffer_f*		ReleaseFileBuffer;
 	QiPlat_WallSeconds_f*			WallSeconds;
 	QiPlat_SetupMainExeLibraries_f* SetupMainExeLibraries;
+	QiPlat_GetGuiContext* GetGuiContext;
 };
 
 extern const PlatFuncs_s*  plat;
