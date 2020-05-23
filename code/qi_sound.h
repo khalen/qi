@@ -30,8 +30,8 @@ struct SoundBuffer_s
 };
 static_assert(sizeof(SoundBuffer_s) == 32, "Wrong size for SoundBuffer_s");
 
-struct Memory_s;
-typedef SoundBuffer_s* Qis_MakeSoundBuffer_f(Memory_s* memory, const int numSamples, const int channels, const int sampsPerSec);
+struct Memory;
+typedef SoundBuffer_s* Qis_MakeSoundBuffer_f(Memory* memory, const int numSamples, const int channels, const int sampsPerSec);
 typedef void Qis_UpdateSound_f(SoundBuffer_s* soundBuffer, const u32 samplesToWrite);
 
 void Qis_Init();

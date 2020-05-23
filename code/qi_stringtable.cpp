@@ -18,7 +18,7 @@ void
 RebuildHashTable(StringTable* st)
 {
 	const char* strings = ST_Strings(st);
-	const char* cur		= strings + 1;
+	const char* cur     = strings + 1;
 
 	u32* hashTable = ST_HashTable(st);
 	memset(hashTable, 0, sizeof(u32) * st->hashSlots);
@@ -26,11 +26,11 @@ RebuildHashTable(StringTable* st)
 	while (cur < strings + st->stringBytes)
 	{
 		const HashLength hl  = Hash_String(cur);
-		u32				 idx = hl.hash % st->hashSlots;
+		u32              idx = hl.hash % st->hashSlots;
 		while (hashTable[idx])
 			idx = (idx + 1) % st->hashSlots;
 		hashTable[idx] = cur - strings;
-		cur			   = cur + hl.length + 1;
+		cur            = cur + hl.length + 1;
 	}
 }
 
@@ -41,8 +41,8 @@ ST_Init(StringTable* st, u32 byteSize, u32 avgStringLen)
 	st->byteSize = byteSize;
 
 	r32 estBytesPerString = avgStringLen + 1 + sizeof(u32) * QI_ST_HASH_FACTOR;
-	r32 estNumStrings	 = (byteSize - sizeof(*st)) / estBytesPerString;
-	st->hashSlots		  = (u32)estNumStrings;
+	r32 estNumStrings     = (byteSize - sizeof(*st)) / estBytesPerString;
+	st->hashSlots         = (u32)estNumStrings;
 
 	memset(ST_HashTable(st), 0, st->hashSlots * sizeof(u32));
 
@@ -57,13 +57,13 @@ ST_Grow(StringTable* st, u32 byteSize)
 	Assert(byteSize >= st->byteSize);
 
 	const char* oldStrings = ST_Strings(st);
-	st->byteSize		   = byteSize;
+	st->byteSize           = byteSize;
 
 	r32 avgStringLen   = (st->count > 0) ? (st->stringBytes / (r32)st->count) : 15.0f;
 	r32 bytesPerString = avgStringLen + 1.0f + sizeof(u32) * QI_ST_HASH_FACTOR;
-	r32 numStrings	 = (byteSize - sizeof(*st)) / bytesPerString;
+	r32 numStrings     = (byteSize - sizeof(*st)) / bytesPerString;
 	st->hashSlots
-		= (u32)(numStrings * QI_ST_HASH_FACTOR) > st->hashSlots ? (u32)numStrings * QI_ST_HASH_FACTOR : st->hashSlots;
+	    = (u32)(numStrings * QI_ST_HASH_FACTOR) > st->hashSlots ? (u32)numStrings * QI_ST_HASH_FACTOR : st->hashSlots;
 
 	char* newStrings = ST_Strings(st);
 	memmove(newStrings, oldStrings, st->stringBytes);
@@ -75,7 +75,7 @@ size_t
 ST_Pack(StringTable* st)
 {
 	const char* oldStrings = ST_Strings(st);
-	st->hashSlots		   = (u32)(st->count * QI_ST_HASH_FACTOR);
+	st->hashSlots          = (u32)(st->count * QI_ST_HASH_FACTOR);
 
 	if (st->hashSlots < 1)
 		st->hashSlots = 1;
@@ -105,9 +105,9 @@ ST_Find(const StringTable* st, const char* str)
 	if (*str == 0)
 		return 0;
 
-	const HashLength hl		   = Hash_String(str);
-	const char*		 strings   = ST_Strings(st);
-	const u32*		 hashTable = ST_HashTable(st);
+	const HashLength hl        = Hash_String(str);
+	const char*      strings   = ST_Strings(st);
+	const u32*       hashTable = ST_HashTable(st);
 
 	u32 idx = hl.hash % st->hashSlots;
 	while (hashTable[idx])
@@ -128,9 +128,9 @@ ST_Intern(StringTable* st, const char* str)
 	if (*str == 0)
 		return 0;
 
-	const HashLength hl		   = Hash_String(str);
-	char*			 strings   = ST_Strings(st);
-	u32*			 hashTable = ST_HashTable(st);
+	const HashLength hl        = Hash_String(str);
+	char*            strings   = ST_Strings(st);
+	u32*             hashTable = ST_HashTable(st);
 
 	u32 idx = hl.hash % st->hashSlots;
 	while (hashTable[idx])

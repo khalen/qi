@@ -12,13 +12,13 @@
 enum KVType : u8
 {
 	NIL	   = 0,
-	STRING = 0,
 	INT,
 	REAL,
+    STRING,
 	ARRAY,
 	TRUE,
 	FALSE,
-	KEYVALUES,
+	OBJECT,
 };
 
 typedef u32 KVRef;
@@ -81,3 +81,4 @@ const char* KV_GetValueAsString(const KeyValues* kva, const Value v);
 
 #define __QI_KEYVALUES_H
 #endif // #ifndef __QI_KEYVALUES_H
+

@@ -41,7 +41,7 @@ GenTone(SoundBuffer_s* outputBuf, const u32 samplesToWrite, const r32 toneHz, co
 }
 
 SoundBuffer_s*
-Qis_MakeSoundBuffer(Memory_s* memory, const int numSamples, const int channels, const int sampsPerSec)
+Qis_MakeSoundBuffer(Memory* memory, const int numSamples, const int channels, const int sampsPerSec)
 {
 	u32    sampleBufBytes = numSamples * channels * sizeof(i16);
 	size_t totalBytes     = sizeof(SoundBuffer_s) + sampleBufBytes;

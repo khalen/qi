@@ -8,7 +8,7 @@
 
 #include "basictypes.h"
 
-#define QI_ST_FULL -1
+#define QI_ST_FULL        -1
 #define QI_ST_HASH_FACTOR 2.0f
 
 typedef u32 Symbol;
@@ -39,12 +39,12 @@ ST_StringCapacity(StringTable* st)
 	return st->byteSize - sizeof(*st) - sizeof(u32) * st->hashSlots;
 }
 
-void ST_Init(StringTable* st, u32 byteSize, u32 avgSymbolLen);
-void ST_Grow(StringTable* st, u32 newSize);
-size_t ST_Pack(StringTable* st);
+void        ST_Init(StringTable* st, u32 byteSize, u32 avgSymbolLen);
+void        ST_Grow(StringTable* st, u32 newSize);
+size_t      ST_Pack(StringTable* st);
 const char* ST_ToString(const StringTable* st, u32 symbol);
-Symbol ST_Intern(StringTable* st, const char* str);
-Symbol ST_Find(const StringTable* st, const char* str);
+Symbol      ST_Intern(StringTable* st, const char* str);
+Symbol      ST_Find(const StringTable* st, const char* str);
 
 #define __QI_STRINGTABLE_H
 #endif // #ifndef __QI_STRINGTABLE_H

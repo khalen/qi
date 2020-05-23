@@ -31,7 +31,7 @@
 struct GameGlobals_s
 {
 	bool		isInitialized;
-	Memory_s*   memory;
+	Memory*   memory;
 	SubSystem_s gameSubsystems[MAX_SUBSYSTEMS];
 
 	i32 screenWid;
@@ -41,14 +41,14 @@ struct GameGlobals_s
 	WorldPos_s	playerPos;
 	v2			  dPlayerPos;
 	WorldPos_s	cameraPos;
-	MemoryArena_s tileArena;
-	MemoryArena_s assetArena;
+	MemoryArena   tileArena;
+	MemoryArena   assetArena;
 
 	Bitmap_s testBitmaps[5];
 	Bitmap_s playerBmps[4][3];
 	i32		 playerFacingIdx;
 
-	BuddyAllocator_s* testAlloc;
+	BuddyAllocator* testAlloc;
 };
 
 GameGlobals_s* g_game;
@@ -61,7 +61,7 @@ GameAllocate()
 }
 
 void
-MA_Init(MemoryArena_s* arena, const size_t size)
+MA_Init(MemoryArena* arena, const size_t size)
 {
 	arena->size		 = size;
 	arena->curOffset = 0;
@@ -69,7 +69,7 @@ MA_Init(MemoryArena_s* arena, const size_t size)
 }
 
 u8*
-MA_Alloc(MemoryArena_s* arena, const size_t reqSize)
+MA_Alloc(MemoryArena* arena, const size_t reqSize)
 {
 	const size_t size = (reqSize + 15) & ~0xFull;
 
@@ -81,16 +81,16 @@ MA_Alloc(MemoryArena_s* arena, const size_t reqSize)
 
 template<typename T>
 T*
-MemoryArena_PushStruct(MemoryArena_s* arena)
+MemoryArena_PushStruct(MemoryArena* arena)
 {
 	T* newT = (T*)MA_Alloc(arena, sizeof(T));
 	return newT;
 }
 
-internal void ReadBitmap(ThreadContext_s* thread, MemoryArena_s* memArena, Bitmap_s* result, const char* filename);
+internal void ReadBitmap(ThreadContext_s* thread, MemoryArena* memArena, Bitmap_s* result, const char* filename);
 
 void
-CreateBitmap(MemoryArena_s* arena, Bitmap_s* result, const u32 width, const u32 height)
+CreateBitmap(MemoryArena* arena, Bitmap_s* result, const u32 width, const u32 height)
 {
 	Assert(arena && result);
 	result->width	= width;
@@ -389,7 +389,7 @@ internal SubSystem_s* s_subSystems[] = {
 };
 
 internal void
-InitGameSystems(Memory_s* memory)
+InitGameSystems(Memory* memory)
 {
 	NoiseGenerator::InitGradients();
 
@@ -658,7 +658,7 @@ ShiftFromMask(const u32 mask)
 }
 
 internal void
-ReadBitmap(ThreadContext_s* thread, MemoryArena_s* memArena, Bitmap_s* result, const char* filename)
+ReadBitmap(ThreadContext_s* thread, MemoryArena* memArena, Bitmap_s* result, const char* filename)
 {
 	size_t readSize;
 	u8*	fileData = (u8*)plat->ReadEntireFile(thread, filename, &readSize);
@@ -843,7 +843,7 @@ Qi_GameUpdateAndRender(ThreadContext_s*, Input_s* input, Bitmap_s* screenBitmap)
 
 const PlatFuncs_s* plat;
 void
-Qi_Init(const PlatFuncs_s* platFuncs, Memory_s* memory)
+Qi_Init(const PlatFuncs_s* platFuncs, Memory* memory)
 {
 	plat = platFuncs;
 	plat->SetupMainExeLibraries();

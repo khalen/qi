@@ -182,7 +182,7 @@ struct ThreadContext_s
 	int dummy;
 };
 
-struct Memory_s;
+struct Memory;
 
 // Game / Platform Linkage
 struct PlatFuncs_s;
@@ -190,7 +190,7 @@ struct GameFuncs_s;
 
 // Functions provided by the base game layer
 typedef void Qi_GameUpdateAndRender_f(ThreadContext_s* tc, Input_s* input, Bitmap_s* screenBitmap);
-typedef void Qi_Init_f(const PlatFuncs_s* plat, Memory_s* memory);
+typedef void Qi_Init_f(const PlatFuncs_s* plat, Memory* memory);
 
 struct SoundFuncs_s;
 

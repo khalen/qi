@@ -70,7 +70,7 @@ struct World_s
 	TileChunk_s chunks[WORLD_CHUNKS_DIM * WORLD_CHUNKS_DIM];
 };
 
-void SetTileValue(MemoryArena_s* tileArena, World_s* world, const WorldPos_s* pos, const u32 value);
+void SetTileValue(MemoryArena* tileArena, World_s* world, const WorldPos_s* pos, const u32 value);
 u32  GetTileValue(World_s* world, const WorldPos_s* pos);
 u32  GetTileValue(World_s* world, i32 tileX, i32 tileY);
 void AddSubtileOffset(WorldPos_s* pos, const v2 offset);

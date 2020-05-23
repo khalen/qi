@@ -48,7 +48,7 @@ struct Globals_s
 	Sound_s		   sound;
 	SoundBuffer_s* soundUpdateBuffer;
 	Input_s		   inputState;
-	Memory_s	   memory;
+	Memory         memory;
 	u32			   cursorBuf[16];
 	u32			   curCursorPos;
 
@@ -75,8 +75,8 @@ struct Globals_s
 	static const size_t sdlHeapSize   = 150000;
 	static const size_t imGuiHeapSize = 150000;
 
-	BuddyAllocator_s* sdlAllocator;
-	BuddyAllocator_s* imGuiAllocator;
+	BuddyAllocator* sdlAllocator;
+	BuddyAllocator* imGuiAllocator;
 
 	// IMGUI
 	SDL_Cursor* mouseCursors[ImGuiMouseCursor_COUNT];

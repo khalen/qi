@@ -32,7 +32,7 @@ GetChunk(World_s* world, const WorldPos_s* pos)
 }
 
 void
-SetTileValue(MemoryArena_s* tileArena, World_s* world, const WorldPos_s* pos, const u32 value)
+SetTileValue(MemoryArena* tileArena, World_s* world, const WorldPos_s* pos, const u32 value)
 {
 	TileChunk_s* chunk = GetChunk(world, pos);
 	Assert(chunk);

@@ -7,7 +7,7 @@
 //
 
 // Raw memory as handed to us on game initialization
-struct Memory_s
+struct Memory
 {
 	size_t permanentSize;
 	u8*    permanentStorage;
@@ -18,10 +18,10 @@ struct Memory_s
 	u8*    transientPos;
 };
 
-void* M_AllocRaw(Memory_s* memory, const size_t size);
+void* M_AllocRaw(Memory* memory, const size_t size);
 template<typename T>
 T*
-M_New(Memory_s* memory)
+M_New(Memory* memory)
 {
 	void* buf = M_AllocRaw(memory, sizeof(T));
 	Assert(buf != nullptr);
@@ -29,10 +29,10 @@ M_New(Memory_s* memory)
 	return reinterpret_cast<T*>(buf);
 }
 
-void* M_TransientAllocRaw(Memory_s* memory, const size_t size);
+void* M_TransientAllocRaw(Memory* memory, const size_t size);
 template<typename T>
 T*
-M_TransientNew(Memory_s* memory)
+M_TransientNew(Memory* memory)
 {
 	void* buf = M_TransientAllocRaw(memory, sizeof(T));
 	Assert(buf != nullptr);
@@ -41,24 +41,24 @@ M_TransientNew(Memory_s* memory)
 }
 
 // Memory arena, simple incrementing allocator
-struct MemoryArena_s
+struct MemoryArena
 {
 	u8*    base;
 	size_t size;
 	size_t curOffset;
 };
 
-void MA_Init( MemoryArena_s* arena, const size_t size );
-u8* MA_Alloc( MemoryArena_s* arena, const size_t size );
+void MA_Init(MemoryArena* arena, const size_t size);
+u8* MA_Alloc(MemoryArena* arena, const size_t size);
 
 // Malloc / free general buddy allocator
-struct MemLink_s
+struct MemLink
 {
-    MemLink_s* next;
-    MemLink_s* prev;
+	MemLink* next;
+	MemLink* prev;
 };
 
-struct BuddyAllocator_s
+struct BuddyAllocator
 {
     u8* basePtr;
     size_t size;
@@ -69,15 +69,38 @@ struct BuddyAllocator_s
     size_t freeBitsOffset;
     size_t splitBitsOffset;
 };
-static_assert((sizeof(BuddyAllocator_s) & (sizeof(MemLink_s) - 1)) == 0, "Bad buddy allocator struct size");
+static_assert((sizeof(BuddyAllocator) & (sizeof(MemLink) - 1)) == 0, "Bad buddy allocator struct size");
 
-BuddyAllocator_s* BA_InitBuffer(u8* buffer, const size_t size, const size_t smallestBlockSize);
-BuddyAllocator_s* BA_Init(Memory_s* memory, const size_t size, const size_t smallestBlockSize, const bool isTransient = false);
-void* BA_Alloc(BuddyAllocator_s* allocator, const size_t size);
-void* BA_Realloc(BuddyAllocator_s* allocator, void* mem, const size_t newSize);
-void* BA_Calloc(BuddyAllocator_s* allocator, const size_t size);
-void BA_Free(BuddyAllocator_s* allocator, void* block);
-size_t BA_DumpInfo(BuddyAllocator_s* allocator);
+BuddyAllocator* BA_InitBuffer(u8* buffer, const size_t size, const size_t smallestBlockSize);
+BuddyAllocator* BA_Init(Memory* memory, const size_t size, const size_t smallestBlockSize, const bool isTransient = false);
+void* BA_Alloc(BuddyAllocator* allocator, const size_t size);
+void* BA_Realloc(BuddyAllocator* allocator, void* mem, const size_t newSize);
+void* BA_Calloc(BuddyAllocator* allocator, const size_t size);
+void BA_Free(BuddyAllocator* allocator, void* block);
+size_t BA_DumpInfo(BuddyAllocator* allocator);
+
+// Generic allocator support
+struct Allocator;
+typedef void* (ReallocFn)(Allocator* allocator, void* prevMem, const size_t newSize);
+typedef void (FreeFn)(Allocator* allocator, void* mem);
+
+struct Allocator
+{
+	ReallocFn* realloc;
+	FreeFn* free;
+};
+
+struct MemoryArenaAllocator : public Allocator
+{
+	MemoryArena arena;
+};
+void MAA_Init(MemoryArenaAllocator* maa, const size_t arenaSize);
+
+struct BuddyAllocatorAllocator : public Allocator
+{
+	BuddyAllocator* buddy;
+};
+void BAA_Init(BuddyAllocatorAllocator* baa, Memory* memory, const size_t size, const size_t smallestBlockSize, const bool isTransient = false);
 
 #define __QI_MEMORY_H
 #endif // #ifndef __QI_MEMORY_H
