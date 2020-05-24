@@ -1,6 +1,3 @@
-#include "SDL_clipboard.h"
-#include "SDL_mouse.h"
-#include "SDL_stdinc.h"
 #include "basictypes.h"
 #include "qi.h"
 #include "qi_memory.h"
@@ -11,23 +8,35 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#if HAS(OSX_BUILD)
 #include <sys/mman.h>
 #include <dlfcn.h>
 #include <libproc.h>
 #include <unistd.h>
+#endif
 #include <errno.h>
 
 #undef internal
+#if HAS(OSX_BUILD)
 #include <mach/mach.h>
 #include <mach/mach_time.h>
+#endif
 
 #include "qi_ogl.h"
 
-#include <SDL_opengl.h>
-#include <SDL.h>
+#if HAS(WIN32_BUILD)
+#include <direct.h>
+#define PATH_MAX MAX_PATH
+#endif
+
+#include "SDL.h"
+#include "SDL_opengl.h"
 #include "SDL_events.h"
 #include "SDL_scancode.h"
 #include "SDL_video.h"
+#include "SDL_clipboard.h"
+#include "SDL_mouse.h"
+#include "SDL_stdinc.h"
 
 #include "imgui.h"
 
@@ -42,7 +51,6 @@ struct Sound_s
 struct Globals_s
 {
 	bool   gameRunning;
-	double clockConversionFactor;
 
 	Bitmap_s	   frameBuffer;
 	Sound_s		   sound;
@@ -54,6 +62,7 @@ struct Globals_s
 
 	char gameAppPath[PATH_MAX];
 	char gameRecordBasePath[PATH_MAX];
+
 
 	void*			   gameDylib;
 	char			   gameDylibPath[PATH_MAX];
@@ -186,7 +195,7 @@ OS_UpdateSound()
 static r64
 WallSeconds()
 {
-	return (r64)mach_absolute_time() * g.timeConversionFactor;
+	return (r64)SDL_GetPerformanceCounter() * g.timeConversionFactor;
 }
 
 static void
@@ -199,25 +208,31 @@ OS_LoadGameDll()
 		return;
 	}
 
+#if HAS(OSX_BUILD)
 	if (statbuf.st_mtimespec.tv_sec == g.gameDylibLastMtime)
 		return;
-
 	g.gameDylibLastMtime = statbuf.st_mtimespec.tv_sec;
+#else
+	if (statbuf.st_mtime == g.gameDylibLastMtime)
+		return;
+    g.gameDylibLastMtime = statbuf.st_mtime;
+#endif
+
 
 	if (g.gameDylib != nullptr)
 	{
-		dlclose(g.gameDylib);
+		SDL_UnloadObject(g.gameDylib);
 		g.gameDylib = nullptr;
 	}
 
 	printf("Hotloading game dylib\n");
 
-	g.gameDylib = dlopen(g.gameDylibPath, RTLD_LAZY | RTLD_GLOBAL);
+	g.gameDylib = SDL_LoadObject(g.gameDylibPath);
 
 	if (g.gameDylib)
 	{
 		typedef const GameFuncs_s* GetGameFuncs_f();
-		GetGameFuncs_f*            GetGameFuncs = (GetGameFuncs_f*)dlsym(g.gameDylib, "Qi_GetGameFuncs");
+		GetGameFuncs_f*            GetGameFuncs = (GetGameFuncs_f*)SDL_LoadFunction(g.gameDylib, "Qi_GetGameFuncs");
 		Assert(GetGameFuncs);
 		g.game = GetGameFuncs();
 
@@ -360,10 +375,7 @@ InitImGui(SDL_Window* window)
 static void
 InitGameGlobals()
 {
-	mach_timebase_info_data_t timebase;
-
-	mach_timebase_info(&timebase);
-	g.timeConversionFactor = 1.0 / 1.0e9;
+	g.timeConversionFactor = 1.0 / (double)SDL_GetPerformanceFrequency();
 
 #if HAS(DEV_BUILD)
 	size_t baseAddressPerm  = TB(2);
@@ -373,7 +385,10 @@ InitGameGlobals()
 	size_t baseAddressTrans = 0;
 #endif
 
-	g.memory.permanentSize = MB(64);
+    g.memory.permanentSize = MB(64);
+    g.memory.transientSize = GB(4);
+
+#if HAS(OSX_BUILD)
 	g.memory.permanentStorage
 		= (u8*)mmap((void*)baseAddressPerm, g.memory.permanentSize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
 	if (g.memory.permanentStorage == (void*)MAP_FAILED)
@@ -394,35 +409,31 @@ InitGameGlobals()
 	}
 	Assert(g.memory.transientStorage != nullptr);
 	g.memory.transientPos = g.memory.transientStorage;
+#else
+    g.memory.permanentStorage
+        = (u8*)VirtualAlloc((void*)baseAddressPerm, g.memory.permanentSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    Assert(g.memory.permanentStorage != nullptr);
+    g.memory.permanentPos = g.memory.permanentStorage;
 
-	// Set up heaps for SDL and ImGUI
+    g.memory.transientStorage
+        = (u8*)VirtualAlloc((void*)baseAddressTrans, g.memory.transientSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    Assert(g.memory.transientStorage != nullptr);
+    g.memory.transientPos = g.memory.transientStorage;
+#endif
+
+    // Set up heaps for SDL and ImGUI
 #if 0
 	g.sdlAllocator = BA_Init(&g.memory, g.sdlHeapSize, 16, false);
 	g.imGuiAllocator = BA_Init(&g.memory, g.imGuiHeapSize, 16, false);
 #endif
 
-	// Set up module path
-	pid_t pid = getpid();
-	proc_pidpath(pid, g.gameAppPath, sizeof(g.gameAppPath));
-	size_t fileNameLen = StringLen(g.gameAppPath);
-
-	char* pastLastSlash = g.gameAppPath;
-	for (u32 i = 0; i < fileNameLen; i++)
-		if (g.gameAppPath[i] == '/')
-			pastLastSlash = g.gameAppPath + i + 1;
-	*pastLastSlash = 0;
-
 	const char* gameLibSuffix = "";
 
-#if HAS(DEBUG_BUILD)
-	gameLibSuffix = "_d";
-#elif HAS(OPTIMIZED_BUILD) && HAS(DEV_BUILD)
-	gameLibSuffix = "_p";
-#elif HAS(OPTIMIZED_BUILD) && !HAS(RELEASE_BUILD)
-	gameLibSuffix = "_r";
-#endif
-
+#if HAS(OSX_BUILD)
 	const char* gameDylibName = "libqi_game.dylib";
+#else
+    const char* gameDylibName = "qi_game.dll";
+#endif
 	MakeGameEXERelativePath(g.gameDylibPath, gameDylibName);
 	MakeGameEXERelativePath(g.gameRecordBasePath, "qi_");
 
@@ -439,8 +450,13 @@ InitGameGlobals()
 	g.frameBuffer.pitch = (g.frameBuffer.width + 0xF) & ~0xF;
 	size_t fbSize = g.frameBuffer.pitch * g.frameBuffer.height * sizeof(u32);
 	g.frameBuffer.byteSize = fbSize;
-	g.frameBuffer.pixels = (u32 *)mmap(0, fbSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-	Assert(g.frameBuffer.pixels != (u32 *)MAP_FAILED);
+#if HAS(OSX_BUILD)
+    g.frameBuffer.pixels = (u32 *)mmap(0, fbSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    Assert(g.frameBuffer.pixels != (u32 *)MAP_FAILED);
+#else
+    g.frameBuffer.pixels = (u32*)VirtualAlloc(nullptr, fbSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    Assert(g.frameBuffer.pixels != nullptr);
+#endif
 	for (u32 c = 0; c < g.frameBuffer.pitch / sizeof(u32) * g.frameBuffer.height; c++)
 		g.frameBuffer.pixels[c] = 0xFF00FFFF;
 }
@@ -838,13 +854,18 @@ void UpdateImGui(Input_s* newInput)
     UpdateMouseCursor();
 }
 
+#ifdef main
+#undef main
+#endif
 int
 main(int argc, const char* argv[])
 {
 // In dev builds, chdir into the hardcoded data directory to facilitate running the exe from
 // non distribution places
-#if HAS(DEV_BUILD)
+#if HAS(DEV_BUILD) && HAS(OSX_BUILD)
 	chdir("/Users/jon/work/qi/data/");
+#elif HAS(DEV_BUILD) && HAS(WIN32_BUILD)
+    chdir("d:\\work\\qi\\data");
 #endif
 
 	// SDL_SetMemoryFunctions(SdlMalloc, SdlCalloc, SdlRealloc, SdlFree);
@@ -877,7 +898,7 @@ main(int argc, const char* argv[])
 	SDL_GL_MakeCurrent(window, context);
 
 	r64 secs = WallSeconds();
-	usleep(1000 * 1000);
+	SDL_Delay(1000 * 1000);
 	r64 oneSec = WallSeconds() - secs;
 	printf("Onesec: %g\n", oneSec);
 
@@ -941,12 +962,12 @@ main(int argc, const char* argv[])
 			while (msToSleep > maxSoundSleepMS)
 			{
 				OS_UpdateSound();
-				usleep(maxSoundSleepMS * 1000);
+				SDL_Delay(maxSoundSleepMS * 1000);
 				msToSleep -= maxSoundSleepMS;
 			}
 
 			if (msToSleep > 0)
-				usleep(msToSleep * 1000);
+				SDL_Delay(msToSleep * 1000);
 
 			while (frameElapsed < secondsPerFrame)
 			{

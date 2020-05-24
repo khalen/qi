@@ -1,9 +1,11 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.16.5)
 
 project(qi
   VERSION 0.1.0.0
   DESCRIPTION "Quantum Immortality game and engine c. 2020 Jon Davis and Quantum Immortality"
-  LANGUAGES CXX)
+  LANGUAGES C CXX)
+
+message("CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
 
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   set(CMAKE_CXX_EXTENSIONS off)
@@ -11,7 +13,7 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
   
   set(MACOSX $<PLATFORM_ID:Darwin>)
-  set(WIN32 $<PLATFORM_ID:Win32>)
+  set(WIN32 $<PLATFORM_ID:Windows>)
 
   set(SRC_DIR "${CMAKE_SOURCE_DIR}/code")
   set(BIN_DIR "${CMAKE_SOURCE_DIR}/bin")
@@ -24,11 +26,18 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   set(IS_PROFILE $<CONFIG:Profile>)
   set(IS_RELEASE $<CONFIG:Release>)
   set(IS_DEV $<NOT:${IS_RELEASE}>)
-  set(IS_CLANG $<CXX_COMPILER_ID:Clang>)
+
+  if (MSVC)
+    set(IS_CLANG 0)
+  else()
+    set(IS_CLANG 1)
+  endif()
 
   set(GAME_EXE_NAME ${PROJECT_NAME})
   set(GAME_LIB_NAME ${PROJECT_NAME}_game)
   set(GAME_TST_NAME ${PROJECT_NAME}_test)
 endif()
 
+add_subdirectory(thirdparty)
 add_subdirectory(code)
+

@@ -60,25 +60,6 @@ GameAllocate()
 	return M_New<T>(g_game->memory);
 }
 
-void
-MA_Init(MemoryArena* arena, const size_t size)
-{
-	arena->size		 = size;
-	arena->curOffset = 0;
-	arena->base		 = (u8*)M_AllocRaw(g_game->memory, size);
-}
-
-u8*
-MA_Alloc(MemoryArena* arena, const size_t reqSize)
-{
-	const size_t size = (reqSize + 15) & ~0xFull;
-
-	Assert(arena && arena->curOffset + size <= arena->size);
-	u8* mem = arena->base + arena->curOffset;
-	arena->curOffset += size;
-	return mem;
-}
-
 template<typename T>
 T*
 MemoryArena_PushStruct(MemoryArena* arena)
@@ -112,7 +93,7 @@ InitGameGlobals(const SubSystem_s* sys, bool isReInit)
 	if (isReInit)
 		return;
 
-	MA_Init(&g_game->tileArena, MB(32));
+	MA_Init(&g_game->tileArena, g_game->memory, MB(32));
 
 	g_game->playerPos.x.tile = 10;
 	g_game->playerPos.y.tile = 10;
@@ -847,7 +828,6 @@ Qi_Init(const PlatFuncs_s* platFuncs, Memory* memory)
 {
 	plat = platFuncs;
 	plat->SetupMainExeLibraries();
-	ImGui::SetCurrentContext(plat->GetGuiContext());
 
 	if (g_game == nullptr)
 	{

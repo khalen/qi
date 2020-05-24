@@ -17,6 +17,10 @@ typedef signed int         i32;
 typedef unsigned long long u64;
 typedef long long          i64;
 
+#if HAS(WIN32_BUILD)
+typedef long long ssize_t;
+#endif
+
 typedef float  r32;
 typedef double r64;
 
@@ -70,6 +74,8 @@ static_assert(sizeof(r64) == 8, "Bad size i64");
 #define BEGIN_PACKED_DEFS __pragma(pack(push)) __pragma(pack(1))
 
 #define END_PACKED_DEFS __pragma(pack(pop))
+
+#pragma warning(disable: 4996)
 
 #define PACKED
 #else

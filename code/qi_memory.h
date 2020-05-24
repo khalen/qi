@@ -48,7 +48,7 @@ struct MemoryArena
 	size_t curOffset;
 };
 
-void MA_Init(MemoryArena* arena, const size_t size);
+void MA_Init(MemoryArena* arena, Memory* memory, const size_t size);
 u8* MA_Alloc(MemoryArena* arena, const size_t size);
 
 // Malloc / free general buddy allocator

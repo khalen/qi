@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <cmath>
 
-Vector2 NoiseGenerator::GradientTable[NoiseGenerator::NumGradients];
+Vector2* NoiseGenerator::GradientTable;
 static size_t GradCounts[NoiseGenerator::NumGradients];
 
 r32
@@ -52,6 +52,8 @@ NoiseGenerator::Smoothed2D(const Vector2& unscaledCoords, r32 scale)
 void
 NoiseGenerator::InitGradients()
 {
+	static Vector2 LocalGradTable[NoiseGenerator::NumGradients];
+	GradientTable = LocalGradTable;
     const r32 dTheta  = (2.0f * Q_PI) / (NumGradients + 0);
     const r32 gradMag = sqrtf(2.0f);
     r32       theta   = 0.0f;
@@ -158,7 +160,7 @@ void NoiseGenerator::DumpAndClearStats()
     printf("Grad stats:\n");
     for (u32 i = 0; i < NumGradients; i++)
     {
-        printf("%ld\n", GradCounts[i]);
+        printf("%zu\n", GradCounts[i]);
         GradCounts[i] = 0;
     }
 
@@ -172,7 +174,7 @@ void NoiseGenerator::DumpAndClearStats()
 
     for (u32 i = 0; i < NumGradients; i++)
     {
-        printf("%ld\n", GradCounts[i]);
+        printf("%zu\n", GradCounts[i]);
         GradCounts[i] = 0;
     }
 }

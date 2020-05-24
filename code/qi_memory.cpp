@@ -21,7 +21,7 @@ blockSizeOfLevel(const size_t totalSize, const u32 level)
 static inline u32
 blockIndex(const u32 idxInLevel, const u32 level)
 {
-	return (1 << level) + idxInLevel - 1;
+	return (1u << level) + idxInLevel - 1;
 }
 
 static inline u32
@@ -142,7 +142,7 @@ freeBlockIndex(BuddyAllocator* allocator, const u32 idxInLevel, const u32 level)
     *(getFreeBits(allocator) + byteIdx) |= (1 << bitIdx);
 }
 
-static inline void
+[[maybe_unused]] static inline void
 toggleAllocatedBlockIndex(BuddyAllocator* allocator, const u32 idxInLevel, const u32 level)
 {
     const u32 idx	  = blockIndex(idxInLevel, level);
@@ -498,7 +498,7 @@ BA_DumpInfo(BuddyAllocator* allocator)
 	for (size_t i = 0; i <= allocator->maxLevel; i++)
 	{
 		size_t bSize = blockSizeOfLevel(allocator->size, i);
-		printf("\nFreelist %ld, block size 0x%lx:", i, bSize);
+		printf("\nFreelist %zu, block size 0x%zx:", i, bSize);
 		MemLink* freeList;
 		for (freeList = freeLists[i]; freeList; freeList = freeList->next)
 		{
@@ -506,7 +506,7 @@ BA_DumpInfo(BuddyAllocator* allocator)
 			totalFree += bSize;
 		}
 	}
-	printf("\nTotal free size: %ld", totalFree);
+	printf("\nTotal free size: %zu", totalFree);
     size_t		 splitBitsBytes		  = (1 << allocator->maxLevel) / (sizeof(u8) * 8);
     size_t		 freeBitsBytes		  = (1 << (allocator->maxLevel + 1)) / (sizeof(u8) * 8);
 
@@ -559,6 +559,25 @@ M_TransientAllocRaw(Memory* memory, const size_t size)
 	return result;
 }
 
+void
+MA_Init(MemoryArena* arena, Memory* memory, const size_t size)
+{
+    arena->size		 = size;
+    arena->curOffset = 0;
+    arena->base		 = (u8*)M_AllocRaw(memory, size);
+}
+
+u8*
+MA_Alloc(MemoryArena* arena, const size_t reqSize)
+{
+    const size_t size = (reqSize + 15) & ~0xFull;
+
+    Assert(arena && arena->curOffset + size <= arena->size);
+    u8* mem = arena->base + arena->curOffset;
+    arena->curOffset += size;
+    return mem;
+}
+
 static void*
 BAA_Realloc_(Allocator* alloc, void* prevMem, const size_t newSize)
 {
@@ -594,9 +613,9 @@ static void MAA_Free_(Allocator*, void*)
 {
 }
 
-void MAA_Init(MemoryArenaAllocator* maa, const size_t size)
+void MAA_Init(MemoryArenaAllocator* maa, Memory* memory, const size_t size)
 {
-	MA_Init(&maa->arena, size);
+	MA_Init(&maa->arena, memory, size);
     maa->realloc = MAA_Realloc_;
     maa->free = MAA_Free_;
 }

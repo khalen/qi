@@ -44,14 +44,14 @@ class NoiseGenerator
     u32 Seed;
 
   public:
-    NoiseGenerator(const u32 ISeed = 0)
-        : Seed(ISeed)
+	NoiseGenerator(u32 ISeed)
     {
-    }
+		Seed = ISeed;
+	}
 
     constexpr static size_t NumGradients = 0x20;
     constexpr static size_t GradientMask = 0x1F;
-    static Vector2 GradientTable[NumGradients];
+    static Vector2* GradientTable;
 
     static void InitGradients();
 

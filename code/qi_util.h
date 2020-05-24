@@ -7,6 +7,9 @@
 //
 
 #include "basictypes.h"
+#if !HAS(IS_CLANG)
+#include <intrin.h>
+#endif
 
 template<typename T, size_t N>
 constexpr int countof(T (&)[N])
@@ -65,14 +68,18 @@ template <typename T>
 inline i32
 BitScanRight(const T v)
 {
-    return ffs(v);
+    return __builtin_ffs(v);
 }
 
 template <>
 inline i32
 BitScanRight<u64>(const u64 v)
 {
-    return ffsll(v);
+#if HAS(IS_CLANG)
+    return __builtin_ffsll(v);
+#else
+	return __lzcnt64(v);
+#endif
 }
 
 #define __QI_UTIL_H

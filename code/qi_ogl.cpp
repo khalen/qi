@@ -47,6 +47,7 @@ GetShaderText(const char* fileName)
 	memset(shaderBuf, 0, statBuf.st_size + 1);
 	Assert(shaderBuf);
 
+#pragma warning(disable: 4996)
 	FILE* f = fopen(fileName, "rb");
 	fread(shaderBuf, 1, statBuf.st_size, f);
 	fclose(f);

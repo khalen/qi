@@ -65,6 +65,14 @@
 #error Undefined platform! Need define for PLAT_EXPORT / PLAT_IMPORT
 #endif
 
+#if defined(QI_COMPILER_CLANG) && QI_COMPILER_CLANG == 1
+#define IS_CLANG        HAS_X
+#define IS_MSVC         HAS__
+#else
+#define IS_CLANG        HAS__
+#define IS_MSVC         HAS_X
+#endif
+
 #define __HAS_H
 #endif // #ifndef __HAS_H
 

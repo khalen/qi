@@ -13,7 +13,11 @@
 
 #include <math.h>
 #include <string.h>
+#if HAS(WIN32_BUILD)
+#include <malloc.h>
+#else
 #include <sys/malloc.h>
+#endif
 
 struct SoundGlobals_s
 {

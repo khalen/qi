@@ -19,7 +19,7 @@ static inline HashLength Hash_String(const char* str)
     for (; *s; s++)
         hash = hash ^ ((hash << 5) + (hash >> 2) + (u8)*s);
 
-    HashLength result = {hash, s - str};
+    HashLength result = {hash, (u32)(s - str)};
     return result;
 }
 
