@@ -14,3 +14,4 @@ GTAGS
 compile_*
 /build/*
 /bin/*
+data/imgui.ini

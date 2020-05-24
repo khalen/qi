@@ -1,4 +1,4 @@
-if (${MACOSX})
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   execute_process(COMMAND "sdl2-config" "--cflags" OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE SDL_CFLAGS)
   separate_arguments(SDL_CFLAGS)
 
@@ -15,7 +15,7 @@ else()
         )
 endif()
 
-add_library(${GAME_LIB_NAME} SHARED "")
+add_library(${GAME_LIB_NAME} SHARED "" keystore.cpp)
 add_executable(${GAME_TST_NAME} "")
 add_executable(${GAME_EXE_NAME} "")
 
@@ -65,26 +65,26 @@ target_link_options(${GAME_EXE_NAME} PRIVATE ${SDL_LDFLAGS})
 file(GLOB HEADER_LIST CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Header Files" FILES ${HEADER_LIST})
 
-set(QI_EXE_SRCS qi_memory.cpp qi_ogl.cpp sdl_qi.cpp)
+set(QI_EXE_SRCS memory.cpp hw_ogl.cpp main_sdl.cpp)
 
 target_sources(${GAME_LIB_NAME}
   PRIVATE
 
-  qi.cpp
-  qi_array.cpp
-  qi_debug.cpp
-  qi_deque.cpp
-  qi_ent.cpp
-  qi_gjk.cpp
-  qi_lexer.cpp
-  qi_math.cpp
-  qi_memory.cpp
-  qi_noise.cpp
-  qi_ogl.cpp
-  qi_profile.cpp
-  qi_sound.cpp
-  qi_stringtable.cpp
-  qi_tile.cpp
+        game.cpp
+        array.cpp
+        debug.cpp
+        deque.cpp
+        entity.cpp
+        gjk.cpp
+        lexer.cpp
+        math_util.cpp
+        memory.cpp
+        noise.cpp
+        hw_ogl.cpp
+        profile.cpp
+        sound.cpp
+        stringtable.cpp
+        tile.cpp
 
   ${HEADER_LIST}
   ${IMGUI_SRCS}
@@ -100,9 +100,9 @@ target_sources(${GAME_EXE_NAME}
 target_sources(${GAME_TST_NAME}
   PRIVATE
 
-  qi_test.cpp
-  qi_noise.cpp
-  qi_lexer.cpp
+        test.cpp
+        noise.cpp
+        lexer.cpp
   )
 
 file(GLOB IMGUI_SRCS CONFIGURE_DEPENDS ${IMGUI}/*.cpp ${IMGUI}/*.h)
@@ -110,21 +110,21 @@ file(GLOB IMGUI_SRCS CONFIGURE_DEPENDS ${IMGUI}/*.cpp ${IMGUI}/*.h)
 target_sources(${GAME_LIB_NAME}
   PRIVATE
 
-  qi.cpp
-  qi_array.cpp
-  qi_debug.cpp
-  qi_deque.cpp
-  qi_ent.cpp
-  qi_gjk.cpp
-  qi_lexer.cpp
-  qi_math.cpp
-  qi_memory.cpp
-  qi_noise.cpp
-  qi_ogl.cpp
-  qi_profile.cpp
-  qi_sound.cpp
-  qi_stringtable.cpp
-  qi_tile.cpp
+        game.cpp
+        array.cpp
+        debug.cpp
+        deque.cpp
+        entity.cpp
+        gjk.cpp
+        lexer.cpp
+        math_util.cpp
+        memory.cpp
+        noise.cpp
+        hw_ogl.cpp
+        profile.cpp
+        sound.cpp
+        stringtable.cpp
+        tile.cpp
 
   ${HEADER_LIST}
   ${IMGUI_SRCS}
@@ -140,9 +140,9 @@ target_sources(${GAME_EXE_NAME}
 target_sources(${GAME_TST_NAME}
   PRIVATE
 
-  qi_test.cpp
-  qi_noise.cpp
-  qi_lexer.cpp
+        test.cpp
+        noise.cpp
+        lexer.cpp
   )
 
 target_link_libraries(${GAME_EXE_NAME} PRIVATE imgui glad)
@@ -150,9 +150,9 @@ target_link_libraries(${GAME_LIB_NAME} PRIVATE glad)
 target_link_libraries(${GAME_EXE_NAME} PRIVATE ${GAME_LIB_NAME})
 
 target_sources(${PROJECT_NAME}_test PRIVATE
-    qi_test.cpp
-    qi_noise.cpp
-    qi_lexer.cpp
+        test.cpp
+        noise.cpp
+        lexer.cpp
 )
 
 install(
