@@ -9,14 +9,14 @@
 #include "basictypes.h"
 #include "memory.h"
 
-enum KVType : u8
+enum ValueType : u8
 {
 	NIL = 0,
 	FALSE,
 	TRUE,
 	INT,
 	REAL,
-    SYMBOL,
+	SYMBOL,
 	STRING,
 	ARRAY,
 	OBJECT,
@@ -26,52 +26,75 @@ typedef u32 ValueRef;
 typedef i64 IntValue;
 typedef r64 RealValue;
 
-#define KVR_SHIFT 3
-#define KVR_MASK  7
+#define VALUE_SHIFT 3
+#define VALUE_MASK  7
 
 inline constexpr ValueRef
-MakeValueRef(const u32 offset, const KVType type)
+MakeValueRef(const u32 offset, const ValueType type)
 {
-	return (offset << KVR_SHIFT) | type;
+	return (offset << VALUE_SHIFT) | type;
 }
 
-inline constexpr KVType
+inline constexpr ValueType
 ValueRefType(const ValueRef ref)
 {
-	return (KVType)(ref & KVR_MASK);
+	return (ValueType)(ref & VALUE_MASK);
 }
 
 inline constexpr size_t
 ValueRefOffset(const ValueRef ref)
 {
-	return (size_t)ref >> KVR_SHIFT;
+	return (size_t)ref >> VALUE_SHIFT;
 }
 
-const ValueRef TrueValue = MakeValueRef(0, KVType::TRUE);
-const ValueRef FalseValue = MakeValueRef(0, KVType::FALSE);
+const ValueRef TrueValue  = MakeValueRef(0, ValueType::TRUE);
+const ValueRef FalseValue = MakeValueRef(0, ValueType::FALSE);
+const ValueRef NilValue   = MakeValueRef(0, ValueType::NIL);
 
 // Header for a memory block representing a top level config data store. Root will refer to a KV object or an array.
-struct KeyStore
-{
-	u32 sizeBytes;
-    u32 usedBytes;
-	ValueRef root;
-};
-void KV_Init(KeyStore* cd, void* buffer, size_t bufSize);
+struct KeyStore;
+KeyStore* KS_Create(const size_t initialSize);
+void      KS_Free(KeyStore** ksp);
 
-struct DataBlock
-{
-	u32 usedElems;
-	u32 sizeElems;
-	u32 nextBlock;
-};
-u32 DB_ElemCount(const DataBlock* db);
+ValueRef KS_Root(const KeyStore* ks);
+void     KS_SetRoot(KeyStore* ks, ValueRef root);
 
-struct KeyValue
+inline constexpr ValueRef
+KS_Nil()
 {
-	ValueRef key;   // Must be symbol
-	ValueRef value;
-};
+	return NilValue;
+}
+
+inline constexpr ValueRef
+KS_True()
+{
+	return TrueValue;
+}
+
+inline constexpr ValueRef
+KS_False()
+{
+	return FalseValue;
+}
+
+ValueRef KS_AddInt(KeyStore** ksp, const IntValue val);
+ValueRef KS_AddReal(KeyStore** ksp, const RealValue val);
+ValueRef KS_AddString(KeyStore** ksp, const char* str);
+
+ValueRef KS_AddArray(KeyStore** ksp, const u32 count);
+u32      KS_ArrayCount(const KeyStore* ks, const ValueRef array);
+ValueRef KS_ArrayElem(const KeyStore* ks, const ValueRef array, const u32 elem);
+ValueRef KS_ArraySet(const KeyStore* ks, const ValueRef array, const u32 elem, const ValueRef value);
+ValueRef KS_ArrayPush(KeyStore** ksp, const ValueRef array, const ValueRef value);
+
+ValueRef KS_AddObject(KeyStore** ksp, const u32 count);
+u32      KS_ObjectCount(const KeyStore* ks, const ValueRef object);
+Symbol   KS_ObjectElemKey(const KeyStore* ks, const ValueRef object, const u32 elem);
+ValueRef KS_ObjectElemValue(const KeyStore* ks, const ValueRef object, const u32 elem);
+ValueRef KS_ObjectSetValue(const KeyStore* ks, const ValueRef object, const char* key, const ValueRef value);
+ValueRef KS_ObjectSetValue(const KeyStore* ks, const ValueRef object, Symbol key, const ValueRef value);
+ValueRef KS_ObjectGetValue(const KeyStore* ks, const ValueRef object, const char* key, const ValueRef value);
+ValueRef KS_ObjectGetValue(const KeyStore* ks, const ValueRef object, Symbol key, const ValueRef value);
 
 #define __QI_KEYVALUES_H
 #endif // #ifndef __QI_KEYVALUES_H
