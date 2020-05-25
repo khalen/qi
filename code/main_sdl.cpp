@@ -941,10 +941,10 @@ main(int argc, const char* argv[])
 		for (int analog = 0; analog < ANALOG_COUNT; analog++)
 			kbdController->analogs[analog] = oldController->analogs[analog];
 
-		SDL_Event event;
+		SDL_Event event = {0};
 		while (SDL_PollEvent(&event))
 		{
-			if (event.type >= SDL_KEYDOWN && event.type < SDL_MOUSEMOTION)
+			if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
 				HandleKeyEvent(&event, &newInput);
 			else if (event.type >= SDL_MOUSEMOTION && event.type < SDL_JOYAXISMOTION)
 				HandleMouseEvent(&event, &newInput);
@@ -988,7 +988,7 @@ main(int argc, const char* argv[])
 			}
 
 			if (msToSleep > 0)
-				SDL_Delay(msToSleep);
+                SDL_Delay(msToSleep);
 
 			while (frameElapsed < secondsPerFrame)
 			{

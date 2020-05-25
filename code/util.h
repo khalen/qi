@@ -68,7 +68,11 @@ template <typename T>
 inline i32
 BitScanRight(const T v)
 {
+#if HAS(IS_CLANG)
     return __builtin_ffs(v);
+#else
+    return _tzcnt_u32(v);
+#endif
 }
 
 template <>
@@ -78,7 +82,7 @@ BitScanRight<u64>(const u64 v)
 #if HAS(IS_CLANG)
     return __builtin_ffsll(v);
 #else
-	return __lzcnt64(v);
+	return _tzcnt_u64(v);
 #endif
 }
 

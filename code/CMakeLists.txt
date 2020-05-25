@@ -5,8 +5,13 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
   execute_process(COMMAND "sdl2-config" "--static-libs" OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE SDL_LDFLAGS)
   separate_arguments(SDL_LDFLAGS)
 else()
-    set(SDL_CFLAGS /I${THIRDPARTY}/SDL2/include /D_THREAD_SAFE)
-    set(SDL_LDFLAGS ${THIRDPARTY}/SDL2/lib/x64/sdl2.lib)
+    if(${IS_CLANG})
+        set(SDL_CFLAGS -I${THIRDPARTY}/SDL2/include -D_THREAD_SAFE)
+        set(SDL_LDFLAGS ${THIRDPARTY}/SDL2/lib/x64/sdl2.lib)
+    else()
+        set(SDL_CFLAGS /I${THIRDPARTY}/SDL2/include /D_THREAD_SAFE)
+        set(SDL_LDFLAGS ${THIRDPARTY}/SDL2/lib/x64/sdl2.lib)
+    endif()
     set(COMPILE_DEFINITIONS
         _CRT_SECURE_NO_WARNINGS
         _CRT_SECURE_NO_DEPRECATE
@@ -42,7 +47,7 @@ if (${IS_CLANG})
 else()
     set(COMPILE_FLAGS
         $<${IS_OPTIMIZED}:/O2 /Ot /Oi>
-        $<${HAS_DEBUG_INFO}:/Z7>
+        $<${HAS_DEBUG_INFO}:/Zi /Zo>
         )
 endif()
 

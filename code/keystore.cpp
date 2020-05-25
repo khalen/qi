@@ -68,18 +68,6 @@ KS__GetBlock(const KeyStore* ks, const ValueRef ref)
 	return (DataBlock*)KS__ValuePtr(ks, ref);
 }
 
-KeyStore*
-KS_Create(const size_t initialSize)
-{
-	const size_t actualSize = initialSize + sizeof(KeyStore);
-	KeyStore*    ks         = (KeyStore*)BA_Alloc(gks->allocator, actualSize);
-	ks->sizeBytes           = (u32)actualSize;
-	ks->usedBytes           = (u32)sizeof(KeyStore);
-	KS_SetRoot(ks, NilValue);
-
-	return ks;
-}
-
 static ValueRef
 KS__Write(KeyStore** ksp, ValueType type, void* data, size_t sizeBytes, size_t extraSizeBytes)
 {
@@ -97,6 +85,23 @@ KS__Write(KeyStore** ksp, ValueType type, void* data, size_t sizeBytes, size_t e
 	memcpy(dataPtr, data, sizeBytes);
 	memset(dataPtr + sizeBytes, 0, extraSizeBytes);
 	return MakeValueRef(dataPtr - (u8*)ks, type);
+}
+
+void KS_SetRoot(KeyStore* ks, const ValueRef root)
+{
+	ks->root = root;
+}
+
+KeyStore*
+KS_Create(const size_t initialSize)
+{
+    const size_t actualSize = initialSize + sizeof(KeyStore);
+    KeyStore*    ks         = (KeyStore*)BA_Alloc(gks->allocator, actualSize);
+    ks->sizeBytes           = (u32)actualSize;
+    ks->usedBytes           = (u32)sizeof(KeyStore);
+    KS_SetRoot(ks, NilValue);
+
+    return ks;
 }
 
 struct KeyValue
