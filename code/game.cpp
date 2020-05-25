@@ -13,6 +13,7 @@
 #include "gjk.h"
 #include "util.h"
 #include "noise.h"
+#include "keystore.h"
 #include <stdio.h>
 #include <imgui.h>
 
@@ -86,6 +87,36 @@ static void InitGameGlobals(const SubSystem*, bool);
 SubSystem GameSubSystem = {"Game", InitGameGlobals, sizeof(GameGlobals_s), nullptr};
 
 internal void
+TestKeyStore(void)
+{
+	KeyStore* ks = KS_Create("TestKS");
+
+	ValueRef subObj = KS_AddObject(&ks, 0);
+	KS_ObjectSetValue(&ks, subObj, "fooInt", KS_AddInt(&ks, 12345));
+	KS_ObjectSetValue(&ks, subObj, "fooInt", KS_AddInt(&ks, 54321));
+	KS_ObjectSetValue(&ks, subObj, "strVal", KS_AddString(&ks, "This is a test of the emergency broadcast system.  This is only a test. In the event of an actual emergency asdjajhrg a hahr k a a efahefg g a kefagsh"));
+	KS_ObjectSetValue(&ks, subObj, "symVal", KS_AddSymbol(&ks, "IAmASymbol"));
+	ValueRef subSubArray = KS_AddArray(&ks, 2);
+	KS_ArrayPush(&ks, subSubArray, KS_AddReal(&ks, 1.5432));
+	KS_ArrayPush(&ks, subSubArray, KS_AddString(&ks, "Lincoln was shot and killed"));
+	Assert(KS_ArrayCount(ks, subSubArray) == 2);
+	for (u32 i = 0; i < KS_ArrayCount(ks, subSubArray); i++)
+	{
+		printf("Array %d: 0x%x", i, KS_ArrayElem(ks, subSubArray, i));
+	}
+	ValueRef subSubSubArray = KS_AddArray(&ks, 0);
+	KS_ArrayPush(&ks, subSubSubArray, KS_AddInt(&ks, 99999));
+	KS_ArrayPush(&ks, subSubArray, subSubSubArray);
+	KS_ObjectSetValue(&ks, subObj, "nestedArrayTest", subSubArray);
+	KS_ObjectSetValue(&ks, KS_Root(ks), "testObj", subObj);
+	KS_ObjectSetValue(&ks, KS_Root(ks), "testInt", KS_AddInt(&ks, 911911911));
+
+	char* tmpBuf = (char *)g_game->memory->transientPos;
+	u32 len = KS_ValueToString(ks, KS_Root(ks), tmpBuf, g_game->memory->transientSize, true);
+	plat->WriteEntireFile(nullptr, "test.qed", tmpBuf, len);
+}
+
+internal void
 InitGameGlobals(const SubSystem* sys, bool isReInit)
 {
 	Assert(sys->globalPtr);
@@ -94,6 +125,8 @@ InitGameGlobals(const SubSystem* sys, bool isReInit)
 		return;
 
 	MA_Init(&g_game->tileArena, g_game->memory, MB(32));
+
+	TestKeyStore();
 
 	g_game->playerPos.x.tile = 10;
 	g_game->playerPos.y.tile = 10;
@@ -365,12 +398,12 @@ extern SubSystem KeyStoreSubsystem;
 extern SubSystem DebugSubSystem;
 
 internal SubSystem* s_subSystems[] = {
-    &GameSubSystem,
-    &SoundSubSystem,
-    &KeyStoreSubsystem,
 #if !HAS(RELEASE_BUILD)
-    &DebugSubSystem,
+	&DebugSubSystem,
 #endif
+	&KeyStoreSubsystem,
+	&SoundSubSystem,
+    &GameSubSystem,
 };
 
 internal void

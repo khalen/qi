@@ -8,6 +8,10 @@
 
 #include "basictypes.h"
 #include "memory.h"
+#include "stringtable.h"
+
+const u32 kKSDefaultInitialElems = 5;
+const u32 kKSDefaultInitialSize = 1024;
 
 enum ValueType : u8
 {
@@ -26,8 +30,8 @@ typedef u32 ValueRef;
 typedef i64 IntValue;
 typedef r64 RealValue;
 
-#define VALUE_SHIFT 3
-#define VALUE_MASK  7
+#define VALUE_SHIFT 4
+#define VALUE_MASK  15
 
 inline constexpr ValueRef
 MakeValueRef(const u32 offset, const ValueType type)
@@ -51,9 +55,15 @@ const ValueRef TrueValue  = MakeValueRef(0, ValueType::TRUE);
 const ValueRef FalseValue = MakeValueRef(0, ValueType::FALSE);
 const ValueRef NilValue   = MakeValueRef(0, ValueType::NIL);
 
+struct KeyValue
+{
+	ValueRef key;
+	ValueRef value;
+};
+
 // Header for a memory block representing a top level config data store. Root will refer to a KV object or an array.
 struct KeyStore;
-KeyStore* KS_Create(const size_t initialSize);
+KeyStore* KS_Create(const char* name, const u32 initialElems = kKSDefaultInitialElems, const size_t initialSize = kKSDefaultInitialSize);
 void      KS_Free(KeyStore** ksp);
 
 ValueRef KS_Root(const KeyStore* ks);
@@ -77,24 +87,34 @@ KS_False()
 	return FalseValue;
 }
 
-ValueRef KS_AddInt(KeyStore** ksp, const IntValue val);
-ValueRef KS_AddReal(KeyStore** ksp, const RealValue val);
+u32 KS_ValueToString(const KeyStore *ks, ValueRef value, const char *buffer, size_t bufSize, bool pretty);
+
+ValueRef KS_AddInt(KeyStore** ksp, IntValue val);
+ValueRef KS_AddReal(KeyStore** ksp, RealValue val);
 ValueRef KS_AddString(KeyStore** ksp, const char* str);
 
-ValueRef KS_AddArray(KeyStore** ksp, const u32 count);
-u32      KS_ArrayCount(const KeyStore* ks, const ValueRef array);
-ValueRef KS_ArrayElem(const KeyStore* ks, const ValueRef array, const u32 elem);
-ValueRef KS_ArraySet(const KeyStore* ks, const ValueRef array, const u32 elem, const ValueRef value);
-ValueRef KS_ArrayPush(KeyStore** ksp, const ValueRef array, const ValueRef value);
+ValueRef KS_AddSymbol(KeyStore **ksp, const char *str);
+ValueRef KS_AddSymbol(KeyStore **ksp, Symbol sym);
 
-ValueRef KS_AddObject(KeyStore** ksp, const u32 count);
-u32      KS_ObjectCount(const KeyStore* ks, const ValueRef object);
-Symbol   KS_ObjectElemKey(const KeyStore* ks, const ValueRef object, const u32 elem);
-ValueRef KS_ObjectElemValue(const KeyStore* ks, const ValueRef object, const u32 elem);
-ValueRef KS_ObjectSetValue(const KeyStore* ks, const ValueRef object, const char* key, const ValueRef value);
-ValueRef KS_ObjectSetValue(const KeyStore* ks, const ValueRef object, Symbol key, const ValueRef value);
-ValueRef KS_ObjectGetValue(const KeyStore* ks, const ValueRef object, const char* key, const ValueRef value);
-ValueRef KS_ObjectGetValue(const KeyStore* ks, const ValueRef object, Symbol key, const ValueRef value);
+ValueRef KS_AddArray(KeyStore** ksp, u32 count);
+ValueRef KS_AddArray(KeyStore **ksp, ValueRef* initialValues, u32 initialCount, u32 extraCount);
+u32      KS_ArrayCount(const KeyStore* ks, ValueRef array);
+ValueRef KS_ArrayElem(const KeyStore* ks, ValueRef array, u32 elem);
+void     KS_ArraySet(const KeyStore* ks, ValueRef array, u32 elem, ValueRef value);
+void     KS_ArrayPush(KeyStore** ksp, ValueRef array, ValueRef value);
+
+ValueRef KS_AddObject(KeyStore** ksp, u32 count);
+ValueRef KS_AddObject(KeyStore **ksp, KeyValue *initialKeyValues, u32 initialCount, u32 extraCount);
+u32      KS_ObjectCount(const KeyStore* ks, ValueRef object);
+
+KeyValue KS_ObjectElemKeyValue(const KeyStore *ks, ValueRef object, u32 elem);
+ValueRef KS_ObjectElemKey(const KeyStore* ks, ValueRef object, u32 elem);
+ValueRef KS_ObjectElemValue(const KeyStore* ks, ValueRef object, u32 elem);
+void     KS_ObjectSetValue(KeyStore** ks, ValueRef object, const char* key, ValueRef value);
+void     KS_ObjectSetValue(KeyStore** ks, ValueRef object, ValueRef keyVal, ValueRef value);
+ValueRef KS_ObjectGetValue(const KeyStore* ks, ValueRef object, const char* key);
+ValueRef KS_ObjectGetValue(const KeyStore* ks, ValueRef object, ValueRef keyVal);
 
 #define __QI_KEYVALUES_H
 #endif // #ifndef __QI_KEYVALUES_H
+
