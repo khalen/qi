@@ -44,11 +44,13 @@ if (${IS_CLANG})
       $<${IS_CLANG}:-fvisibility=hidden>
       $<${IS_CLANG}:-fvisibility-inlines-hidden>
       )
+    set(LINK_FLAGS "")
 else()
     set(COMPILE_FLAGS
         $<${IS_OPTIMIZED}:/O2 /Ot /Oi>
         $<${HAS_DEBUG_INFO}:/Zi /Zo>
         )
+    set(LINK_FLAGS $<${HAS_DEBUG_INFO}:/DEBUG>)
 endif()
 
 set(INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} ${THIRDPARTY}/include ${THIRDPARTY}/imgui)
@@ -65,7 +67,9 @@ target_compile_options(${GAME_EXE_NAME} PRIVATE ${SDL_CFLAGS} ${COMPILE_FLAGS})
 target_compile_options(${GAME_LIB_NAME} PRIVATE ${COMPILE_FLAGS})
 target_compile_options(${GAME_TST_NAME} PRIVATE ${COMPILE_FLAGS})
 
-target_link_options(${GAME_EXE_NAME} PRIVATE ${SDL_LDFLAGS})
+target_link_options(${GAME_EXE_NAME} PRIVATE ${SDL_LDFLAGS} ${LINK_FLAGS})
+target_link_options(${GAME_LIB_NAME} PRIVATE ${LINK_FLAGS})
+target_link_options(${GAME_TST_NAME} PRIVATE ${LINK_FLAGS})
 
 file(GLOB HEADER_LIST CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Header Files" FILES ${HEADER_LIST})

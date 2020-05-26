@@ -89,6 +89,7 @@ SubSystem GameSubSystem = {"Game", InitGameGlobals, sizeof(GameGlobals_s), nullp
 internal void
 TestKeyStore(void)
 {
+#if 0
 	KeyStore* ks = KS_Create("TestKS");
 
 	ValueRef subObj = KS_AddObject(&ks, 0);
@@ -114,6 +115,34 @@ TestKeyStore(void)
 	char* tmpBuf = (char *)g_game->memory->transientPos;
 	u32 len = KS_ValueToString(ks, KS_Root(ks), tmpBuf, g_game->memory->transientSize, true);
 	plat->WriteEntireFile(nullptr, "test.qed", tmpBuf, len);
+
+	KeyStore* ksf = nullptr;
+	const char* error = QED_LoadFile(&ksf, "Test", "test.qed");
+	if (error != nullptr)
+	{
+		printf("Error loading test.qed: %s", error);
+	}
+
+	tmpBuf = (char*)g_game->memory->transientPos;
+	len    = KS_ValueToString(ksf, KS_Root(ksf), tmpBuf, g_game->memory->transientSize, true);
+	plat->WriteEntireFile(nullptr, "test1.qed", tmpBuf, len);
+
+	KS_Free(&ks);
+	KS_Free(&ksf);
+
+	ksf   = nullptr;
+	error = QED_LoadFile(&ksf, "Sample", "sample.qed");
+	if (error != nullptr)
+	{
+		printf("Error loading sample.qed: %s", error);
+	}
+
+	tmpBuf = (char*)g_game->memory->transientPos;
+	len    = KS_ValueToString(ksf, KS_Root(ksf), tmpBuf, g_game->memory->transientSize, true);
+	plat->WriteEntireFile(nullptr, "sampleout.qed", tmpBuf, len);
+
+	KS_Free(&ksf);
+#endif
 }
 
 internal void

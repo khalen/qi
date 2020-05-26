@@ -88,3 +88,4 @@ BitScanRight<u64>(const u64 v)
 
 #define __QI_UTIL_H
 #endif // #ifndef __QI_UTIL_H
+

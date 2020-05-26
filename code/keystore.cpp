@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <setjmp.h>
 #include <stdarg.h>
+#include <ctype.h>
 #include "stringtable.h"
 #include "debug.h"
 #include "memory.h"
@@ -170,6 +171,23 @@ KS_ValueString(const KeyStore *ks, ValueRef value)
 	return (const char *) (KS__ValuePtr(ks, value));
 }
 
+static bool
+P_CanStartSymbol(char c)
+{
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_');
+}
+
+static bool
+P_CanContinueSymbol(char c)
+{
+	return P_CanStartSymbol(c) || (c >= '0' && c <= '9');
+}
+
+static bool P_IsNonASCII(char c)
+{
+	return !isprint(c);
+}
+
 Symbol
 KS_ValueSymbol(const KeyStore *ks, ValueRef value)
 {
@@ -252,14 +270,52 @@ KS__ValueToString_r(const KeyStore *ks, ValueRef value, char **bufPtr, const cha
 		break;
 
 	case SYMBOL:
-		KS__EmitStr(bufPtr, bufEnd, KS_ValueSymbolAsStr(ks, value));
+	{
+		const char* sym = KS_ValueSymbolAsStr(ks, value);
+		size_t symLen = strlen(sym);
+		if (symLen == 0)
+		{
+			KS__EmitFixedStr(bufPtr, bufEnd, "``", 2);
+		}
+		else
+		{
+			bool needsQuote = !P_CanStartSymbol(*sym);
+			for (size_t i = 1; i < symLen; i++)
+				needsQuote |= !P_CanContinueSymbol(sym[i]);
+			if (needsQuote)
+				KS__EmitFixedStr(bufPtr, bufEnd, "`", 1);
+			KS__EmitStr(bufPtr, bufEnd, sym);
+			if (needsQuote)
+				KS__EmitFixedStr(bufPtr, bufEnd, "`", 1);
+		}
 		break;
+	}
 
 	case STRING:
-		KS__EmitStr(bufPtr, bufEnd, "\"");
-		KS__EmitStr(bufPtr, bufEnd, (const char *) (KS__ValuePtr(ks, value)));
-		KS__EmitStr(bufPtr, bufEnd, "\"");
+	{
+		const char* str = (const char*)(KS__ValuePtr(ks, value));
+		size_t len = strlen(str);
+		if (len == 0)
+		{
+			KS__EmitFixedStr(bufPtr, bufEnd, "\"\"", 2);
+		}
+		else
+		{
+			bool needsQuote = P_IsNonASCII(str[0]);
+			for (size_t i = 1; i < len; i++)
+				needsQuote |= P_IsNonASCII(str[i]);
+			if(needsQuote)
+				KS__EmitFixedStr(bufPtr, bufEnd, "\"\"\"", 3);
+			else
+				KS__EmitFixedStr(bufPtr, bufEnd, "\"", 1);
+			KS__EmitStr(bufPtr, bufEnd, str);
+			if (needsQuote)
+				KS__EmitFixedStr(bufPtr, bufEnd, "\"\"\"", 3);
+			else
+				KS__EmitFixedStr(bufPtr, bufEnd, "\"", 1);
+		}
 		break;
+	}
 
 	case ARRAY:
 	{
@@ -370,8 +426,10 @@ ValueRef
 KS_AddArray(KeyStore **ksp, ValueRef* initial, u32 count, u32 extra)
 {
 	ValueRef arr = KS_AddArray(ksp, count + extra);
-	u8* dataPtr = (u8*)(KS__GetBlockDataPtr(*ksp, KS__GetBlock(*ksp, arr)));
+	DataBlock* db  = KS__GetBlock(*ksp, arr);
+	u8* dataPtr = (u8*)(KS__GetBlockDataPtr(*ksp, db));
 	memcpy(dataPtr, initial, count * sizeof(ValueRef));
+	db->usedElems = count;
 	return arr;
 }
 
@@ -482,8 +540,10 @@ ValueRef
 KS_AddObject(KeyStore **ksp, KeyValue* initial, u32 count, u32 extra)
 {
 	ValueRef obj = KS_AddObject(ksp, count + extra);
-	u8 *dataPtr = (u8 *) (KS__GetBlockDataPtr(*ksp, KS__GetBlock(*ksp, obj)));
+	DataBlock* db = KS__GetBlock(*ksp, obj);
+	u8 *dataPtr = (u8 *) (KS__GetBlockDataPtr(*ksp, db));
 	memcpy(dataPtr, initial, count * sizeof(KeyValue));
+	db->usedElems = count;
 	return obj;
 }
 
@@ -653,7 +713,7 @@ void PB_Destroy(PushBuffer<T, InitialSize>* pb)
 {
 	if (pb->hasGrown)
 	{
-		BA_Free(gks->allocator, pb);
+		BA_Free(gks->allocator, pb->curPtr);
 	}
 }
 template <typename T, i32 InitialSize=128>
@@ -685,24 +745,6 @@ PB_Push(PushBuffer<T, InitialSize> *pb, T value)
 
 typedef PushBuffer<char> CharBuffer;
 typedef PushBuffer<ValueRef> ValueBuffer;
-
-#if 0
-// test.qed
-/* Comment */
-TopLevelValue=12345.0
-TopLevelInt=12345
-TestStr="This is a\n\tTest"
-TestArr   = [These 999 are "mixed" values false nil 99199, commas, "are" "optional"]
-TestObj = {
-	innerArr = [
-		 99.9 """
-		 Verbatim
-		 Strings
-		 "work!!"
-		 """ true { bob = 1, jane = 5.5 steve = 3.1415 }
-	 ]
-}
-#endif
 
 struct ParseContext
 {
@@ -756,7 +798,8 @@ QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buffer, size_t bu
 	gpc.end = buffer + bufSize;
 	gpc.errorBuf[0] = 0;
 
-	P_ParseObject(true);
+	ValueRef root = P_ParseObject(true);
+	KS_SetRoot(*gpc.ksp, root);
 
 	return nullptr;
 }
@@ -766,6 +809,7 @@ QED_LoadFile(KeyStore** ksp, const char* ksName, const char* fileName)
 {
 	size_t fileSize = 0;
 	void* fileBuf = plat->ReadEntireFile(nullptr, fileName, &fileSize);
+	gpc.s = (const char *)fileBuf;
 	if (gpc.s == nullptr)
 	{
 		snprintf(gpc.errorBuf, sizeof(gpc.errorBuf), "QED error: Couldn't read file %s", fileName);
@@ -908,26 +952,22 @@ P_ParseTrue()
 	return TrueValue;
 }
 
-static bool
-P_CanStartSymbol(char c)
-{
-	return (c >= 'a' && c <= 'z')
-		|| (c >= 'A' && c <= 'Z')
-		|| (c == '_');
-}
-
-static bool
-P_CanContinueSymbol(char c)
-{
-	return P_CanStartSymbol(c) || (c >= '0' && c <= '9');
-}
-
 static ValueRef
 P_ParseSymbol()
 {
 	CharBuffer sym;
 
 	PB_Init(&sym);
+	if (NEXT() == '`')
+	{
+		SKIP();
+		while (gpc.s < gpc.end && NEXT() != '`')
+		{
+			PB_Push(&sym, *gpc.s);
+			gpc.s++;
+		}
+		P_SkipToken("`");
+	}
 	while(gpc.s < gpc.end && P_CanContinueSymbol(*gpc.s))
 	{
 		PB_Push(&sym, *gpc.s);
@@ -977,6 +1017,7 @@ P_ParseNumber()
 	{
 		intv = 10 * intv + (c - '0');
 		SKIP();
+		c = NEXT();
 	}
 
 	// Optional fractional part
@@ -986,12 +1027,15 @@ P_ParseNumber()
 	{
 		SKIP();
 		P_SkipSpace();
+		c = NEXT();
+		c  = NEXT();
 		isReal = true;
 		while (gpc.s < gpc.end && (c >= '0' && c <= '9'))
 		{
 			fracv = 10 * fracv + (c - '0');
 			fracdivv *= 10;
-			c = NEXT(); SKIP();
+			SKIP();
+			c = NEXT();
 		}
 		P_SkipSpace();
 		c = NEXT();
@@ -1002,31 +1046,35 @@ P_ParseNumber()
 	{
 		SKIP();
 		P_SkipSpace();
+		c = NEXT();
 		isReal = true;
 
 		// Exponent sign
 		if (c == '+')
 		{
-			c = NEXT(); SKIP();
+			SKIP();
+			c = NEXT();
 		}
 		else if (c == '-')
 		{
 			expsign = -1;
-			c = NEXT(); SKIP();
+			SKIP();
+			c = NEXT();
 		}
 
 		// Exponent
 		while (gpc.s < gpc.end && (c >= '0' && c <= '9'))
 		{
 			expv = 10 * expv + (c - '0');
-			c = NEXT(); SKIP();
+			SKIP();
+			c = NEXT();
 		}
 	}
 
 	ValueRef ret;
 	if (isReal)
 	{
-		RealValue value = (RealValue)sign * ((RealValue)intv + ((RealValue)fracdivv / (RealValue)fracv)) * pow(10.0, (RealValue)expsign * (RealValue)expv);
+		RealValue value = (RealValue)sign * ((RealValue)intv + ((RealValue)fracv / (RealValue)fracdivv)) * pow(10.0, (RealValue)expsign * (RealValue)expv);
 		ret = KS_AddReal(gpc.ksp, value);
 	}
 	else
@@ -1054,6 +1102,7 @@ P_ParseVerbatimString()
 		gpc.s++;
 	}
 	P_SkipToken("\"\"\"");
+	PB_Push(&str, (char)0);
 
 	ValueRef ref = KS_AddString(gpc.ksp, str.curPtr);
 	PB_Destroy(&str);
@@ -1123,7 +1172,7 @@ P_ParseValue()
 		return P_ParseTrue();
 	else if (c == '\"')
 		return P_ParseString();
-	else if (P_CanStartSymbol(c))
+	else if (P_CanStartSymbol(c) || c == '`')
 		return P_ParseSymbol();
 	else if (c == '[')
 		return P_ParseArray();
@@ -1173,15 +1222,14 @@ P_ParseObject(bool topLevel)
 		P_SkipSpace();
 		P_SkipToken("=");
 		ValueRef value = P_ParseValue();
-		PB_Push(&vb, key);
+		PB_Push(&vb, value);
 		P_SkipSpace();
 	}
 	if (!topLevel)
 	{
 		P_SkipToken("}");
 	}
-	ValueRef rval = KS_AddObject(gpc.ksp, (KeyValue *)vb.curPtr, vb.used / 2, 0);
+	ValueRef rval = KS_AddObject(gpc.ksp, (KeyValue*)vb.curPtr, vb.used / 2, 0);
 	PB_Destroy(&vb);
 	return rval;
 }
-

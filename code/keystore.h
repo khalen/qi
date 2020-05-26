@@ -118,8 +118,8 @@ ValueRef KS_ObjectGetValue(const KeyStore* ks, ValueRef object, ValueRef keyVal)
 // QED Parser
 
 // Returns nullptr on success, error message on failure; *ksp will be created if initially null
-const char* QED_LoadFile(KeyStore** ksp, const char* fileName);
-const char* QED_LoadBuffer(KeyStore** ksp, const char* buf, size_t bufSize);
+const char* QED_LoadFile(KeyStore** ksp, const char* ksName, const char* fileName);
+const char* QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buf, size_t bufSize);
 
 #define __QI_KEYVALUES_H
 #endif // #ifndef __QI_KEYVALUES_H

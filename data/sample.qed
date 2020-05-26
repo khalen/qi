@@ -1,15 +1,18 @@
 // Comments are preceded by //
 // Outer braces elided, : is a synonym for =
+// Commas are whitespace in values
 Value1 = 1.0e32  // Float
 Value2 = 5    // Int
-Value3 = 500l // Int64
+Value3 = 500 // Int64
 Value4 = "This is a test"
-Value5 = "
+Value5 = """
   Arbitrarily formatted
-     text with spaces and newliens
+     text with spaces and newlines
          preserved verbatim
-"
+"""
 Value6 = IdentifiersAreSymbolsNotStrings
 Value7 = `Embedded spaces in a symbol`
 Value8 = [ array, of, symbols, or, "arbitrary", `other values` ]
-Value9 = { SubValue1 = { SubSubValue1 = Arbitrary, SubSubValue2 = Nesting, SubSubValue3 = [ 1 2 3 4 5 ] } }
+Value9 = { SubValue1 = { SubSubValue1 = Arbitrary, SubSubValue2 = Nesting, SubSubValue3 = [ 1 2 [3 4] 5 ] } }
+`Oddly Named Field`="Regular\nString\nWith\nEmbedded\nCtrl Chars"
+

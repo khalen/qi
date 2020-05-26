@@ -288,6 +288,9 @@ OS_ReadEntireFile(ThreadContext*, const char* fileName, size_t* fileSize)
 	fread(fileBuf, 1, statBuf.st_size, f);
 	fclose(f);
 
+	if (fileSize != nullptr)
+		*fileSize = statBuf.st_size;
+
 	return fileBuf;
 }
 
