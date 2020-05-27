@@ -88,10 +88,13 @@ KS_False()
 }
 
 u32 KS_ValueToString(const KeyStore *ks, ValueRef value, const char *buffer, size_t bufSize, bool pretty);
+// Allocates and returns a new keystore based on the parameter. Will result in an optimally sized copy (no extra
+// space in objects/arrays, no unreferenced int/string/real values, etc.
+KeyStore* KS_CompactCopy(const KeyStore* ks);
 
-ValueRef KS_AddInt(KeyStore** ksp, IntValue val);
-ValueRef KS_AddReal(KeyStore** ksp, RealValue val);
-ValueRef KS_AddString(KeyStore** ksp, const char* str);
+ValueRef KS_AddInt(KeyStore** ksp, IntValue val, ValueRef prevRef = NilValue);
+ValueRef KS_AddReal(KeyStore** ksp, RealValue val, ValueRef prevRef = NilValue);
+ValueRef KS_AddString(KeyStore** ksp, const char* str, ValueRef prevRef = NilValue);
 
 ValueRef KS_AddSymbol(KeyStore **ksp, const char *str);
 ValueRef KS_AddSymbol(KeyStore **ksp, Symbol sym);
@@ -100,12 +103,37 @@ ValueRef KS_AddArray(KeyStore** ksp, u32 count);
 ValueRef KS_AddArray(KeyStore **ksp, ValueRef* initialValues, u32 initialCount, u32 extraCount);
 u32      KS_ArrayCount(const KeyStore* ks, ValueRef array);
 ValueRef KS_ArrayElem(const KeyStore* ks, ValueRef array, u32 elem);
-void     KS_ArraySet(const KeyStore* ks, ValueRef array, u32 elem, ValueRef value);
+void     KS_ArraySet(KeyStore* ks, ValueRef array, u32 elem, ValueRef value);
 void     KS_ArrayPush(KeyStore** ksp, ValueRef array, ValueRef value);
 
 ValueRef KS_AddObject(KeyStore** ksp, u32 count);
 ValueRef KS_AddObject(KeyStore **ksp, KeyValue *initialKeyValues, u32 initialCount, u32 extraCount);
 u32      KS_ObjectCount(const KeyStore* ks, ValueRef object);
+
+// Simple helpers for common cases
+IntValue    KS_GetKeyInt(const KeyStore*ks, ValueRef object, const char* key);
+IntValue    KS_GetKeyInt(const KeyStore* ks, ValueRef object, Symbol key);
+RealValue   KS_GetKeyReal(const KeyStore* ks, ValueRef object, const char* key);
+RealValue   KS_GetKeyReal(const KeyStore* ks, ValueRef object, Symbol key);
+const char* KS_GetKeyString(const KeyStore* ks, ValueRef object, const char* key);
+const char* KS_GetKeyString(const KeyStore* ks, ValueRef object, Symbol key);
+bool        KS_GetKeyBool(const KeyStore* ks, ValueRef object, const char* key);
+bool        KS_GetKeyBool(const KeyStore* ks, ValueRef object, Symbol key);
+const char* KS_GetKeyAsString(const KeyStore* ks, ValueRef object, const char* key, ValueType* typePtr = nullptr);
+const char* KS_GetKeyAsString(const KeyStore* ks, ValueRef object, Symbol key, ValueType* typePtr = nullptr);
+
+void        KS_SetKeyInt(KeyStore** ksp, ValueRef object, const char* key, IntValue val);
+void        KS_SetKeyInt(KeyStore** ksp, ValueRef object, Symbol key, IntValue val);
+void        KS_SetKeyReal(KeyStore** ksp, ValueRef object, const char* key, RealValue val);
+void        KS_SetKeyReal(KeyStore** ksp, ValueRef object, Symbol key, RealValue val);
+void        KS_SetKeyString(KeyStore** ksp, ValueRef object, const char* key, const char* val);
+void        KS_SetKeyString(KeyStore** ksp, ValueRef object, Symbol key, const char* val);
+void        KS_SetKeyBool(KeyStore** ksp, ValueRef object, const char* key, bool val);
+void        KS_SetKeyBool(KeyStore** ksp, ValueRef object, Symbol key, bool val);
+
+// These both try to "DWIM" based on the key type, ie. object will parse QED syntax using P_ParseValue()
+const char* KS_SetKeyAsString(KeyStore** ksp, ValueRef object, const char* key, ValueType type, const char* val, ssize_t len = -1);
+const char* KS_SetKeyAsString(KeyStore** ksp, ValueRef object, Symbol key, ValueType type, const char* val, ssize_t len = -1);
 
 KeyValue KS_ObjectElemKeyValue(const KeyStore *ks, ValueRef object, u32 elem);
 ValueRef KS_ObjectElemKey(const KeyStore* ks, ValueRef object, u32 elem);
@@ -122,6 +150,8 @@ const char* QED_LoadFile(KeyStore** ksp, const char* ksName, const char* fileNam
 const char* QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buf, size_t bufSize);
 
 // Global data store interface
+KeyStore* QED_LoadDataStore(const char* dsName);
+KeyStore* QED_GetDataStore(const char* dsName);
 
 #define __QI_KEYVALUES_H
 #endif // #ifndef __QI_KEYVALUES_H

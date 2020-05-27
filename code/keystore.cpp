@@ -15,6 +15,11 @@
 #include "keystore.h"
 #include "game.h"
 
+#if HAS(IS_CLANG)
+#pragma clang diagnostic push
+#pragma ide diagnostic   ignored "bugprone-reserved-identifier"
+#endif
+
 // Repository for game configuration data, using a global symbol table for key values.
 static const size_t    kGlobalSymbolTableSize = 64 * 1024;
 static const size_t    kConfigDataHeapSize    = 4 * 1024 * 1024;
@@ -382,22 +387,52 @@ KS_DumpToFile(const KeyStore *ks, const char *fileName)
 }
 
 ValueRef
-KS_AddInt(KeyStore **ksp, IntValue val)
+KS_AddInt(KeyStore **ksp, IntValue val, ValueRef curRef)
 {
-	return KS__Write(ksp, ValueType::INT, &val, sizeof(IntValue), 0);
+	if (curRef == NilValue)
+	{
+		return KS__Write(ksp, ValueType::INT, &val, sizeof(IntValue), 0);
+	}
+	else
+	{
+		Assert(ValueRefType(curRef) == ValueType::INT);
+		*(IntValue*)(KS__ValuePtr(*ksp, curRef)) = val;
+		return curRef;
+	}
 }
 
 ValueRef
-KS_AddReal(KeyStore **ksp, RealValue val)
+KS_AddReal(KeyStore **ksp, RealValue val, ValueRef curRef)
 {
-	return KS__Write(ksp, ValueType::REAL, &val, sizeof(RealValue), 0);
+	if (curRef == NilValue)
+	{
+		return KS__Write(ksp, ValueType::REAL, &val, sizeof(RealValue), 0);
+	}
+	else
+	{
+		Assert(ValueRefType(curRef) == ValueType::REAL);
+		*(RealValue*)(KS__ValuePtr(*ksp, curRef)) = val;
+		return curRef;
+	}
 }
 
 ValueRef
-KS_AddString(KeyStore **ksp, const char *str)
+KS_AddString(KeyStore **ksp, const char *str, ValueRef curRef)
 {
-	size_t len = strlen(str);
-	return KS__Write(ksp, ValueType::STRING, str, len + 1, 0);
+	size_t len = strlen(str) + 1; // null terminated
+	if (curRef != NilValue)
+	{
+		Assert(ValueRefType(curRef) == ValueType::STRING);
+		char* oldStr = (char *)KS__ValuePtr(*ksp, curRef);
+		size_t oldLen = strlen(oldStr) + 1;
+		if (oldLen >= len)
+		{
+			memcpy(oldStr, str, len);
+			return curRef;
+		}
+	}
+
+	return KS__Write(ksp, ValueType::STRING, str, len, 0);
 }
 
 ValueRef
@@ -764,9 +799,8 @@ struct ParseContext
 	char errorBuf[80];
 } gpc;
 
-static bool P_SkipToken(const char *str);
-static void P_Expect(const char* str);
-static void P_Optional(const char* str);
+static bool P_SkipToken(const char *tok);
+static void P_Optional(const char* tok);
 static void P_SkipSpace();
 static void P_SkipComment();
 
@@ -777,9 +811,19 @@ static ValueRef P_ParseArray();
 
 static ValueRef P_ParseObject(bool topLevel);
 
-const char*
-QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buffer, size_t bufSize)
+static const char* P_ParseBuffer(KeyStore** ksp, const char* ksName, const char* buffer, size_t bufSize, ValueRef* refOut)
 {
+	if (*ksp == nullptr)
+	{
+		const char* name = ksName ? ksName : "Unnamed";
+		*ksp             = KS_Create(name);
+		gpc.ownsKs       = true;
+	}
+	else
+	{
+		gpc.ownsKs = false;
+	}
+
 	if (setjmp(gpc.escBuf))
 	{
 		if (gpc.ownsKs)
@@ -787,28 +831,31 @@ QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buffer, size_t bu
 			KS_Free(gpc.ksp);
 			gpc.ownsKs = false;
 		}
+		*refOut = NilValue;
 		return gpc.errorBuf;
 	}
 
-	if (*ksp == nullptr)
-	{
-		const char* name = ksName ? ksName : "Unnamed";
-		*ksp = KS_Create(name);
-		gpc.ownsKs = true;
-	}
-	else
-	{
-		gpc.ownsKs = false;
-	}
-
-	gpc.ksp = ksp;
-	gpc.s = buffer;
-	gpc.end = buffer + bufSize;
+	gpc.ksp         = ksp;
+	gpc.s           = buffer;
+	gpc.end         = buffer + bufSize;
 	gpc.errorBuf[0] = 0;
 
-	ValueRef root = P_ParseObject(true);
-	KS_SetRoot(*gpc.ksp, root);
+	ValueRef parsed = P_ParseObject(true);
+	*refOut = parsed;
 
+	return nullptr;
+}
+
+const char*
+QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buffer, size_t bufSize)
+{
+	ValueRef result = NilValue;
+	const char* parseError = P_ParseBuffer(ksp, ksName, buffer, bufSize, &result);
+	if (parseError == nullptr)
+	{
+		Assert(*ksp);
+		KS_SetRoot(*ksp, result);
+	}
 	return nullptr;
 }
 
@@ -817,8 +864,7 @@ QED_LoadFile(KeyStore** ksp, const char* ksName, const char* fileName)
 {
 	size_t fileSize = 0;
 	void* fileBuf = plat->ReadEntireFile(nullptr, fileName, &fileSize);
-	gpc.s = (const char *)fileBuf;
-	if (gpc.s == nullptr)
+	if (fileBuf == nullptr)
 	{
 		snprintf(gpc.errorBuf, sizeof(gpc.errorBuf), "QED error: Couldn't read file %s", fileName);
 		return gpc.errorBuf;
@@ -828,6 +874,285 @@ QED_LoadFile(KeyStore** ksp, const char* ksName, const char* fileName)
 	plat->ReleaseFileBuffer(nullptr, fileBuf);
 
 	return rval;
+}
+
+static ValueRef KS__CopyValue(KeyStore** destp, const KeyStore* src, ValueRef srcVal)
+{
+	switch(ValueRefType(srcVal))
+	{
+	case INT:
+		return KS_AddInt(destp, KS_ValueInt(src, srcVal));
+	case REAL:
+		return KS_AddReal(destp, KS_ValueReal(src, srcVal));
+	case STRING:
+		return KS_AddString(destp, KS_ValueString(src, srcVal));
+	case ARRAY:
+	{
+		u32      arrayCount = KS_ArrayCount(src, srcVal);
+		ValueRef newArr     = KS_AddArray(destp, arrayCount);
+
+		ValueRef* oldVals = KS__ArrayElemPtr((KeyStore *)src, srcVal, 0);
+		ValueRef* newVals = KS__ArrayElemPtr(*destp, newArr, 0);
+		for (u32 i = 0; i < arrayCount; i++)
+		{
+			newVals[i] = KS__CopyValue(destp, src, oldVals[i]);
+		}
+
+		return newArr;
+	}
+	case OBJECT:
+	{
+		u32      objCount = KS_ObjectCount(src, srcVal);
+		ValueRef newObj   = KS_AddObject(destp, objCount);
+
+		KeyValue* oldKVs = KS__ObjectElemPtr((KeyStore *)src, srcVal, 0);
+		KeyValue* newKVs = KS__ObjectElemPtr(*destp, newObj, 0);
+		for (u32 i = 0; i < objCount; i++)
+		{
+			newKVs[i].key   = KS__CopyValue(destp, src, oldKVs[i].key);
+			newKVs[i].value = KS__CopyValue(destp, src, oldKVs[i].value);
+		}
+
+		return newObj;
+	}
+	default:
+		return srcVal;
+	}
+
+	return NilValue;
+}
+
+KeyStore*
+KS_CompactCopy(const KeyStore* ks)
+{
+	KeyStore* newKS = KS_Create(ST_ToString(gks->symbolTable, ks->name), 0, 0);
+	KS_SetRoot(newKS, KS__CopyValue(&newKS, ks, KS_Root(ks)));
+	return newKS;
+}
+
+IntValue
+KS_GetKeyInt(const KeyStore* ks, ValueRef object, const char* key)
+{
+	return KS_GetKeyInt(ks, object, ST_Intern(gks->symbolTable, key));
+}
+
+IntValue
+KS_GetKeyInt(const KeyStore* ks, ValueRef object, Symbol key)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue* kv = KS__ObjectFindKey(ks, object, keySym);
+	if (kv)
+	{
+		Assert(ValueRefType(kv->value) == ValueType::INT);
+		return KS_ValueInt(ks, kv->value);
+	}
+	return (IntValue)0;
+}
+
+RealValue
+KS_GetKeyReal(const KeyStore* ks, ValueRef object, const char* key)
+{
+	return KS_GetKeyReal(ks, object, ST_Intern(gks->symbolTable, key));
+}
+
+RealValue
+KS_GetKeyReal(const KeyStore* ks, ValueRef object, Symbol key)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue* kv = KS__ObjectFindKey(ks, object, keySym);
+	if (kv)
+	{
+		Assert(ValueRefType(kv->value) == ValueType::REAL);
+		return KS_ValueReal(ks, kv->value);
+	}
+	return (RealValue)0.0;
+}
+
+const char*
+KS_GetKeyString(const KeyStore* ks, ValueRef object, const char* key)
+{
+	return KS_GetKeyString(ks, object, ST_Intern(gks->symbolTable, key));
+}
+
+const char*
+KS_GetKeyString(const KeyStore* ks, ValueRef object, Symbol key)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue* kv = KS__ObjectFindKey(ks, object, keySym);
+	if (kv)
+	{
+		Assert(ValueRefType(kv->value) == ValueType::STRING);
+		return KS_ValueString(ks, kv->value);
+	}
+	return nullptr;
+}
+
+bool
+KS_GetKeyBool(const KeyStore* ks, ValueRef object, const char* key)
+{
+	return KS_GetKeyBool(ks, object, ST_Intern(gks->symbolTable, key));
+}
+
+bool
+KS_GetKeyBool(const KeyStore* ks, ValueRef object, Symbol key)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue* kv = KS__ObjectFindKey(ks, object, keySym);
+	if (kv)
+	{
+		Assert(kv->value == TrueValue || kv->value == FalseValue);
+		return kv->value == TrueValue;
+	}
+	return FalseValue;
+}
+
+const char*
+KS_GetKeyAsString(const KeyStore* ks, ValueRef object, const char* key, ValueType* typePtr)
+{
+	return KS_GetKeyAsString(ks, object, ST_Intern(gks->symbolTable, key), typePtr);
+}
+
+const char*
+KS_GetKeyAsString(const KeyStore* ks, ValueRef object, Symbol key, ValueType* typePtr)
+{
+	ValueRef    keySym = MakeValueRef(key, ValueType::SYMBOL);
+	static char stupidBuffer[16384];
+	KeyValue* kv = KS__ObjectFindKey(ks, object, keySym);
+	if (kv)
+	{
+		if (typePtr)
+			*typePtr = ValueRefType(kv->value);
+		KS_ValueToString(ks, kv->value, stupidBuffer, sizeof(stupidBuffer), false);
+		return stupidBuffer;
+	}
+	return nullptr;
+}
+
+void
+KS_SetKeyInt(KeyStore** ksp, ValueRef object, const char* key, IntValue val)
+{
+	KS_SetKeyInt(ksp, object, ST_Intern(gks->symbolTable, key), val);
+}
+
+void
+KS_SetKeyInt(KeyStore** ksp, ValueRef object, Symbol key, IntValue val)
+{
+	ValueRef keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue* kv = KS__ObjectFindKey(*ksp, object, keySym);
+	if (kv)
+	{
+		kv->value = KS_AddInt(ksp, val, kv->value);
+	}
+	else
+	{
+		KS_ObjectSetValue(ksp, object, key, KS_AddInt(ksp, val));
+	}
+}
+
+void
+KS_SetKeyReal(KeyStore** ksp, ValueRef object, const char* key, RealValue val)
+{
+	KS_SetKeyReal(ksp, object, ST_Intern(gks->symbolTable, key), val);
+}
+
+void
+KS_SetKeyReal(KeyStore** ksp, ValueRef object, Symbol key, RealValue val)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue* kv     = KS__ObjectFindKey(*ksp, object, keySym);
+	if (kv)
+	{
+		kv->value = KS_AddInt(ksp, val, kv->value);
+	}
+	else
+	{
+		KS_ObjectSetValue(ksp, object, key, KS_AddReal(ksp, val));
+	}
+}
+
+void
+KS_SetKeyString(KeyStore** ksp, ValueRef object, const char* key, const char* val)
+{
+	KS_SetKeyString(ksp, object, ST_Intern(gks->symbolTable, key), val);
+}
+
+void
+KS_SetKeyString(KeyStore** ksp, ValueRef object, Symbol key, const char* val)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue* kv     = KS__ObjectFindKey(*ksp, object, keySym);
+	if (kv)
+	{
+		kv->value = KS_AddString(ksp, val, kv->value);
+	}
+	else
+	{
+		KS_ObjectSetValue(ksp, object, key, KS_AddString(ksp, val));
+	}
+}
+
+void
+KS_SetKeyBool(KeyStore** ksp, ValueRef object, const char* key, bool val)
+{
+	KS_SetKeyBool(ksp, object, ST_Intern(gks->symbolTable, key), val);
+}
+
+void
+KS_SetKeyBool(KeyStore** ksp, ValueRef object, Symbol key, bool val)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue* kv     = KS__ObjectFindKey(*ksp, object, keySym);
+	ValueRef refVal = val ? TrueValue : FalseValue;
+	if (kv)
+	{
+		kv->value = refVal;
+	}
+	else
+	{
+		KS_ObjectSetValue(ksp, object, key, refVal);
+	}
+}
+
+const char*
+KS_SetKeyAsString(KeyStore** ksp, ValueRef object, const char* key, ValueType type, const char* val, ssize_t len)
+{
+	return KS_SetKeyAsString(ksp, object, ST_Intern(gks->symbolTable, key), type, val, len);
+}
+
+const char*
+KS_SetKeyAsString(KeyStore** ksp, ValueRef object, Symbol key, ValueType type, const char* val, ssize_t len)
+{
+	ValueRef result = NilValue;
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+
+	if (len < 0)
+		len = strlen(val);
+
+	const char* errorMsg = P_ParseBuffer(ksp, nullptr, val, len, &result);
+	if (errorMsg != nullptr)
+		return errorMsg;
+
+	KeyValue* kv     = KS__ObjectFindKey(*ksp, object, keySym);
+	if (kv)
+	{
+		kv->value = result;
+	}
+	else
+	{
+		KS_ObjectSetValue(ksp, object, key, result);
+	}
+	return nullptr;
+}
+
+KeyStore*
+QED_LoadDataStore(const char* dsName)
+{
+	return nullptr;
+}
+KeyStore*
+QED_GetDataStore(const char* dsName)
+{
+	return nullptr;
 }
 
 static void
@@ -1218,11 +1543,15 @@ P_ParseObject(bool topLevel)
 	ValueBuffer vb;
 	PB_Init(&vb);
 	P_SkipSpace();
-	if (!topLevel)
+	if (topLevel)
+	{
+		P_Optional("{");
+	}
+	else
 	{
 		P_SkipToken("{");
-		P_SkipSpace();
 	}
+	P_SkipSpace();
 	while (gpc.s < gpc.end && NEXT() != '}')
 	{
 		ValueRef key = P_ParseSymbol();
@@ -1233,7 +1562,11 @@ P_ParseObject(bool topLevel)
 		PB_Push(&vb, value);
 		P_SkipSpace();
 	}
-	if (!topLevel)
+	if (topLevel)
+	{
+		P_Optional("}");
+	}
+	else
 	{
 		P_SkipToken("}");
 	}
@@ -1241,3 +1574,8 @@ P_ParseObject(bool topLevel)
 	PB_Destroy(&vb);
 	return rval;
 }
+
+#if HAS(IS_CLANG)
+#pragma clang diagnostic pop
+#endif
+

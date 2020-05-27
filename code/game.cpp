@@ -480,7 +480,7 @@ RoundIReal(r32 val)
 static u32
 PackColor(r32 r, r32 g, r32 b)
 {
-	return (RoundReal(r * 255.0f) << 16) | (RoundReal(g * 255.0f) << 8) | (RoundReal(b * 255.0f) << 0);
+	return (RoundReal(r * 255.0f) << 16u) | (RoundReal(g * 255.0f) << 8u) | (RoundReal(b * 255.0f) << 0u);
 }
 
 internal void
