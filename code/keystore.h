@@ -121,6 +121,8 @@ ValueRef KS_ObjectGetValue(const KeyStore* ks, ValueRef object, ValueRef keyVal)
 const char* QED_LoadFile(KeyStore** ksp, const char* ksName, const char* fileName);
 const char* QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buf, size_t bufSize);
 
+// Global data store interface
+
 #define __QI_KEYVALUES_H
 #endif // #ifndef __QI_KEYVALUES_H
 

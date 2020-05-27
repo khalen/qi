@@ -18,13 +18,21 @@
 // Repository for game configuration data, using a global symbol table for key values.
 static const size_t    kGlobalSymbolTableSize = 64 * 1024;
 static const size_t    kConfigDataHeapSize    = 4 * 1024 * 1024;
+static const size_t    kMaxDataStoreCount     = 64;
+
+struct GameDataStore
+{
+	Symbol      name;
+	KeyStore*   keyStore;
+};
 
 // Module
 struct KeyStoreGlobals
 {
 	BuddyAllocator *allocator;
 	StringTable    *symbolTable;
-	KeyStore       *store;
+	GameDataStore  dataStores[kMaxDataStoreCount];
+	u32            numDataStores;
 };
 static KeyStoreGlobals *gks                   = nullptr;
 
