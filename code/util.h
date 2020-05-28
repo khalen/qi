@@ -10,6 +10,7 @@
 #if !HAS(IS_CLANG)
 #include <intrin.h>
 #endif
+#include <stddef.h>
 
 template<typename T, size_t N>
 constexpr int countof(T (&)[N])
@@ -85,6 +86,12 @@ BitScanRight<u64>(const u64 v)
 	return _tzcnt_u64(v);
 #endif
 }
+
+extern const char* VS(const char* msg, ...)
+#if HAS(IS_CLANG)
+    __attribute__ ((format (printf, 1, 2)))
+#endif
+;
 
 #define __QI_UTIL_H
 #endif // #ifndef __QI_UTIL_H

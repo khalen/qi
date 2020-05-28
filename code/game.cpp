@@ -425,6 +425,7 @@ UpdateGameState(Bitmap* screen, Input* input)
 extern SubSystem SoundSubSystem;
 extern SubSystem KeyStoreSubsystem;
 extern SubSystem DebugSubSystem;
+extern SubSystem UtilSubSystem;
 
 internal SubSystem* s_subSystems[] = {
 #if !HAS(RELEASE_BUILD)
@@ -432,6 +433,7 @@ internal SubSystem* s_subSystems[] = {
 #endif
 	&KeyStoreSubsystem,
 	&SoundSubSystem,
+	&UtilSubSystem,
     &GameSubSystem,
 };
 

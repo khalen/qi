@@ -9,11 +9,13 @@
 #include <setjmp.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <limits.h>
 #include "stringtable.h"
 #include "debug.h"
 #include "memory.h"
 #include "keystore.h"
 #include "game.h"
+#include "util.h"
 
 #if HAS(IS_CLANG)
 #pragma clang diagnostic push
@@ -846,36 +848,6 @@ static const char* P_ParseBuffer(KeyStore** ksp, const char* ksName, const char*
 	return nullptr;
 }
 
-const char*
-QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buffer, size_t bufSize)
-{
-	ValueRef result = NilValue;
-	const char* parseError = P_ParseBuffer(ksp, ksName, buffer, bufSize, &result);
-	if (parseError == nullptr)
-	{
-		Assert(*ksp);
-		KS_SetRoot(*ksp, result);
-	}
-	return nullptr;
-}
-
-const char*
-QED_LoadFile(KeyStore** ksp, const char* ksName, const char* fileName)
-{
-	size_t fileSize = 0;
-	void* fileBuf = plat->ReadEntireFile(nullptr, fileName, &fileSize);
-	if (fileBuf == nullptr)
-	{
-		snprintf(gpc.errorBuf, sizeof(gpc.errorBuf), "QED error: Couldn't read file %s", fileName);
-		return gpc.errorBuf;
-	}
-
-	const char* rval = QED_LoadBuffer(ksp, ksName, (const char*) fileBuf, fileSize);
-	plat->ReleaseFileBuffer(nullptr, fileBuf);
-
-	return rval;
-}
-
 static ValueRef KS__CopyValue(KeyStore** destp, const KeyStore* src, ValueRef srcVal)
 {
 	switch(ValueRefType(srcVal))
@@ -1141,17 +1113,6 @@ KS_SetKeyAsString(KeyStore** ksp, ValueRef object, Symbol key, ValueType type, c
 	{
 		KS_ObjectSetValue(ksp, object, key, result);
 	}
-	return nullptr;
-}
-
-KeyStore*
-QED_LoadDataStore(const char* dsName)
-{
-	return nullptr;
-}
-KeyStore*
-QED_GetDataStore(const char* dsName)
-{
 	return nullptr;
 }
 
@@ -1573,6 +1534,68 @@ P_ParseObject(bool topLevel)
 	ValueRef rval = KS_AddObject(gpc.ksp, (KeyValue*)vb.curPtr, vb.used / 2, 0);
 	PB_Destroy(&vb);
 	return rval;
+}
+
+// QED Interfaces
+
+const char*
+QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buffer, size_t bufSize)
+{
+	ValueRef    result     = NilValue;
+	const char* parseError = P_ParseBuffer(ksp, ksName, buffer, bufSize, &result);
+	if (parseError == nullptr)
+	{
+		Assert(*ksp);
+		KS_SetRoot(*ksp, result);
+	}
+	return nullptr;
+}
+
+const char*
+QED_LoadFile(KeyStore** ksp, const char* ksName, const char* fileName)
+{
+	size_t fileSize = 0;
+	void*  fileBuf  = plat->ReadEntireFile(nullptr, fileName, &fileSize);
+	if (fileBuf == nullptr)
+	{
+		snprintf(gpc.errorBuf, sizeof(gpc.errorBuf), "QED error: Couldn't read file %s", fileName);
+		return gpc.errorBuf;
+	}
+
+	const char* rval = QED_LoadBuffer(ksp, ksName, (const char*)fileBuf, fileSize);
+	plat->ReleaseFileBuffer(nullptr, fileBuf);
+
+	return rval;
+}
+
+KeyStore*
+QED_LoadDataStore(const char* dsName)
+{
+	const char* fname = VS("qed/%s.qed", dsName);
+	Symbol name = ST_Intern(gks->symbolTable, dsName);
+	GameDataStore* ds = &gks->dataStores[gks->numDataStores++];
+	memset(ds, 0, sizeof(GameDataStore));
+	ds->name = name;
+	const char* loadResult = QED_LoadFile(&ds->keyStore, dsName, fname);
+	if (loadResult != nullptr)
+	{
+		gks->numDataStores--;
+		fprintf(stderr, "Failed to load game data store %s", fname);
+		return nullptr;
+	}
+	return ds->keyStore;
+}
+
+KeyStore*
+QED_GetDataStore(const char* dsName)
+{
+	Symbol name = ST_Intern(gks->symbolTable, dsName);
+	for (u32 i = 0; i < gks->numDataStores; i++)
+	{
+		if (gks->dataStores[i].name == name)
+			return gks->dataStores[i].keyStore;
+	}
+	return nullptr;
 }
 
 #if HAS(IS_CLANG)
