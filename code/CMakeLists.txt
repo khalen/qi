@@ -20,7 +20,7 @@ else()
         )
 endif()
 
-add_library(${GAME_LIB_NAME} SHARED "" keystore.cpp util.cpp)
+add_library(${GAME_LIB_NAME} SHARED "" keystore.cpp util.cpp gamedb.cpp gamedb.h)
 add_executable(${GAME_TST_NAME} "")
 add_executable(${GAME_EXE_NAME} "")
 
