@@ -24,6 +24,81 @@ struct GameDBGlobals
 
 static GameDBGlobals* gdb = nullptr;
 
+template <typename T>
+T DB_Get(const char* keyPath);
+
+DataNode* DB_FindNode(const char* path, Symbol* pInt);
+template <>
+const char* DB_Get(const char* keyPath)
+{
+	Symbol key;
+	DataNode* node = DB_FindNode(keyPath, &key);
+	if (!node)
+		return nullptr;
+
+	return KS_GetKeyAsString(node->ks, KS_Root(node->ks), key);
+}
+
+template<>
+IntValue
+DB_Get(const char* keyPath)
+{
+	Symbol    key;
+	DataNode* node = DB_FindNode(keyPath, &key);
+	if (!node)
+		return 0;
+
+	return KS_GetKeyInt(node->ks, KS_Root(node->ks), key);
+}
+
+template<>
+RealValue
+DB_Get(const char* keyPath)
+{
+	Symbol    key;
+	DataNode* node = DB_FindNode(keyPath, &key);
+	if (!node)
+		return 0;
+
+	return KS_GetKeyReal(node->ks, KS_Root(node->ks), key);
+}
+
+template<>
+bool
+DB_Get(const char* keyPath)
+{
+	Symbol    key;
+	DataNode* node = DB_FindNode(keyPath, &key);
+	if (!node)
+		return 0;
+
+	return KS_GetKeyBool(node->ks, KS_Root(node->ks), key);
+}
+
+template<>
+ValueRef
+DB_Get(const char* keyPath)
+{
+	Symbol    key;
+	DataNode* node = DB_FindNode(keyPath, &key);
+	if (!node)
+		return 0;
+
+	return KS_ObjectGetValue(node->ks, KS_Root(node->ks), key);
+}
+
+DataNode*
+DB_FindOrCreateChild_r(const char** path, DataNode* root, Symbol** keyp)
+{
+	return nullptr;
+}
+
+DataNode*
+DB_FindNode(const char* path, Symbol* key)
+{
+	return DB_FindOrCreateChild_r(&path, gdb->root, &key);
+}
+
 static void DB_Init(const SubSystem* sys, bool bIsReInit)
 {
 	gdb = (GameDBGlobals *)sys->globalPtr;
