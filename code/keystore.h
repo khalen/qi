@@ -1,4 +1,4 @@
-#ifndef __QI_KEYVALUES_H
+#ifndef __KEYVALUES_H
 
 //
 // Copyright 2017, Quantum Immortality Software and Jon Davis
@@ -63,30 +63,13 @@ struct KeyValue
 
 // Header for a memory block representing a top level config data store. Root will refer to a KV object or an array.
 struct KeyStore;
-KeyStore* KS_Create(const char* name, const u32 initialElems = kKSDefaultInitialElems, const size_t initialSize = kKSDefaultInitialSize);
+KeyStore* KS_Create(const char* name, u32 initialElems = kKSDefaultInitialElems, size_t initialSize = kKSDefaultInitialSize);
 void      KS_Free(KeyStore** ksp);
 
 ValueRef KS_Root(const KeyStore* ks);
 void     KS_SetRoot(KeyStore* ks, ValueRef root);
 
-inline constexpr ValueRef
-KS_Nil()
-{
-	return NilValue;
-}
-
-inline constexpr ValueRef
-KS_True()
-{
-	return TrueValue;
-}
-
-inline constexpr ValueRef
-KS_False()
-{
-	return FalseValue;
-}
-
+StringTable* KS_GetStringTable();
 u32 KS_ValueToString(const KeyStore *ks, ValueRef value, const char *buffer, size_t bufSize, bool pretty);
 // Allocates and returns a new keystore based on the parameter. Will result in an optimally sized copy (no extra
 // space in objects/arrays, no unreferenced int/string/real values, etc.
@@ -153,6 +136,6 @@ const char* QED_LoadBuffer(KeyStore** ksp, const char* ksName, const char* buf, 
 KeyStore* QED_LoadDataStore(const char* dsName);
 KeyStore* QED_GetDataStore(const char* dsName);
 
-#define __QI_KEYVALUES_H
-#endif // #ifndef __QI_KEYVALUES_H
+#define __KEYVALUES_H
+#endif // #ifndef __KEYVALUES_H
 

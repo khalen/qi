@@ -24,10 +24,16 @@ struct GameDBGlobals
 
 static GameDBGlobals* gdb = nullptr;
 
+static DataNode* DN_GetChildren(DataNode* dn)
+{
+	return dn + 1;
+}
+
 template <typename T>
 T DB_Get(const char* keyPath);
 
-DataNode* DB_FindNode(const char* path, Symbol* pInt);
+DataNode* DB_FindNode(const char* path, Symbol* key);
+StringTable* KS_GetStringTable();
 template <>
 const char* DB_Get(const char* keyPath)
 {
@@ -70,7 +76,7 @@ DB_Get(const char* keyPath)
 	Symbol    key;
 	DataNode* node = DB_FindNode(keyPath, &key);
 	if (!node)
-		return 0;
+		return false;
 
 	return KS_GetKeyBool(node->ks, KS_Root(node->ks), key);
 }
@@ -82,21 +88,53 @@ DB_Get(const char* keyPath)
 	Symbol    key;
 	DataNode* node = DB_FindNode(keyPath, &key);
 	if (!node)
-		return 0;
+		return NilValue;
 
 	return KS_ObjectGetValue(node->ks, KS_Root(node->ks), key);
 }
 
 DataNode*
-DB_FindOrCreateChild_r(const char** path, DataNode* root, Symbol** keyp)
+DB_FindOrCreateChild_r(const char* path, const char* curPart, DataNode* root, Symbol* pKey)
 {
+	char pathPart[kMaxDataNodeNameLength];
+	size_t      partLen;
+	const char* dotPos = strchr(curPart, '.');
+	if (dotPos != nullptr
+	{
+		partLen = dotPos - *path;
+		memcpy(pathPart, *path, partLen);
+		pathPart[partLen] = 0;
+		*path += partLen + 1;
+	}
+	else
+	{
+		partLen = strlen(*path);
+		strcpy(pathPart, *path);
+		*path += partLen + 1;
+		if (pKey)
+			*pKey = ST_Intern(KS_GetStringTable(), pathPart);
+	}
+	// Check for existing node with that name
+	if (root)
+	{
+		DataNode* children = DN_GetChildren(root);
+		for (int i = 0; i < root->usedChildren; i++)
+		{
+			if (strcmp(children[i].name, pathPart) == 0)
+			{
+				return DB_FindOrCreateChild_r(path, root, pKey);
+			}
+		}
+		// Node not found; Try to find and load a corresponding qed file
+
+	}
 	return nullptr;
 }
 
 DataNode*
 DB_FindNode(const char* path, Symbol* key)
 {
-	return DB_FindOrCreateChild_r(&path, gdb->root, &key);
+	return DB_FindOrCreateChild_r(&path, gdb->root, key);
 }
 
 static void DB_Init(const SubSystem* sys, bool bIsReInit)
