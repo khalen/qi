@@ -863,11 +863,10 @@ static ValueRef KS__CopyValue(KeyStore** destp, const KeyStore* src, ValueRef sr
 		u32      arrayCount = KS_ArrayCount(src, srcVal);
 		ValueRef newArr     = KS_AddArray(destp, arrayCount);
 
-		ValueRef* oldVals = KS__ArrayElemPtr((KeyStore *)src, srcVal, 0);
 		ValueRef* newVals = KS__ArrayElemPtr(*destp, newArr, 0);
 		for (u32 i = 0; i < arrayCount; i++)
 		{
-			newVals[i] = KS__CopyValue(destp, src, oldVals[i]);
+			newVals[i] = KS__CopyValue(destp, src, KS_ArrayElem(src, srcVal, i));
 		}
 
 		return newArr;
@@ -877,12 +876,12 @@ static ValueRef KS__CopyValue(KeyStore** destp, const KeyStore* src, ValueRef sr
 		u32      objCount = KS_ObjectCount(src, srcVal);
 		ValueRef newObj   = KS_AddObject(destp, objCount);
 
-		KeyValue* oldKVs = KS__ObjectElemPtr((KeyStore *)src, srcVal, 0);
 		KeyValue* newKVs = KS__ObjectElemPtr(*destp, newObj, 0);
 		for (u32 i = 0; i < objCount; i++)
 		{
-			newKVs[i].key   = KS__CopyValue(destp, src, oldKVs[i].key);
-			newKVs[i].value = KS__CopyValue(destp, src, oldKVs[i].value);
+			KeyValue kv = KS_ObjectElemKeyValue(src, srcVal, i);
+			newKVs[i].key   = KS__CopyValue(destp, src, kv.key);
+			newKVs[i].value = KS__CopyValue(destp, src, kv.value);
 		}
 
 		return newObj;
