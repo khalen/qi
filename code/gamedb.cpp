@@ -137,6 +137,36 @@ DB_FindNode(const char* path, Symbol* key)
 	return DB_FindOrCreateChild_r(path, nullptr, gdb->root, key);
 }
 
+#if 0
+KeyStore *QED_LoadDataStore(const char *dsName)
+{
+	const char *   fname = VS("qed/%s.qed", dsName);
+	Symbol         name  = ST_Intern(gks->symbolTable, dsName);
+	GameDataStore *ds    = &gks->dataStores[gks->numDataStores++];
+	memset(ds, 0, sizeof(GameDataStore));
+	ds->name               = name;
+	const char *loadResult = QED_LoadFile(&ds->keyStore, dsName, fname);
+	if (loadResult != nullptr)
+	{
+		gks->numDataStores--;
+		fprintf(stderr, "Failed to load game data store %s", fname);
+		return nullptr;
+	}
+	return ds->keyStore;
+}
+
+KeyStore *QED_GetDataStore(const char *dsName)
+{
+	Symbol name = ST_Intern(gks->symbolTable, dsName);
+	for (u32 i = 0; i < gks->numDataStores; i++)
+	{
+		if (gks->dataStores[i].name == name)
+			return gks->dataStores[i].keyStore;
+	}
+	return nullptr;
+}
+#endif
+
 static void DB_Init(const SubSystem* sys, bool bIsReInit)
 {
 	gdb = (GameDBGlobals *)sys->globalPtr;
