@@ -99,18 +99,18 @@ DB_FindOrCreateChild_r(const char* path, const char* curPart, DataNode* root, Sy
 	char pathPart[kMaxDataNodeNameLength];
 	size_t      partLen;
 	const char* dotPos = strchr(curPart, '.');
-	if (dotPos != nullptr
+	if (dotPos != nullptr)
 	{
-		partLen = dotPos - *path;
-		memcpy(pathPart, *path, partLen);
+		partLen = dotPos - path;
+		memcpy(pathPart, path, partLen);
 		pathPart[partLen] = 0;
-		*path += partLen + 1;
+		path += partLen + 1;
 	}
 	else
 	{
-		partLen = strlen(*path);
-		strcpy(pathPart, *path);
-		*path += partLen + 1;
+		partLen = strlen(path);
+		strcpy(pathPart, path);
+		path += partLen + 1;
 		if (pKey)
 			*pKey = ST_Intern(KS_GetStringTable(), pathPart);
 	}
@@ -122,7 +122,7 @@ DB_FindOrCreateChild_r(const char* path, const char* curPart, DataNode* root, Sy
 		{
 			if (strcmp(children[i].name, pathPart) == 0)
 			{
-				return DB_FindOrCreateChild_r(path, root, pKey);
+				return DB_FindOrCreateChild_r(path, pathPart, root, pKey);
 			}
 		}
 		// Node not found; Try to find and load a corresponding qed file
@@ -134,7 +134,7 @@ DB_FindOrCreateChild_r(const char* path, const char* curPart, DataNode* root, Sy
 DataNode*
 DB_FindNode(const char* path, Symbol* key)
 {
-	return DB_FindOrCreateChild_r(&path, gdb->root, key);
+	return DB_FindOrCreateChild_r(path, nullptr, gdb->root, key);
 }
 
 static void DB_Init(const SubSystem* sys, bool bIsReInit)
