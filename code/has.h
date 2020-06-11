@@ -47,7 +47,7 @@
 #define DEBUG_BUILD WHEN(HAS(DEV_BUILD) && !HAS(OPTIMIZED_BUILD))
 
 #if HAS(RELEASE_BUILD) && !defined(__clang__)
-#pragma message "RELEASE_BUILD enabled"
+#pragma message("RELEASE_BUILD enabled")
 #endif
 
 #if HAS(DEV_BUILD) && !defined(__clang__)
@@ -75,4 +75,3 @@
 
 #define __HAS_H
 #endif // #ifndef __HAS_H
-

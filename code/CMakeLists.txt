@@ -20,9 +20,9 @@ else()
         )
 endif()
 
-add_library(${GAME_LIB_NAME} SHARED "" keystore.cpp util.cpp gamedb.cpp gamedb.h qed_parse.cpp qed_parse.h)
-add_executable(${GAME_TST_NAME} "")
-add_executable(${GAME_EXE_NAME} "")
+add_library(${GAME_LIB_NAME} SHARED "" keystore.cpp util.cpp gamedb.cpp gamedb.h qed_parse.cpp qed_parse.h hw_ogl.h.cpp hw_ogl.h.h)
+add_executable(${GAME_TST_NAME} "" hw_ogl.h.cpp hw_ogl.h.h)
+add_executable(${GAME_EXE_NAME} "" hw_ogl.h.cpp hw_ogl.h.h)
 
 message("IS_CLANG: ${IS_CLANG}")
 set(COMPILE_DEFINITIONS
@@ -76,44 +76,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Header Files" FILES ${HE
 
 set(QI_EXE_SRCS memory.cpp hw_ogl.cpp main_sdl.cpp)
 
-target_sources(${GAME_LIB_NAME}
-  PRIVATE
-
-        game.cpp
-        array.cpp
-        debug.cpp
-        deque.cpp
-        entity.cpp
-        gjk.cpp
-        lexer.cpp
-        math_util.cpp
-        memory.cpp
-        noise.cpp
-        hw_ogl.cpp
-        profile.cpp
-        sound.cpp
-        stringtable.cpp
-        tile.cpp
-
-  ${HEADER_LIST}
-  ${IMGUI_SRCS}
-  )
-
-target_sources(${GAME_EXE_NAME}
-  PRIVATE
-
-  ${QI_EXE_SRCS}
-  ${IMGUI_SRCS}
-  )
-
-target_sources(${GAME_TST_NAME}
-  PRIVATE
-
-        test.cpp
-        noise.cpp
-        lexer.cpp
-  )
-
 file(GLOB IMGUI_SRCS CONFIGURE_DEPENDS ${IMGUI}/*.cpp ${IMGUI}/*.h)
 
 target_sources(${GAME_LIB_NAME}
@@ -134,9 +96,18 @@ target_sources(${GAME_LIB_NAME}
         sound.cpp
         stringtable.cpp
         tile.cpp
+        bitmap.cpp
 
   ${HEADER_LIST}
   ${IMGUI_SRCS}
+  )
+
+target_sources(${GAME_TST_NAME}
+  PRIVATE
+
+        test.cpp
+        noise.cpp
+        lexer.cpp
   )
 
 target_sources(${GAME_EXE_NAME}
@@ -157,12 +128,6 @@ target_sources(${GAME_TST_NAME}
 target_link_libraries(${GAME_EXE_NAME} PRIVATE imgui glad)
 target_link_libraries(${GAME_LIB_NAME} PRIVATE glad)
 target_link_libraries(${GAME_EXE_NAME} PRIVATE ${GAME_LIB_NAME})
-
-target_sources(${PROJECT_NAME}_test PRIVATE
-        test.cpp
-        noise.cpp
-        lexer.cpp
-)
 
 install(
   TARGETS ${GAME_EXE_NAME} ${GAME_LIB_NAME} ${GAME_TST_NAME}

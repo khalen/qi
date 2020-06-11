@@ -13,6 +13,7 @@
 #include <stdio.h>
 
 #include "imgui.h"
+#include "bitmap.h"
 
 internal struct
 {

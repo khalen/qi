@@ -8,9 +8,11 @@
 
 #include "has.h"
 #include "basictypes.h"
+#include "bitmap.h"
 
 #if HAS(PROF_BUILD) || HAS(DEV_BUILD)
 struct Bitmap;
+
 struct ThreadContext;
 
 typedef void Qid_DrawTicks_f(ThreadContext* tc,

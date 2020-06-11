@@ -10,15 +10,14 @@
 #include "game.h"
 #include "math_util.h"
 #include "profile.h"
+#include "bitmap.h"
 
 #define BORDER_SIZE 10
 
-void
-Qid_DrawProfileBox(
-    ThreadContext*, Bitmap* bitmap, const u32 x, const u32 y, const u32 wid, const u32 hgt, const u32 color)
+void Qid_DrawProfileBox(ThreadContext *, Bitmap *bitmap, const u32 x, const u32 y, const u32 wid, const u32 hgt, const u32 color)
 {
 	Assert(x + wid < bitmap->width && y + hgt < bitmap->height);
-	u32* curPtr = bitmap->pixels + x + y * bitmap->pitch;
+	u32 *curPtr = bitmap->pixels + x + y * bitmap->pitch;
 	for (u32 y0 = 0; y0 < hgt; y0++)
 	{
 		for (u32 x0 = 0; x0 < wid; x0++)
@@ -29,15 +28,7 @@ Qid_DrawProfileBox(
 	}
 }
 
-void
-Qid_DrawTicks(ThreadContext* tc,
-              Bitmap*        bitmap,
-              const u32*       tickBuf,
-              const u32        tickCount,
-              const u32        largestTickValue,
-              const u32        yOff,
-              const u32        ySize,
-              const u32        color)
+void Qid_DrawTicks(ThreadContext *tc, Bitmap *bitmap, const u32 *tickBuf, const u32 tickCount, const u32 largestTickValue, const u32 yOff, const u32 ySize, const u32 color)
 {
 	r32 widthScale = bitmap->width - 2.0f * BORDER_SIZE;
 	r32 tickScale  = widthScale / largestTickValue;
@@ -48,16 +39,15 @@ Qid_DrawTicks(ThreadContext* tc,
 	}
 }
 
-void
-Qid_DrawBars(ThreadContext* tc,
-             Bitmap*        bitmap,
-             const u32*       widthBuf,
-             const u32        widthCount,
-             const u32        maxWidth,
-             const u32        yOff,
-             const u32        height,
-             const u32*       colors,
-             const u32        colorCount)
+void Qid_DrawBars(ThreadContext * tc,
+				  Bitmap *bitmap,
+				  const u32 *     widthBuf,
+				  const u32       widthCount,
+				  const u32       maxWidth,
+				  const u32       yOff,
+				  const u32       height,
+				  const u32 *     colors,
+				  const u32       colorCount)
 {
 	r32 widthScale  = bitmap->width - 2.0f * BORDER_SIZE;
 	r32 barScale    = widthScale / maxWidth;

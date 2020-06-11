@@ -7,6 +7,7 @@
 //
 
 #include "game.h"
+#include "bitmap.h"
 #include <glad/glad.h>
 
 class ImDrawData;

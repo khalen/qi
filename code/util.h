@@ -93,6 +93,18 @@ extern const char* VS(const char* msg, ...)
 #endif
 ;
 
+// FIXME: This is slow. Use intrinsics.
+constexpr i32 ShiftFromMask(const u32 mask)
+{
+	if (mask == 0)
+		return -1;
+
+	u32 r = 0;
+	while ((mask & (1 << r)) == 0)
+		r++;
+	return r;
+}
+
 #define __QI_UTIL_H
 #endif // #ifndef __QI_UTIL_H
 

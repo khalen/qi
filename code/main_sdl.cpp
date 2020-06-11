@@ -39,6 +39,7 @@
 #include "SDL_stdinc.h"
 
 #include "imgui.h"
+#include "bitmap.h"
 
 #define internal static
 
@@ -977,7 +978,7 @@ main(int argc, const char* argv[])
 
 		g.game->UpdateAndRender(&g.thread, &g.inputState, &g.frameBuffer);
 
-		r64 frameElapsed    = WallSeconds() - frameStart;
+		volatile r64 frameElapsed    = WallSeconds() - frameStart;
 		u32 maxSoundSleepMS = QI_SOUND_REQUESTED_LATENCY_MS / NUM_AUDIO_BUFFERS;
 
 		if (frameElapsed < secondsPerFrame)

@@ -1,4 +1,5 @@
 #ifndef __QI_DEBUG_H
+#define __QI_DEBUG_H
 
 //
 // Copyright 2017, Quantum Immortality Software and Jon Davis
@@ -35,6 +36,5 @@ struct DebugFuncs_s
 #endif
 };
 #endif
-
-#define __QI_DEBUG_H
 #endif // #ifndef __QI_DEBUG_H
+

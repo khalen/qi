@@ -1,4 +1,5 @@
 #ifndef __QI_H
+#define __QI_H
 
 // qi.h
 //
@@ -9,11 +10,12 @@
 #include "basictypes.h"
 #include "math_util.h"
 #include "debug.h"
+#include "bitmap.h"
 #include <string.h>
 
 #define GAME_DLL_NAME "qi.dll"
 
-#define TARGET_FPS 60.0
+#define TARGET_FPS 30.0
 
 #define GAME_IDEAL_RES_X 1920
 #define GAME_IDEAL_RES_Y 1080
@@ -40,18 +42,6 @@ struct Rect
 	r32 top;
 	r32 width;
 	r32 height;
-};
-
-struct Bitmap
-{
-	// Always 32 bit, xel order is BB GG RR 00 (LE)
-	u32* pixels;
-
-	// Dimensions are in pixels, not bytes
-	u32 width;
-	u32 height;
-	u32 pitch;
-	u32 byteSize;
 };
 
 #define CONTROLLER_MAX_COUNT 5
@@ -131,7 +121,6 @@ struct Controller
 
 			Button leftStickButton;
 			Button rightStickButton;
-			Button pightStickButton;
 
 			Button padButton;
 		};
@@ -188,6 +177,8 @@ struct Memory;
 struct PlatFuncs_s;
 struct GameFuncs_s;
 
+struct Bitmap;
+
 // Functions provided by the base game layer
 typedef void Qi_GameUpdateAndRender_f(ThreadContext* tc, Input* input, Bitmap* screenBitmap);
 typedef void Qi_Init_f(const PlatFuncs_s* plat, Memory* memory);
@@ -235,6 +226,5 @@ extern const SoundFuncs_s* sound;
 extern const DebugFuncs_s* debug;
 #endif
 
-#define __QI_H
 #endif // #ifndef __QI_H
 

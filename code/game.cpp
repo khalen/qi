@@ -14,6 +14,7 @@
 #include "util.h"
 #include "noise.h"
 #include "keystore.h"
+#include "bitmap.h"
 #include <stdio.h>
 #include <imgui.h>
 
@@ -67,19 +68,6 @@ MemoryArena_PushStruct(MemoryArena* arena)
 {
 	T* newT = (T*)MA_Alloc(arena, sizeof(T));
 	return newT;
-}
-
-internal void ReadBitmap(ThreadContext* thread, MemoryArena* memArena, Bitmap* result, const char* filename);
-
-void
-CreateBitmap(MemoryArena* arena, Bitmap* result, const u32 width, const u32 height)
-{
-	Assert(arena && result);
-	result->width    = width;
-	result->height   = height;
-	result->pitch    = width;
-	result->byteSize = width * height * sizeof(u32);
-	result->pixels   = (u32*)MA_Alloc(arena, result->byteSize);
 }
 
 static void InitGameGlobals(const SubSystem*, bool);
@@ -192,27 +180,27 @@ InitGameGlobals(const SubSystem* sys, bool isReInit)
 		}
 	}
 
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[0], "test/test_scene_layer_00.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[1], "test/test_scene_layer_01.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[2], "test/test_scene_layer_02.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[3], "test/test_scene_layer_03.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[4], "test/test_scene_layer_04.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[0], "test/test_scene_layer_00.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[1], "test/test_scene_layer_01.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[2], "test/test_scene_layer_02.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[3], "test/test_scene_layer_03.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[4], "test/test_scene_layer_04.bmp");
 
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][0], "test/test_hero_back_head.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][1], "test/test_hero_back_cape.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][2], "test/test_hero_back_torso.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][0], "test/test_hero_back_head.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][1], "test/test_hero_back_cape.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][2], "test/test_hero_back_torso.bmp");
 
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][0], "test/test_hero_right_head.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][1], "test/test_hero_right_cape.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][2], "test/test_hero_right_torso.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][0], "test/test_hero_right_head.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][1], "test/test_hero_right_cape.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][2], "test/test_hero_right_torso.bmp");
 
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][0], "test/test_hero_front_head.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][1], "test/test_hero_front_cape.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][2], "test/test_hero_front_torso.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][0], "test/test_hero_front_head.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][1], "test/test_hero_front_cape.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][2], "test/test_hero_front_torso.bmp");
 
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][0], "test/test_hero_left_head.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][1], "test/test_hero_left_cape.bmp");
-	ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][2], "test/test_hero_left_torso.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][0], "test/test_hero_left_head.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][1], "test/test_hero_left_cape.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][2], "test/test_hero_left_torso.bmp");
 }
 
 #if 0
@@ -510,37 +498,6 @@ DrawRectangle(Bitmap* bitmap, r32 x, r32 y, r32 width, r32 height, r32 r, r32 g,
 	RenderRectangle(bitmap, RoundIReal(x), RoundIReal(y), RoundIReal(x + width), RoundIReal(y + height), r, g, b);
 }
 
-BEGIN_PACKED_DEFS
-
-struct BmpFileHeader_s
-{
-	u16 type;
-	u32 fileSize;
-	u16 __reserved1;
-	u16 __reserved2;
-	u32 pixelDataOffset;
-} PACKED;
-
-struct BmpImageHeader_s
-{
-	u32 size;
-	u32 width;
-	u32 height;
-	u16 planes;
-	u16 bpp;
-	u32 compression;
-	u32 imageSize;
-	u32 hResolution;
-	u32 vResolution;
-	u32 colors;
-	u32 importantColors;
-	u32 redMask;
-	u32 greenMask;
-	u32 blueMask;
-} PACKED;
-
-END_PACKED_DEFS
-
 internal void
 ClipRectToBmp(const Bitmap* bmp, i32* bx, i32* by, i32* bw, i32* bh)
 {
@@ -691,85 +648,6 @@ internal void
 BltBmpStretchedFixed(ThreadContext* thread, Bitmap* dest, r32 rdx, r32 rdy, r32 rdw, r32 rdh, Bitmap* src)
 {
 	BltBmpStretched(thread, dest, rdx, rdy, rdw, rdh, src, 0, 0, src->width, src->height);
-}
-
-// FIXME: This is slow. Use intrinsics.
-static i32
-ShiftFromMask(const u32 mask)
-{
-	if (mask == 0)
-		return -1;
-
-	u32 r = 0;
-	while ((mask & (1 << r)) == 0)
-		r++;
-	return r;
-}
-
-internal void
-ReadBitmap(ThreadContext* thread, MemoryArena* memArena, Bitmap* result, const char* filename)
-{
-	size_t readSize;
-	u8*    fileData = (u8*)plat->ReadEntireFile(thread, filename, &readSize);
-	Assert(fileData);
-
-	const BmpFileHeader_s*  fileHeader = (BmpFileHeader_s*)fileData;
-	const BmpImageHeader_s* imgHeader  = (BmpImageHeader_s*)(fileData + sizeof(BmpFileHeader_s));
-	u32*                    srcXels    = nullptr;
-	u32*                    dstXels    = nullptr;
-	u32                     rMask, gMask, bMask, aMask;
-	u32                     rShift, gShift, bShift, aShift;
-
-	if (fileHeader->type != 0x4D42) // 'BM' in ASCII
-	{
-		printf("Bad bmp type: 0x%x\n", fileHeader->type);
-		goto end;
-	}
-	if (imgHeader->size < 40)
-	{
-		printf("Unexpected bmp header size: %d\n", imgHeader->size);
-		goto end;
-	}
-
-	CreateBitmap(memArena, result, imgHeader->width, imgHeader->height);
-	srcXels = (u32*)(fileData + fileHeader->pixelDataOffset);
-	dstXels = result->pixels;
-
-	if (imgHeader->compression == 3)
-	{
-		rMask = imgHeader->redMask;
-		gMask = imgHeader->greenMask;
-		bMask = imgHeader->blueMask;
-	}
-	else
-	{
-		rMask = 0xFF0000;
-		gMask = 0x00FF00;
-		bMask = 0x0000FF;
-	}
-
-	aMask = ~(rMask | gMask | bMask);
-
-	rShift = ShiftFromMask(rMask);
-	gShift = ShiftFromMask(gMask);
-	bShift = ShiftFromMask(bMask);
-	aShift = ShiftFromMask(aMask);
-
-	for (u32 idx = 0; idx < result->byteSize / sizeof(u32); idx++)
-	{
-		u32 src = srcXels[idx];
-		u32 r   = (src & rMask) >> rShift;
-		u32 g   = (src & gMask) >> gShift;
-		u32 b   = (src & bMask) >> bShift;
-		u32 a   = (src & aMask) >> aShift;
-
-		dstXels[idx] = (a << 24) | (r << 16) | (g << 8) | b;
-	}
-
-	printf("Read %s: %d x %d\n", filename, result->width, result->height);
-
-end:
-	plat->ReleaseFileBuffer(thread, fileData);
 }
 
 void
