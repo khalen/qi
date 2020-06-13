@@ -20,9 +20,9 @@ else()
         )
 endif()
 
-add_library(${GAME_LIB_NAME} SHARED "" keystore.cpp util.cpp gamedb.cpp gamedb.h qed_parse.cpp qed_parse.h hw_ogl.h.cpp hw_ogl.h.h)
-add_executable(${GAME_TST_NAME} "" hw_ogl.h.cpp hw_ogl.h.h)
-add_executable(${GAME_EXE_NAME} "" hw_ogl.h.cpp hw_ogl.h.h)
+add_library(${GAME_LIB_NAME} SHARED "" keystore.cpp util.cpp gamedb.cpp gamedb.h qed_parse.cpp qed_parse.h)
+add_executable(${GAME_TST_NAME} "")
+add_executable(${GAME_EXE_NAME} "")
 
 message("IS_CLANG: ${IS_CLANG}")
 set(COMPILE_DEFINITIONS
