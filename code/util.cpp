@@ -41,4 +41,3 @@ const char* VS(const char* msg, ...)
 
 	return g_util->vsBuffer;
 }
-

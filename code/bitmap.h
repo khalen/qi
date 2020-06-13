@@ -5,11 +5,11 @@
 #ifndef QI_BITMAP_H
 #define QI_BITMAP_H
 
-#include <cstdio>
 #include "basictypes.h"
+#include "debug.h"
 #include "game.h"
 #include "memory.h"
-#include "debug.h"
+#include <cstdio>
 
 struct Bitmap
 {

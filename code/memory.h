@@ -1,5 +1,7 @@
 #ifndef __QI_MEMORY_H
+#define __QI_MEMORY_H
 
+#include "debug.h"
 #include <string.h>
 
 //
@@ -104,5 +106,5 @@ struct BuddyAllocatorAllocator : public Allocator
 };
 void BAA_Init(BuddyAllocatorAllocator* baa, Memory* memory, const size_t size, const size_t smallestBlockSize, const bool isTransient = false);
 
-#define __QI_MEMORY_H
 #endif // #ifndef __QI_MEMORY_H
+

@@ -1,4 +1,5 @@
 #ifndef __QI_PROFILE_H
+#define __QI_PROFILE_H
 
 //
 // Copyright 2017, Quantum Immortality Software and Jon Davis
@@ -8,7 +9,6 @@
 
 #include "has.h"
 #include "basictypes.h"
-#include "bitmap.h"
 
 #if HAS(PROF_BUILD) || HAS(DEV_BUILD)
 struct Bitmap;
@@ -43,5 +43,5 @@ extern Qid_DrawBars_f Qid_DrawBars;
 extern Qid_DrawProfileBox_f Qid_DrawProfileBox;
 #endif
 
-#define __QI_PROFILE_H
 #endif // #ifndef __QI_PROFILE_H
+

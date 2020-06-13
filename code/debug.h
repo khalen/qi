@@ -17,7 +17,8 @@
 #else
 #define ASSERT_HANDLER_FUNC
 #endif
-extern void Qi_Assert_Handler(const char*, const char*, const int) ASSERT_HANDLER_FUNC;
+
+extern void Qi_Assert_Handler(const char *, const char *, const int) ASSERT_HANDLER_FUNC;
 #define Assert(foo)                                      \
 	do                                                   \
 	{                                                    \
@@ -30,11 +31,10 @@ extern void Qi_Assert_Handler(const char*, const char*, const int) ASSERT_HANDLE
 struct DebugFuncs_s
 {
 #if HAS(PROF_BUILD)
-	Qid_DrawBars_f*       DrawBars;
-	Qid_DrawProfileBox_f* DrawProfileBox;
-	Qid_DrawTicks_f*      DrawTicks;
+	Qid_DrawBars_f *      DrawBars;
+	Qid_DrawProfileBox_f *DrawProfileBox;
+	Qid_DrawTicks_f *     DrawTicks;
 #endif
 };
 #endif
-#endif // #ifndef __QI_DEBUG_H
-
+#endif

@@ -1,5 +1,5 @@
 # GLAD
-add_library(glad STATIC glad/src/glad.c)
+add_library(glad STATIC glad/src/glad.c include/iconfont.h)
 target_include_directories(glad PUBLIC include)
 
 file(GLOB IMGUI_SRCS CONFIGURE_DEPENDS imgui/*.cpp imgui/*.h)

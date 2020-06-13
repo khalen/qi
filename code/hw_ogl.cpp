@@ -14,6 +14,7 @@
 
 #include "imgui.h"
 #include "bitmap.h"
+#include "hwi.h"
 
 const u32    kMaxTextures        = 128;
 const size_t kOglHardwareMemSize = 1024 * 1024;

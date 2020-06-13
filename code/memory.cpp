@@ -448,8 +448,10 @@ BA_InitBuffer(u8* buffer, const size_t size, const size_t smallestBlockSize)
 	Assert(tempAllocatorMemory - (u8*)allocator == (ssize_t)overheadBytes);
 
 	initFreeLists(allocator, allocatorMemory);
+#if 0
 	printf("Created allocator. Before overhead allocationss:\n");
 	BA_DumpInfo(allocator);
+#endif
 
 	overheadBytes = (overheadBytes + smallestBlock - 1) & ~(smallestBlock - 1);
 	Assert((overheadBytes % smallestBlock) == 0);
