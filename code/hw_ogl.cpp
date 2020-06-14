@@ -23,6 +23,14 @@ struct OglBitmap
 {
 	Bitmap *bitmap;
 	GLuint  texture;
+	GLuint  fbo;
+	u32     textureIdx;
+};
+
+enum StateDirtyBits
+{
+	QOS_FrameBuffer = 1 << 0,
+	QOS_Blend = 1 << 1,
 };
 
 struct OglGlobals
@@ -45,6 +53,8 @@ struct OglGlobals
 
 	OglBitmap textures[kMaxTextures];
 	u32       numTextures;
+
+	u32       stateDirty;
 };
 
 static OglGlobals *gOgl;
@@ -178,6 +188,7 @@ static void QiOgl_InitBlitBufferState()
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 5, nullptr);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 5, (void *)(sizeof(GLfloat) * 3));
 }
+
 static void CheckGL()
 {
 	GLenum err;
@@ -191,7 +202,7 @@ static void CheckGL()
 	Assert(!errored);
 }
 
-void QiOgl_BitmapToTexture(GLuint tex, const Bitmap *bitmap)
+void QiOgl_LoadBitmapToTex(GLuint tex, const Bitmap *bitmap)
 {
 	glBindTexture(GL_TEXTURE_2D, tex);
 	CheckGL();
@@ -199,6 +210,62 @@ void QiOgl_BitmapToTexture(GLuint tex, const Bitmap *bitmap)
 	CheckGL();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	CheckGL();
+}
+
+void QiOgl_RegisterBitmap(Bitmap* bitmap, bool canBeTarget);
+void QiOgl_UnregisterBitmap(Bitmap *bitmap);
+
+void QiOgl_LoadBitmap(Bitmap* bitmap)
+{
+	if (!bitmap->hardwareId)
+	{
+		QiOgl_RegisterBitmap(bitmap, false);
+		Assert(bitmap->hardwareId);
+	}
+	OglBitmap* oglBmp = (OglBitmap*)bitmap->hardwareId;
+	QiOgl_LoadBitmapToTex(oglBmp->texture, bitmap);
+}
+
+void QiOgl_RegisterBitmap(Bitmap *bitmap, bool canBeTarget)
+{
+	if (bitmap->hardwareId)
+	{
+		QiOgl_UnregisterBitmap(bitmap);
+	}
+
+	Assert(gOgl->numTextures < kMaxTextures);
+	OglBitmap* oglBmp = &gOgl->textures[gOgl->numTextures];
+	memset(oglBmp, 0, sizeof(*oglBmp));
+	oglBmp->textureIdx = gOgl->numTextures++;
+	glGenTextures(1, &oglBmp->texture);
+	CheckGL();
+	oglBmp->bitmap = bitmap;
+
+	if (canBeTarget)
+	{
+		glGenFramebuffers(1, &oglBmp->fbo); CheckGL();
+		glBindFramebuffer(GL_FRAMEBUFFER, oglBmp->fbo); CheckGL();
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, oglBmp->texture, 0); CheckGL();
+		glBindFrameBuffer(GL_FRAMEBUFFER, 0); CheckGL();
+		gOgl->stateDirty |= QOS_FrameBuffer;
+	}
+}
+
+void QiOgl_UnregisterBitmap(Bitmap *bitmap)
+{
+	if (!bitmap->hardwareId)
+		return;
+
+	OglBitmap* oglBmp = (OglBitmap*)bitmap->hardwareId;
+	glReleaseTexture(oglBmp->texture);
+
+	u32 curIdx = oglBmp->textureIdx;
+	Assert(oglBmp == &gOgl->textures[curIdx]);
+	u32 lastIdx = --gOgl->numTextures;
+	gOgl->textures[curIdx] = gOgl->textures[lastIdx];
+	gOgl->textures[curIdx].textureIdx = curIdx;
+
+	bitmap->hardwareId = nullptr;
 }
 
 #define FR() ((float)rand()) / (float)RAND_MAX
