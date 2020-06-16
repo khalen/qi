@@ -666,6 +666,7 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 {
 	static NoiseGenerator noise(1234);
 
+	g_game->screenBitmap = screenBitmap;
 	g_game->screenWid = screenBitmap->width;
 	g_game->screenHgt = screenBitmap->height;
 

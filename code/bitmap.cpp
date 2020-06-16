@@ -103,7 +103,7 @@ void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result,
 		u32 b   = (src & bMask) >> bShift;
 		u32 a   = (src & aMask) >> aShift;
 
-		dstXels[idx] = (a << 24) | (r << 16) | (g << 8) | b;
+		dstXels[idx] = (a << 24) | (b << 16) | (g << 8) | r;
 	}
 
 	printf("Read %s: %d x %d\n", filename, result->width, result->height);

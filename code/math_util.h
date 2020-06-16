@@ -209,11 +209,11 @@ struct ColorU
 		, a((u8)c)
 	{
 	}
-	ColorU(r32 ir, r32 ig, r32 ib, r32 ia)
-		: r((u8)(ir * 255.0f))
-		, g((u8)(ig * 255.0f))
-		, b((u8)(ib * 255.0f))
-		, a((u8)(ia * 255.0f))
+	ColorU(u8 ir, u8 ig, u8 ib, u8 ia)
+		: r(ir)
+		, g(ig)
+		, b(ib)
+		, a(ia)
 	{
 	}
 	ColorU(const Color& ic) : color((u32)ic) {}

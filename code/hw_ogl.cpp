@@ -17,8 +17,10 @@
 #include "hwi.h"
 #include <new>
 
-const u32    kMaxTextures        = 128;
-const size_t kOglHardwareMemSize = 1024 * 1024;
+#define FR() ((float)rand()) / (float)RAND_MAX
+
+const u32    kMaxTextures               = 128;
+const size_t kOglHardwareMemSize        = 1024 * 1024;
 const size_t kMaxRenderBitmapStackDepth = 32;
 
 struct OglBitmap
@@ -32,7 +34,7 @@ struct OglBitmap
 enum StateDirtyBits
 {
 	QOS_FrameBuffer = 1 << 0,
-	QOS_Blend = 1 << 1,
+	QOS_Blend       = 1 << 1,
 };
 
 struct OglHwi;
@@ -58,13 +60,13 @@ struct OglGlobals
 	OglBitmap textures[kMaxTextures];
 	u32       numTextures;
 
-	Bitmap* renderBitmapStack[kMaxRenderBitmapStackDepth];
+	Bitmap *renderBitmapStack[kMaxRenderBitmapStackDepth];
 	i32     renderBitmapStackPos;
 
-	u32       stateDirty;
-	i32       inBeginFrame;
+	u32 stateDirty;
+	i32 inBeginFrame;
 
-	Bitmap*   screenBitmap;
+	Bitmap *screenBitmap;
 };
 
 static OglGlobals *gOgl;
@@ -179,9 +181,9 @@ void QiOgl_Init()
 	glUseProgram(gOgl->drawUIProgram);
 	gOgl->uiTexLocation      = glGetUniformLocation(gOgl->drawUIProgram, "tex");
 	gOgl->uiProjMtxLocation  = glGetUniformLocation(gOgl->drawUIProgram, "projMtx");
-	gOgl->uiVtxPosLocation   = glGetUniformLocation(gOgl->drawUIProgram, "pos");
-	gOgl->uiVtxUVLocation    = glGetUniformLocation(gOgl->drawUIProgram, "uv");
-	gOgl->uiVtxColorLocation = glGetUniformLocation(gOgl->drawUIProgram, "color");
+	gOgl->uiVtxPosLocation   = glGetAttribLocation(gOgl->drawUIProgram, "pos");
+	gOgl->uiVtxUVLocation    = glGetAttribLocation(gOgl->drawUIProgram, "uv");
+	gOgl->uiVtxColorLocation = glGetAttribLocation(gOgl->drawUIProgram, "color");
 
 	glGenBuffers(1, &gOgl->uiVbo);
 	glGenBuffers(1, &gOgl->uiElements);
@@ -212,8 +214,11 @@ static void QiOgl_InitBlitBufferState()
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 5, (void *)(sizeof(GLfloat) * 3));
 }
 
-static void IGC_SetRenderBitmap(const ImDrawList*, const ImDrawCmd* cmd)
+static void IGC_SetRenderBitmap(const ImDrawList *, const ImDrawCmd *cmd)
 {
+	static GLenum drawNone[] = {GL_NONE};
+
+#if 1
 	if (cmd->UserCallbackData == nullptr)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -221,15 +226,26 @@ static void IGC_SetRenderBitmap(const ImDrawList*, const ImDrawCmd* cmd)
 		return;
 	}
 
-	Bitmap* renderBitmap = (Bitmap*)cmd->UserCallbackData;
+	Bitmap *renderBitmap = (Bitmap *)cmd->UserCallbackData;
 	Assert(renderBitmap->hardwareId != nullptr);
-	OglBitmap* oglBitmap = (OglBitmap*)renderBitmap->hardwareId;
+	OglBitmap *oglBitmap = (OglBitmap *)renderBitmap->hardwareId;
 	Assert(oglBitmap->fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, oglBitmap->fbo);
 	CheckGl();
+#endif
 }
 
-static void QiOgl_PushRenderBitmap(Bitmap* renderBitmap)
+static void IGC_ClearCurrentTarget(const ImDrawList *, const ImDrawCmd* cmd)
+{
+#if 1
+	Color clearColor((u32)(uintptr_t)cmd->UserCallbackData);
+
+	glClearColor(clearColor.r, clearColor.g, clearColor.b, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+#endif
+}
+
+static void QiOgl_PushRenderBitmap(Bitmap *renderBitmap)
 {
 	Assert(gOgl->renderBitmapStackPos < kMaxRenderBitmapStackDepth - 1);
 	gOgl->renderBitmapStack[gOgl->renderBitmapStackPos++] = renderBitmap;
@@ -242,16 +258,18 @@ static void QiOgl_PushRenderBitmap(Bitmap* renderBitmap)
 static void QiOgl_PopRenderBitmap()
 {
 	Assert(gOgl->renderBitmapStackPos > 0);
-	Bitmap* renderBitmap = gOgl->renderBitmapStack[--gOgl->renderBitmapStackPos];
+	Bitmap *renderBitmap                                = gOgl->renderBitmapStack[--gOgl->renderBitmapStackPos];
 	gOgl->renderBitmapStack[gOgl->renderBitmapStackPos] = nullptr;
 
-	ImDrawList *dl                                        = ImGui::GetBackgroundDrawList();
+	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
 	dl->AddCallback(IGC_SetRenderBitmap, renderBitmap);
 }
 
 void QiOgl_BeginFrame()
 {
+	QiOgl_Clear();
+
 	Assert(gOgl->inBeginFrame == 0);
 	gOgl->inBeginFrame++;
 
@@ -260,7 +278,8 @@ void QiOgl_BeginFrame()
 
 	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
-	dl->AddCallback(IGC_SetRenderBitmap, nullptr);
+	Color clearColor(FR(), FR(), FR(), 1.0f);
+	dl->AddCallback(IGC_ClearCurrentTarget, (void *)(uintptr_t)((u32)clearColor));
 }
 
 void QiOgl_EndFrame()
@@ -273,10 +292,11 @@ void QiOgl_EndFrame()
 
 	Assert(gOgl->screenBitmap && gOgl->screenBitmap->hardwareId);
 	OglBitmap *oglBmp = (OglBitmap *)gOgl->screenBitmap->hardwareId;
-	ImGuiIO& io = ImGui::GetIO();
+	ImGuiIO &  io     = ImGui::GetIO();
 
-	ImDrawList *dl     = ImGui::GetBackgroundDrawList();
+	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
+	dl->AddCallback(IGC_SetRenderBitmap, nullptr);
 	dl->AddImage((void *)(uintptr_t)oglBmp->texture, ImVec2(0.0, 0.0), io.DisplaySize);
 }
 
@@ -286,25 +306,26 @@ struct TexCoordRect
 	ImVec2 br;
 };
 
-static void QiOgl_PixelRectToTexCoords(const Bitmap* bitmap, const Rect* pixelRect, TexCoordRect* texCoordRect)
+static void QiOgl_PixelRectToTexCoords(const Bitmap *bitmap, const Rect *pixelRect, TexCoordRect *texCoordRect)
 {
-	r32 iw = 1.0f / (r32)bitmap->width;
-	r32 ih = 1.0f / (r32)bitmap->height;
+	r32 iw           = 1.0f / (r32)bitmap->width;
+	r32 ih           = 1.0f / (r32)bitmap->height;
 	texCoordRect->ul = ImVec2(pixelRect->left * iw, pixelRect->top * ih);
 	texCoordRect->br = ImVec2((pixelRect->left + pixelRect->width) * iw, (pixelRect->top + pixelRect->height) * ih);
 }
 
-static void QiOgl_Blit(const Bitmap* bitmap, const Rect* srcRect, const Rect* destRect, ColorU tint)
+static void QiOgl_Blit(const Bitmap *bitmap, const Rect *srcRect, const Rect *destRect, ColorU tint)
 {
 	Assert(gOgl->inBeginFrame > 0);
 
-	ImVec2 ul(destRect->left, destRect->top);
-	ImVec2 br(destRect->left + destRect->width, destRect->top + destRect->height);
-	TexCoordRect srcUVs;;
+	ImVec2       ul(destRect->left, destRect->top);
+	ImVec2       br(destRect->left + destRect->width, destRect->top + destRect->height);
+	TexCoordRect srcUVs;
+
 	QiOgl_PixelRectToTexCoords(bitmap, srcRect, &srcUVs);
 
 	Assert(bitmap->hardwareId);
-	OglBitmap * oglBmp = (OglBitmap *)bitmap->hardwareId;
+	OglBitmap *oglBmp = (OglBitmap *)bitmap->hardwareId;
 
 	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
@@ -315,28 +336,28 @@ void QiOgl_LoadBitmapToTex(GLuint tex, const Bitmap *bitmap)
 {
 	glBindTexture(GL_TEXTURE_2D, tex);
 	CheckGl();
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap->width, bitmap->height, 0, GL_BGRA, GL_UNSIGNED_BYTE, bitmap->pixels);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap->width, bitmap->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, bitmap->pixels);
 	CheckGl();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	CheckGl();
 }
 
-void QiOgl_RegisterBitmap(Bitmap* bitmap, bool canBeTarget);
+void QiOgl_RegisterBitmap(Bitmap *bitmap, bool canBeTarget);
 void QiOgl_UnregisterBitmap(Bitmap *bitmap);
 
-static bool QiOgl_IsBitmapRegistered(const Bitmap* bitmap)
+static bool QiOgl_IsBitmapRegistered(const Bitmap *bitmap)
 {
 	return bitmap->hardwareId != nullptr;
 }
 
-void QiOgl_LoadBitmap(Bitmap* bitmap)
+void QiOgl_LoadBitmap(Bitmap *bitmap)
 {
 	if (!bitmap->hardwareId)
 	{
 		QiOgl_RegisterBitmap(bitmap, false);
 		Assert(bitmap->hardwareId);
 	}
-	OglBitmap* oglBmp = (OglBitmap*)bitmap->hardwareId;
+	OglBitmap *oglBmp = (OglBitmap *)bitmap->hardwareId;
 	QiOgl_LoadBitmapToTex(oglBmp->texture, bitmap);
 }
 
@@ -348,28 +369,45 @@ void QiOgl_RegisterBitmap(Bitmap *bitmap, bool canBeTarget)
 	}
 
 	Assert(gOgl->numTextures < kMaxTextures);
-	OglBitmap* oglBmp = &gOgl->textures[gOgl->numTextures];
+	OglBitmap *oglBmp = &gOgl->textures[gOgl->numTextures];
 	memset(oglBmp, 0, sizeof(*oglBmp));
 	oglBmp->textureIdx = gOgl->numTextures++;
 	glGenTextures(1, &oglBmp->texture);
 	CheckGl();
 	oglBmp->bitmap = bitmap;
+	bitmap->hardwareId = oglBmp;
+
+	glBindTexture(GL_TEXTURE_2D, oglBmp->texture);
+
+	// Poor filtering. Needed !
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	CheckGl();
+
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	if (canBeTarget)
 	{
+		QiOgl_LoadBitmap(bitmap);
 		glGenFramebuffers(1, &oglBmp->fbo);
 		CheckGl();
+
 		glBindFramebuffer(GL_FRAMEBUFFER, oglBmp->fbo);
 		CheckGl();
-		QiOgl_LoadBitmap(bitmap);
+
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, oglBmp->texture, 0);
 		CheckGl();
+
+		GLenum drawColor0[] = {GL_COLOR_ATTACHMENT0};
+		glDrawBuffers(1, drawColor0);
+		CheckGl();
+
+		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		Assert(status == GL_FRAMEBUFFER_COMPLETE);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		CheckGl();
-		gOgl->stateDirty |= QOS_FrameBuffer;
 	}
-
-	bitmap->hardwareId = oglBmp;
 }
 
 void QiOgl_UnregisterBitmap(Bitmap *bitmap)
@@ -377,19 +415,18 @@ void QiOgl_UnregisterBitmap(Bitmap *bitmap)
 	if (!bitmap->hardwareId)
 		return;
 
-	OglBitmap* oglBmp = (OglBitmap*)bitmap->hardwareId;
+	OglBitmap *oglBmp = (OglBitmap *)bitmap->hardwareId;
 	glDeleteTextures(1, &oglBmp->texture);
 
 	u32 curIdx = oglBmp->textureIdx;
 	Assert(oglBmp == &gOgl->textures[curIdx]);
-	u32 lastIdx = --gOgl->numTextures;
-	gOgl->textures[curIdx] = gOgl->textures[lastIdx];
+	u32 lastIdx                       = --gOgl->numTextures;
+	gOgl->textures[curIdx]            = gOgl->textures[lastIdx];
 	gOgl->textures[curIdx].textureIdx = curIdx;
 
 	bitmap->hardwareId = nullptr;
 }
 
-#define FR() ((float)rand()) / (float)RAND_MAX
 void QiOgl_Clear()
 {
 	glClearColor(FR(), FR(), FR(), 1.0f);
@@ -441,13 +478,19 @@ void QiOgl_SetupImGuiState(ImDrawData *drawData, i32 fbWidth, i32 fbHeight, GLui
 	glUniformMatrix4fv(gOgl->uiProjMtxLocation, 1, GL_FALSE, &orthoMtx[0][0]);
 	CheckGl();
 
+
 	// Bind vertex/index buffers and setup attributes for ImDrawVert
+	glBindVertexArray(vao);
+	CheckGl();
 	glBindBuffer(GL_ARRAY_BUFFER, gOgl->uiVbo);
+	CheckGl();
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gOgl->uiElements);
 	CheckGl();
 
 	glEnableVertexAttribArray(0);
+	CheckGl();
 	glEnableVertexAttribArray(1);
+	CheckGl();
 	glEnableVertexAttribArray(2);
 	CheckGl();
 
@@ -481,10 +524,10 @@ void QiOgl_DrawImGui(ImDrawData *drawData)
 	glGetIntegerv(GL_BLEND_EQUATION_RGB, (GLint *)&lastBlendEquationRgb);
 	GLenum lastBlendEquationAlpha;
 	glGetIntegerv(GL_BLEND_EQUATION_ALPHA, (GLint *)&lastBlendEquationAlpha);
-	GLboolean lastEnableBlend          = glIsEnabled(GL_BLEND);
-	GLboolean lastEnableCullFace       = glIsEnabled(GL_CULL_FACE);
-	GLboolean lastEnableDepthTest      = glIsEnabled(GL_DEPTH_TEST);
-	GLboolean lastEnableScissorTest    = glIsEnabled(GL_SCISSOR_TEST);
+	GLboolean lastEnableBlend       = glIsEnabled(GL_BLEND);
+	GLboolean lastEnableCullFace    = glIsEnabled(GL_CULL_FACE);
+	GLboolean lastEnableDepthTest   = glIsEnabled(GL_DEPTH_TEST);
+	GLboolean lastEnableScissorTest = glIsEnabled(GL_SCISSOR_TEST);
 
 	GLuint vao = 0;
 	glGenVertexArrays(1, &vao);
@@ -516,6 +559,7 @@ void QiOgl_DrawImGui(ImDrawData *drawData)
 			}
 			else
 			{
+				static volatile u32 screenBlits = 0;
 				ImVec4 clipRect;
 				clipRect.x = (cmd->ClipRect.x - clipOffset.x) * clipScale.x;
 				clipRect.y = (cmd->ClipRect.y - clipOffset.y) * clipScale.y;
@@ -527,6 +571,11 @@ void QiOgl_DrawImGui(ImDrawData *drawData)
 					glScissor(clipRect.x, (int)(fbHeight - clipRect.w), (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y));
 					CheckGl();
 
+					GLuint curTexture = (GLuint)(intptr_t)cmd->TextureId;
+					if (curTexture == ((OglBitmap *)(gOgl->screenBitmap->hardwareId))->texture)
+					{
+						screenBlits++;
+					}
 					glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)cmd->TextureId);
 					CheckGl();
 					glDrawElements(GL_TRIANGLES, (GLsizei)cmd->ElemCount, GL_UNSIGNED_SHORT, (void *)(intptr_t)(cmd->IdxOffset * sizeof(ImDrawIdx)));
@@ -596,8 +645,20 @@ struct OglHwi : public Hwi
 	OglHwi() {}
 	virtual ~OglHwi() {}
 
-	void BeginFrame() override { QiOgl_BeginFrame(); }
-	void EndFrame() override { QiOgl_EndFrame(); }
+	void BeginFrame() override
+	{
+		ImGui::NewFrame();
+		QiOgl_BeginFrame();
+	}
+
+	void EndFrame() override
+	{
+		QiOgl_EndFrame();
+		QiOgl_Clear();
+		ImGui::EndFrame();
+		ImGui::Render();
+		QiOgl_DrawImGui(ImGui::GetDrawData());
+	}
 
 	void RegisterBitmap(Bitmap *bitmap, bool canBeRenderTarget) override { QiOgl_RegisterBitmap(bitmap, canBeRenderTarget); }
 
@@ -616,7 +677,10 @@ struct OglHwi : public Hwi
 
 	void PopRenderTarget() override { QiOgl_PopRenderBitmap(); }
 
-	void BlitStretched(Bitmap *srcBitmap, const Rect *srcRectPixels, const Rect *destRectPixels, ColorU tint) override { QiOgl_Blit(srcBitmap, srcRectPixels, destRectPixels, tint); }
+	void BlitStretched(Bitmap *srcBitmap, const Rect *srcRectPixels, const Rect *destRectPixels, ColorU tint) override
+	{
+		QiOgl_Blit(srcBitmap, srcRectPixels, destRectPixels, tint);
+	}
 
 	void Blit(Bitmap *srcBitmap, v2 srcXY, v2 destXY, v2 size, ColorU tint) override
 	{
@@ -698,18 +762,16 @@ struct OglHwi : public Hwi
 
 	void ResetState() override {}
 
-	void Finalize() override
-	{
-	}
+	void Finalize() override {}
 };
 
-Hwi* gHwi = nullptr;
+Hwi *gHwi = nullptr;
 
 void QiOgl_InitSystem(const SubSystem *sys, bool isReinit)
 {
-	gOgl = (OglGlobals *)sys->globalPtr;
-	void* hwiPtr = (void *)(gOgl + 1);
-	gHwi = new(hwiPtr) OglHwi();
+	gOgl         = (OglGlobals *)sys->globalPtr;
+	void *hwiPtr = (void *)(gOgl + 1);
+	gHwi         = new (hwiPtr) OglHwi();
 
 	if (!isReinit)
 	{
@@ -719,4 +781,3 @@ void QiOgl_InitSystem(const SubSystem *sys, bool isReinit)
 }
 
 SubSystem HardwareSubsystem = {"OglHardware", QiOgl_InitSystem, sizeof(OglGlobals) + sizeof(OglHwi) + kOglHardwareMemSize};
-

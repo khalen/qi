@@ -950,7 +950,6 @@ int main(int argc, const char *argv[])
 
 	ImGui::StyleColorsLight();
 
-	QiOgl_Init();
 	SDL_GL_MakeCurrent(window, context);
 
 	r64 secs = WallSeconds();
