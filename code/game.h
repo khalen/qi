@@ -11,6 +11,7 @@
 #include "math_util.h"
 #include "debug.h"
 #include "bitmap.h"
+#include "hwi.h"
 #include <string.h>
 
 #define GAME_DLL_NAME "qi.dll"
@@ -182,6 +183,7 @@ struct Bitmap;
 // Functions provided by the base game layer
 typedef void Qi_GameUpdateAndRender_f(ThreadContext* tc, Input* input, Bitmap* screenBitmap);
 typedef void Qi_Init_f(const PlatFuncs_s* plat, Memory* memory);
+typedef Hwi* Qi_GetHwi_f();
 
 struct SoundFuncs_s;
 
@@ -198,6 +200,7 @@ struct GameFuncs_s
 
 	Qi_Init_f*				  Init;
 	Qi_GameUpdateAndRender_f* UpdateAndRender;
+	Qi_GetHwi_f*              GetHwi;
 };
 
 // Functions to be provided by the platform layer

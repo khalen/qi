@@ -18,26 +18,38 @@ enum BlendState
 	BSTATE_Src_DstAlpha,
 };
 
-void Hwi_RegisterBitmap(Bitmap *bitmap, bool canBeRenderTarget = false);
-void Hwi_UnregisterBitmap(Bitmap *bitmap);
+struct Hwi
+{
+	virtual void BeginFrame() = 0;
+	virtual void EndFrame() = 0;
 
-void Hwi_SetScreenTarget(Bitmap *screenTarget);
-void Hwi_PushRenderTarget(Bitmap *targetBitmap);
-void Hwi_PopRenderTarget();
+	virtual void RegisterBitmap(Bitmap *bitmap, bool canBeRenderTarget = false) = 0;
+	virtual void UnregisterBitmap(Bitmap *bitmap) = 0;
+	virtual void UploadBitmap(Bitmap *bitmap) = 0;
 
-void Hwi_BlitStretched(Bitmap *srcBitmap, const Rect *srcRectPixels, const Rect *destRectPixels, ColorU tint = ColorU(255, 255, 255, 255));
-void Hwi_Blit(Bitmap* srcBitmap, v2 srcXY, v2 destXY, v2 size, ColorU tint = ColorU(255, 255, 255, 255));
+	virtual void SetScreenTarget(Bitmap *screenTarget) = 0;
+	virtual void PushRenderTarget(Bitmap *targetBitmap) = 0;
+	virtual void PopRenderTarget() = 0;
 
-void Hwi_PushClipRect(Rect* clipRect);
-void Hwi_PopClipRect();
+	virtual void BlitStretched(Bitmap *srcBitmap, const Rect *srcRectPixels, const Rect *destRectPixels, ColorU tint = ColorU(255, 255, 255, 255)) = 0;
+	virtual void Blit(Bitmap *srcBitmap, v2 srcXY, v2 destXY, v2 size, ColorU tint = ColorU(255, 255, 255, 255)) = 0;
 
-void Hwi_PushBlendState(BlendState blend);
-void Hwi_PopBlendState();
+	virtual void PushClipRect(Rect *clipRect) = 0;
+	virtual void PopClipRect() = 0;
 
-void Hwi_DrawLine(v2 p0, v2 p1, ColorU color = ColorU(255, 255, 255, 255));
-void Hwi_DrawRect(const Rect* rect, ColorU color = ColorU(255, 255, 255, 255));
-void Hwi_DrawBezier(v2 a, v2 b, v2 c, v2 d, ColorU color = ColorU(255, 255, 255, 255));
+	virtual void PushBlendState(BlendState blend) = 0;
+	virtual void PopBlendState() = 0;
 
-void Hwi_ResetState();
+	virtual void DrawLine(v2 p0, v2 p1, ColorU color = ColorU(255, 255, 255, 255)) = 0;
+	virtual void DrawRect(const Rect *rect, ColorU color = ColorU(255, 255, 255, 255)) = 0;
+	virtual void FillRect(const Rect *rect, ColorU color = ColorU(255, 255, 255, 255)) = 0;
+	virtual void DrawBezier(v2 a, v2 b, v2 c, v2 d, ColorU color = ColorU(255, 255, 255, 255)) = 0;
+
+	virtual void ResetState() = 0;
+
+	virtual void Finalize() = 0;
+};
+
+extern Hwi* gHwi;
 
 #endif // HWI_H

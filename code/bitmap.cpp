@@ -4,6 +4,7 @@
 
 #include "bitmap.h"
 #include "util.h"
+#include "hwi.h"
 
 void Bm_CreateBitmap(MemoryArena *arena, Bitmap *result, const u32 width, const u32 height, Bitmap::Format format, u32 flags)
 {
@@ -106,6 +107,8 @@ void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result,
 	}
 
 	printf("Read %s: %d x %d\n", filename, result->width, result->height);
+	gHwi->RegisterBitmap(result, false);
+	gHwi->UploadBitmap(result);
 
 end:
 	plat->ReleaseFileBuffer(thread, fileData);

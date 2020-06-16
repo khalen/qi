@@ -13,11 +13,11 @@
 class ImDrawData;
 
 void QiOgl_Init();
-void QiOgl_BitmapToTexture(GLuint tex, const Bitmap* bitmap);
 void QiOgl_Clear();
-void QiOgl_BlitBufferToScreen(const Bitmap* bitmap);
 void QiOgl_DrawImGui(ImDrawData* drawData);
+void QiOgl_SetScreenBitmap(Bitmap* bitmap);
+void QiOgl_BeginFrame();
+void QiOgl_EndFrame();
 
 #define __QI_OGL_H
 #endif // #ifndef __QI_OGL_H
-

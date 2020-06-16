@@ -15,6 +15,7 @@
 #include "noise.h"
 #include "keystore.h"
 #include "bitmap.h"
+#include "hwi.h"
 #include <stdio.h>
 #include <imgui.h>
 
@@ -51,6 +52,7 @@ struct GameGlobals_s
 	i32    playerFacingIdx;
 
 	BuddyAllocator *testAlloc;
+	Bitmap* screenBitmap;
 };
 
 GameGlobals_s *g_game;
@@ -221,6 +223,7 @@ static inline void PlotPt(Bitmap *bitmap, i32 x, i32 y, u32 rgba)
 
 void DrawDebugLine(Bitmap *screen, v2 &p0, v2 &p1, u32 rgba)
 {
+#if 0
 	i32 x0 = p0.x + 0.5f;
 	i32 x1 = p1.x + 0.5f;
 	i32 y0 = p0.y + 0.5f;
@@ -256,6 +259,13 @@ void DrawDebugLine(Bitmap *screen, v2 &p0, v2 &p1, u32 rgba)
 			y0 += dydx;
 		}
 	}
+#else
+	if (screen != g_game->screenBitmap)
+		gHwi->PushRenderTarget(screen);
+	gHwi->DrawLine(p0, p1, ColorU(rgba));
+	if (screen != g_game->screenBitmap)
+		gHwi->PopRenderTarget();
+#endif
 }
 
 void DrawDebugPoly(Bitmap *screen, PolyShape_s *poly, u32 rgba)
@@ -460,6 +470,7 @@ static u32 PackColor(r32 r, r32 g, r32 b)
 
 internal void RenderRectangle(Bitmap *bitmap, i32 x0, i32 y0, i32 x1, i32 y1, r32 r, r32 g, r32 b)
 {
+#if 0
 	const u32 color = PackColor(r, g, b);
 
 	x0 = Qi_Clamp<i32>(x0, 0, bitmap->width);
@@ -474,6 +485,20 @@ internal void RenderRectangle(Bitmap *bitmap, i32 x0, i32 y0, i32 x1, i32 y1, r3
 			xel[x] = color;
 		xel += bitmap->pitch;
 	}
+#else
+	const ColorU color(r, g, b, 255);
+	Rect rect;
+	rect.left = x0;
+	rect.top = y0;
+	rect.width = x1 - x0;
+	rect.height = y1 - y0;
+
+	if (bitmap != g_game->screenBitmap)
+		gHwi->PushRenderTarget(bitmap);
+	gHwi->FillRect(&rect, color);
+	if (bitmap != g_game->screenBitmap)
+		gHwi->PopRenderTarget();
+#endif
 }
 
 internal void DrawRectangle(Bitmap *bitmap, r32 x, r32 y, r32 width, r32 height, r32 r, r32 g, r32 b)
@@ -562,6 +587,7 @@ internal void BltBmpFixed(ThreadContext *thread, Bitmap *dest, i32 dx, i32 dy, c
 
 internal void BltBmpStretched(ThreadContext *thread, Bitmap *dest, r32 rdx, r32 rdy, r32 rdw, r32 rdh, Bitmap *src, r32 rsx, r32 rsy, r32 rsw, r32 rsh)
 {
+#if 0
 	r32 rdx1 = ceil(rdx + rdw);
 	r32 rdy1 = ceil(rdy + rdh);
 	rdx      = floor(rdx);
@@ -611,6 +637,24 @@ internal void BltBmpStretched(ThreadContext *thread, Bitmap *dest, r32 rdx, r32 
 		for (i32 x = 0; x < dw; x++, curSx += sdx)
 			BlendPixel(destXelRow[x + dx], srcXelRow[curSx >> 16]);
 	}
+#else
+	Rect srcRect, destRect;
+	srcRect.left   = rsx;
+	srcRect.top    = rsy;
+	srcRect.width  = rsw;
+	srcRect.height = rsh;
+
+	destRect.left   = rdx;
+	destRect.top    = rdy;
+	destRect.width  = rdw;
+	destRect.height = rdh;
+
+	if (dest != g_game->screenBitmap)
+		gHwi->PushRenderTarget(dest);
+	gHwi->BlitStretched(src, &srcRect, &destRect);
+	if (dest != g_game->screenBitmap)
+		gHwi->PopRenderTarget();
+#endif
 }
 
 internal void BltBmpStretchedFixed(ThreadContext *thread, Bitmap *dest, r32 rdx, r32 rdy, r32 rdw, r32 rdh, Bitmap *src)
@@ -723,6 +767,11 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 	DrawDebugShapes(screenBitmap);
 }
 
+Hwi* Qi_GetHwi()
+{
+	return gHwi;
+}
+
 const PlatFuncs_s *plat;
 void               Qi_Init(const PlatFuncs_s *platFuncs, Memory *memory)
 {
@@ -744,6 +793,7 @@ internal GameFuncs_s s_game = {
 #endif
 	Qi_Init,
 	Qi_GameUpdateAndRender,
+	Qi_GetHwi,
 };
 const GameFuncs_s *game = &s_game;
 

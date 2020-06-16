@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "sound.h"
 #include "debug.h"
+#include "hwi.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -524,6 +525,10 @@ static void InitGameGlobals()
 #endif
 	for (u32 c = 0; c < g.frameBuffer.pitch / sizeof(u32) * g.frameBuffer.height; c++)
 		g.frameBuffer.pixels[c] = 0xFF00FFFF;
+
+	g.frameBuffer.hardwareId = nullptr;
+	Hwi* hwi = g.game->GetHwi();
+	hwi->SetScreenTarget(&g.frameBuffer);
 }
 
 static const char *IntToString(const i32 src)
@@ -999,7 +1004,8 @@ int main(int argc, const char *argv[])
 
 		UpdateImGui(&g.inputState);
 
-		ImGui::NewFrame();
+		Hwi* hwi = g.game->GetHwi();
+		hwi->BeginFrame();
 		ImGui::ShowDemoWindow(&showDemoWindow);
 
 		g.game->UpdateAndRender(&g.thread, &g.inputState, &g.frameBuffer);
@@ -1032,11 +1038,7 @@ int main(int argc, const char *argv[])
 		}
 
 		frameStart = WallSeconds();
-		QiOgl_Clear();
-		QiOgl_BlitBufferToScreen(&g.frameBuffer);
-		ImGui::EndFrame();
-		ImGui::Render();
-		QiOgl_DrawImGui(ImGui::GetDrawData());
+		hwi->EndFrame();
 		SDL_GL_SwapWindow(window);
 	}
 

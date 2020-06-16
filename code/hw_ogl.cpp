@@ -15,6 +15,7 @@
 #include "imgui.h"
 #include "bitmap.h"
 #include "hwi.h"
+#include <new>
 
 const u32    kMaxTextures        = 128;
 const size_t kOglHardwareMemSize = 1024 * 1024;
@@ -33,6 +34,8 @@ enum StateDirtyBits
 	QOS_FrameBuffer = 1 << 0,
 	QOS_Blend = 1 << 1,
 };
+
+struct OglHwi;
 
 struct OglGlobals
 {
@@ -65,6 +68,19 @@ struct OglGlobals
 };
 
 static OglGlobals *gOgl;
+
+static void CheckGl()
+{
+	GLenum err;
+	bool   errored = false;
+	while ((err = glGetError()) != GL_NO_ERROR)
+	{
+		errored = true;
+		fprintf(stderr, "GL Error: 0x%x\n", err);
+	}
+
+	Assert(!errored);
+}
 
 // TODO: Change shader load to use platform functionality once we have proper files / asset system
 internal char *GetShaderText(const char *fileName)
@@ -200,17 +216,17 @@ static void IGC_SetRenderBitmap(const ImDrawList*, const ImDrawCmd* cmd)
 {
 	if (cmd->UserCallbackData == nullptr)
 	{
-		glSetFramebuffer(GL_FRAMEBUFFER, 0);
-		CheckGL();
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		CheckGl();
 		return;
 	}
 
 	Bitmap* renderBitmap = (Bitmap*)cmd->UserCallbackData;
-	Assert(renderBitmap->hardwareId ! nullptr);
+	Assert(renderBitmap->hardwareId != nullptr);
 	OglBitmap* oglBitmap = (OglBitmap*)renderBitmap->hardwareId;
 	Assert(oglBitmap->fbo);
-	glSetFramebuffer(GL_FRAMEBUFFER, oglBitmap->fbo);
-	CheckGL();
+	glBindFramebuffer(GL_FRAMEBUFFER, oglBitmap->fbo);
+	CheckGl();
 }
 
 static void QiOgl_PushRenderBitmap(Bitmap* renderBitmap)
@@ -234,7 +250,7 @@ static void QiOgl_PopRenderBitmap()
 	dl->AddCallback(IGC_SetRenderBitmap, renderBitmap);
 }
 
-static void QiOgl_BeginFrame()
+void QiOgl_BeginFrame()
 {
 	Assert(gOgl->inBeginFrame == 0);
 	gOgl->inBeginFrame++;
@@ -244,10 +260,10 @@ static void QiOgl_BeginFrame()
 
 	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
-	dl->AddCallback(IGC_SetRenderBitmap, nullPtr);
+	dl->AddCallback(IGC_SetRenderBitmap, nullptr);
 }
 
-static void QiOgl_EndFrame()
+void QiOgl_EndFrame()
 {
 	gOgl->inBeginFrame--;
 	Assert(gOgl->inBeginFrame == 0);
@@ -261,7 +277,7 @@ static void QiOgl_EndFrame()
 
 	ImDrawList *dl     = ImGui::GetBackgroundDrawList();
 	Assert(dl);
-	dl->AddImage((void *)(uintptr_t)oglBmp->texture, ImVec2(0.0, 0.0), io.DisplaySize)
+	dl->AddImage((void *)(uintptr_t)oglBmp->texture, ImVec2(0.0, 0.0), io.DisplaySize);
 }
 
 struct TexCoordRect
@@ -295,31 +311,23 @@ static void QiOgl_Blit(const Bitmap* bitmap, const Rect* srcRect, const Rect* de
 	dl->AddImage((void *)(uintptr_t)oglBmp->texture, ul, br, srcUVs.ul, srcUVs.br, (u32)tint);
 }
 
-static void CheckGL()
-{
-	GLenum err;
-	bool   errored = false;
-	while ((err = glGetError()) != GL_NO_ERROR)
-	{
-		errored = true;
-		fprintf(stderr, "GL Error: 0x%x\n", err);
-	}
-
-	Assert(!errored);
-}
-
 void QiOgl_LoadBitmapToTex(GLuint tex, const Bitmap *bitmap)
 {
 	glBindTexture(GL_TEXTURE_2D, tex);
-	CheckGL();
+	CheckGl();
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap->width, bitmap->height, 0, GL_BGRA, GL_UNSIGNED_BYTE, bitmap->pixels);
-	CheckGL();
+	CheckGl();
 	glBindTexture(GL_TEXTURE_2D, 0);
-	CheckGL();
+	CheckGl();
 }
 
 void QiOgl_RegisterBitmap(Bitmap* bitmap, bool canBeTarget);
 void QiOgl_UnregisterBitmap(Bitmap *bitmap);
+
+static bool QiOgl_IsBitmapRegistered(const Bitmap* bitmap)
+{
+	return bitmap->hardwareId != nullptr;
+}
 
 void QiOgl_LoadBitmap(Bitmap* bitmap)
 {
@@ -344,17 +352,23 @@ void QiOgl_RegisterBitmap(Bitmap *bitmap, bool canBeTarget)
 	memset(oglBmp, 0, sizeof(*oglBmp));
 	oglBmp->textureIdx = gOgl->numTextures++;
 	glGenTextures(1, &oglBmp->texture);
-	CheckGL();
+	CheckGl();
 	oglBmp->bitmap = bitmap;
 
 	if (canBeTarget)
 	{
-		glGenFramebuffers(1, &oglBmp->fbo); CheckGL();
-		glBindFramebuffer(GL_FRAMEBUFFER, oglBmp->fbo); CheckGL();
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, oglBmp->texture, 0); CheckGL();
-		glBindFrameBuffer(GL_FRAMEBUFFER, 0); CheckGL();
+		glGenFramebuffers(1, &oglBmp->fbo);
+		CheckGl();
+		glBindFramebuffer(GL_FRAMEBUFFER, oglBmp->fbo);
+		CheckGl();
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, oglBmp->texture, 0);
+		CheckGl();
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		CheckGl();
 		gOgl->stateDirty |= QOS_FrameBuffer;
 	}
+
+	bitmap->hardwareId = oglBmp;
 }
 
 void QiOgl_UnregisterBitmap(Bitmap *bitmap)
@@ -363,7 +377,7 @@ void QiOgl_UnregisterBitmap(Bitmap *bitmap)
 		return;
 
 	OglBitmap* oglBmp = (OglBitmap*)bitmap->hardwareId;
-	glReleaseTexture(oglBmp->texture);
+	glDeleteTextures(1, &oglBmp->texture);
 
 	u32 curIdx = oglBmp->textureIdx;
 	Assert(oglBmp == &gOgl->textures[curIdx]);
@@ -383,6 +397,7 @@ void QiOgl_Clear()
 
 void QiOgl_BlitBufferToScreen(const Bitmap *bitmap)
 {
+#if 0
 	QiOgl_InitBlitBufferState();
 	QiOgl_BitmapToTexture(gOgl->blitTexture, bitmap);
 	glBindVertexArray(gOgl->quadVao);
@@ -391,6 +406,8 @@ void QiOgl_BlitBufferToScreen(const Bitmap *bitmap)
 	glBindTexture(GL_TEXTURE_2D, gOgl->blitTexture);
 	glUniform1i(gOgl->samplerUniformLocation, 0);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+#else
+#endif
 }
 
 void QiOgl_SetupImGuiState(ImDrawData *drawData, i32 fbWidth, i32 fbHeight, GLuint vao)
@@ -402,7 +419,7 @@ void QiOgl_SetupImGuiState(ImDrawData *drawData, i32 fbWidth, i32 fbHeight, GLui
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_SCISSOR_TEST);
-	CheckGL();
+	CheckGl();
 
 	// Setup viewport, orthographic projection matrix
 	// Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport
@@ -421,22 +438,22 @@ void QiOgl_SetupImGuiState(ImDrawData *drawData, i32 fbWidth, i32 fbHeight, GLui
 	glUseProgram(gOgl->drawUIProgram);
 	glUniform1i(gOgl->uiTexLocation, 0);
 	glUniformMatrix4fv(gOgl->uiProjMtxLocation, 1, GL_FALSE, &orthoMtx[0][0]);
-	CheckGL();
+	CheckGl();
 
 	// Bind vertex/index buffers and setup attributes for ImDrawVert
 	glBindBuffer(GL_ARRAY_BUFFER, gOgl->uiVbo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gOgl->uiElements);
-	CheckGL();
+	CheckGl();
 
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
 	glEnableVertexAttribArray(2);
-	CheckGL();
+	CheckGl();
 
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid *)IM_OFFSETOF(ImDrawVert, pos));
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (GLvoid *)IM_OFFSETOF(ImDrawVert, uv));
 	glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (GLvoid *)IM_OFFSETOF(ImDrawVert, col));
-	CheckGL();
+	CheckGl();
 }
 
 void QiOgl_DrawImGui(ImDrawData *drawData)
@@ -447,26 +464,26 @@ void QiOgl_DrawImGui(ImDrawData *drawData)
 	if (fbWidth <= 0 || fbHeight <= 0)
 		return;
 
-	GLint last_viewport[4];
-	glGetIntegerv(GL_VIEWPORT, last_viewport);
-	GLint last_scissor_box[4];
-	glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
-	GLenum last_blend_src_rgb;
-	glGetIntegerv(GL_BLEND_SRC_RGB, (GLint *)&last_blend_src_rgb);
-	GLenum last_blend_dst_rgb;
-	glGetIntegerv(GL_BLEND_DST_RGB, (GLint *)&last_blend_dst_rgb);
-	GLenum last_blend_src_alpha;
-	glGetIntegerv(GL_BLEND_SRC_ALPHA, (GLint *)&last_blend_src_alpha);
-	GLenum last_blend_dst_alpha;
-	glGetIntegerv(GL_BLEND_DST_ALPHA, (GLint *)&last_blend_dst_alpha);
-	GLenum last_blend_equation_rgb;
-	glGetIntegerv(GL_BLEND_EQUATION_RGB, (GLint *)&last_blend_equation_rgb);
-	GLenum last_blend_equation_alpha;
-	glGetIntegerv(GL_BLEND_EQUATION_ALPHA, (GLint *)&last_blend_equation_alpha);
-	GLboolean last_enable_blend        = glIsEnabled(GL_BLEND);
-	GLboolean last_enable_cull_face    = glIsEnabled(GL_CULL_FACE);
-	GLboolean last_enable_depth_test   = glIsEnabled(GL_DEPTH_TEST);
-	GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
+	GLint lastViewport[4];
+	glGetIntegerv(GL_VIEWPORT, lastViewport);
+	GLint lastScissorBox[4];
+	glGetIntegerv(GL_SCISSOR_BOX, lastScissorBox);
+	GLenum lastBlendSrcRgb;
+	glGetIntegerv(GL_BLEND_SRC_RGB, (GLint *)&lastBlendSrcRgb);
+	GLenum lastBlendDstRgb;
+	glGetIntegerv(GL_BLEND_DST_RGB, (GLint *)&lastBlendDstRgb);
+	GLenum lastBlendSrcAlpha;
+	glGetIntegerv(GL_BLEND_SRC_ALPHA, (GLint *)&lastBlendSrcAlpha);
+	GLenum lastBlendDstAlpha;
+	glGetIntegerv(GL_BLEND_DST_ALPHA, (GLint *)&lastBlendDstAlpha);
+	GLenum lastBlendEquationRgb;
+	glGetIntegerv(GL_BLEND_EQUATION_RGB, (GLint *)&lastBlendEquationRgb);
+	GLenum lastBlendEquationAlpha;
+	glGetIntegerv(GL_BLEND_EQUATION_ALPHA, (GLint *)&lastBlendEquationAlpha);
+	GLboolean lastEnableBlend          = glIsEnabled(GL_BLEND);
+	GLboolean lastEnableCullFace       = glIsEnabled(GL_CULL_FACE);
+	GLboolean lastEnableDepthTest      = glIsEnabled(GL_DEPTH_TEST);
+	GLboolean lastEnableScissorTest    = glIsEnabled(GL_SCISSOR_TEST);
 
 	GLuint vao = 0;
 	glGenVertexArrays(1, &vao);
@@ -483,7 +500,7 @@ void QiOgl_DrawImGui(ImDrawData *drawData)
 		// Upload vtx data
 		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)cmdList->VtxBuffer.Size * sizeof(ImDrawVert), (const GLvoid *)cmdList->VtxBuffer.Data, GL_STREAM_DRAW);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)cmdList->IdxBuffer.Size * sizeof(ImDrawIdx), (const GLvoid *)cmdList->IdxBuffer.Data, GL_STREAM_DRAW);
-		CheckGL();
+		CheckGl();
 
 		for (int cmdIdx = 0; cmdIdx < cmdList->CmdBuffer.Size; cmdIdx++)
 		{
@@ -507,41 +524,41 @@ void QiOgl_DrawImGui(ImDrawData *drawData)
 				if (clipRect.x < fbWidth && clipRect.y < fbHeight && clipRect.z >= 0.0f && clipRect.w >= 0.0f)
 				{
 					glScissor(clipRect.x, (int)(fbHeight - clipRect.w), (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y));
-					CheckGL();
+					CheckGl();
 
 					glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)cmd->TextureId);
-					CheckGL();
+					CheckGl();
 					glDrawElements(GL_TRIANGLES, (GLsizei)cmd->ElemCount, GL_UNSIGNED_SHORT, (void *)(intptr_t)(cmd->IdxOffset * sizeof(ImDrawIdx)));
-					CheckGL();
+					CheckGl();
 				}
 			}
 		}
 	}
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-	CheckGL();
+	CheckGl();
 	glDeleteVertexArrays(1, &vao);
-	CheckGL();
-	glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
-	glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
-	if (last_enable_blend)
+	CheckGl();
+	glBlendEquationSeparate(lastBlendEquationRgb, lastBlendEquationAlpha);
+	glBlendFuncSeparate(lastBlendSrcRgb, lastBlendDstRgb, lastBlendSrcAlpha, lastBlendDstAlpha);
+	if (lastEnableBlend)
 		glEnable(GL_BLEND);
 	else
 		glDisable(GL_BLEND);
-	if (last_enable_cull_face)
+	if (lastEnableCullFace)
 		glEnable(GL_CULL_FACE);
 	else
 		glDisable(GL_CULL_FACE);
-	if (last_enable_depth_test)
+	if (lastEnableDepthTest)
 		glEnable(GL_DEPTH_TEST);
 	else
 		glDisable(GL_DEPTH_TEST);
-	if (last_enable_scissor_test)
+	if (lastEnableScissorTest)
 		glEnable(GL_SCISSOR_TEST);
 	else
 		glDisable(GL_SCISSOR_TEST);
-	glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
-	glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
+	glViewport(lastViewport[0], lastViewport[1], (GLsizei)lastViewport[2], (GLsizei)lastViewport[3]);
+	glScissor(lastScissorBox[0], lastScissorBox[1], (GLsizei)lastScissorBox[2], (GLsizei)lastScissorBox[3]);
 }
 
 void QiOgl_CreateFontsTexture()
@@ -572,11 +589,126 @@ void QiOgl_DestroyFontTexture()
 	}
 }
 
-void QiOgl_RegisterBitmap(Bitmap *bitmap) {}
+// HWI interface
+struct OglHwi : public Hwi
+{
+	OglHwi() {}
+	virtual ~OglHwi() {}
+
+	void BeginFrame() override { QiOgl_BeginFrame(); }
+	void EndFrame() override { QiOgl_EndFrame(); }
+
+	void RegisterBitmap(Bitmap *bitmap, bool canBeRenderTarget) override { QiOgl_RegisterBitmap(bitmap, canBeRenderTarget); }
+
+	void UnregisterBitmap(Bitmap *bitmap) override { QiOgl_UnregisterBitmap(bitmap); }
+
+	void UploadBitmap(Bitmap *bitmap) override { QiOgl_LoadBitmap(bitmap); }
+
+	void SetScreenTarget(Bitmap *screenTarget) override
+	{
+		if (!QiOgl_IsBitmapRegistered(screenTarget))
+			QiOgl_RegisterBitmap(screenTarget, true);
+		gOgl->screenBitmap = screenTarget;
+	}
+
+	void PushRenderTarget(Bitmap *targetBitmap) override { QiOgl_PushRenderBitmap(targetBitmap); }
+
+	void PopRenderTarget() override { QiOgl_PopRenderBitmap(); }
+
+	void BlitStretched(Bitmap *srcBitmap, const Rect *srcRectPixels, const Rect *destRectPixels, ColorU tint) override { QiOgl_Blit(srcBitmap, srcRectPixels, destRectPixels, tint); }
+
+	void Blit(Bitmap *srcBitmap, v2 srcXY, v2 destXY, v2 size, ColorU tint) override
+	{
+		Rect srcRect, destRect;
+
+		srcRect.left   = srcXY.x;
+		srcRect.top    = srcXY.y;
+		srcRect.width  = size.x;
+		srcRect.height = size.y;
+
+		destRect.left   = destXY.x;
+		destRect.top    = destXY.y;
+		destRect.width  = size.x;
+		destRect.height = size.y;
+
+		QiOgl_Blit(srcBitmap, &srcRect, &destRect, tint);
+	}
+
+	static inline void CvtRectToImVecs(const Rect *rect, ImVec2 &mins, ImVec2 &maxs)
+	{
+		mins.x = rect->left;
+		mins.y = rect->top;
+		maxs.x = rect->left + rect->width;
+		maxs.y = rect->top + rect->height;
+	}
+
+	void PushClipRect(Rect *clipRect) override
+	{
+		ImDrawList *dl = ImGui::GetBackgroundDrawList();
+		Assert(dl);
+		ImVec2 mins, maxs;
+		CvtRectToImVecs(clipRect, mins, maxs);
+		dl->PushClipRect(mins, maxs, false);
+	}
+
+	void PopClipRect() override
+	{
+		ImDrawList *dl = ImGui::GetBackgroundDrawList();
+		Assert(dl);
+		dl->PopClipRect();
+	}
+
+	void PushBlendState(BlendState blend) override {}
+
+	void PopBlendState() override {}
+
+	void DrawLine(v2 p0, v2 p1, ColorU color) override
+	{
+		ImDrawList *dl = ImGui::GetBackgroundDrawList();
+		Assert(dl);
+		dl->AddLine(ImVec2(p0.x, p0.y), ImVec2(p1.x, p1.y), 1.0f, (u32)color);
+	}
+
+	void DrawRect(const Rect *rect, ColorU color) override
+	{
+		ImDrawList *dl = ImGui::GetBackgroundDrawList();
+		Assert(dl);
+		ImVec2 mins, maxs;
+		CvtRectToImVecs(rect, mins, maxs);
+		dl->AddRect(mins, maxs, (u32)color, 0, 0, 1.0f);
+	}
+
+	void FillRect(const Rect *rect, ColorU color) override
+	{
+		ImDrawList *dl = ImGui::GetBackgroundDrawList();
+		Assert(dl);
+		ImVec2 mins, maxs;
+		CvtRectToImVecs(rect, mins, maxs);
+		dl->AddRectFilled(mins, maxs, (u32)color, 0, 0);
+	}
+
+	void DrawBezier(v2 a, v2 b, v2 c, v2 d, ColorU color) override
+	{
+		ImDrawList *dl = ImGui::GetBackgroundDrawList();
+		Assert(dl);
+		ImVec2 ia(a.x, a.y), ib(b.x, b.y), ic(c.x, c.y), id(d.x, d.y);
+		dl->AddBezierCurve(ia, ib, ic, id, (u32)color, 1.0f);
+	}
+
+	void ResetState() override {}
+
+	void Finalize() override
+	{
+	}
+};
+
+Hwi* gHwi = nullptr;
 
 void QiOgl_InitSystem(const SubSystem *sys, bool isReinit)
 {
 	gOgl = (OglGlobals *)sys->globalPtr;
+	void* hwiPtr = (void *)(gOgl + 1);
+	gHwi = new(hwiPtr) OglHwi();
 
 	if (!isReinit)
 	{
@@ -585,5 +717,5 @@ void QiOgl_InitSystem(const SubSystem *sys, bool isReinit)
 	}
 }
 
-SubSystem HardwareSubsystem = {"OglHardware", QiOgl_InitSystem, sizeof(OglGlobals) + kOglHardwareMemSize};
+SubSystem HardwareSubsystem = {"OglHardware", QiOgl_InitSystem, sizeof(OglGlobals) + sizeof(OglHwi) + kOglHardwareMemSize};
 
