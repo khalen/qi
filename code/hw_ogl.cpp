@@ -361,6 +361,7 @@ void QiOgl_RegisterBitmap(Bitmap *bitmap, bool canBeTarget)
 		CheckGl();
 		glBindFramebuffer(GL_FRAMEBUFFER, oglBmp->fbo);
 		CheckGl();
+		QiOgl_LoadBitmap(bitmap);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, oglBmp->texture, 0);
 		CheckGl();
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
