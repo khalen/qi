@@ -434,6 +434,11 @@ internal void InitGameSystems(Memory *memory)
 	g_game->memory = memory;
 
 	bool isReload = g_game->isInitialized;
+	if (!isReload)
+	{
+		void* initMemPtr = M_AllocRaw(memory, sizeof(GameGlobals_s));
+		Assert(initMemPtr == (void *)g_game);
+	}
 
 	for (i32 i = 0; i < countof(s_subSystems); i++)
 	{

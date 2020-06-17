@@ -51,7 +51,8 @@ struct OglGlobals
 	GLint samplerUniformLocation;
 
 	// ImGui draw support
-	GLuint fontTexture;
+	Bitmap fontBitmap;
+
 	GLuint drawUIProgram, drawUIVertexProgram, drawUIFragmentProgram;
 	i32    uiTexLocation, uiProjMtxLocation;
 	i32    uiVtxPosLocation, uiVtxUVLocation, uiVtxColorLocation;
@@ -291,13 +292,12 @@ void QiOgl_EndFrame()
 	Assert(gOgl->renderBitmapStackPos == 0);
 
 	Assert(gOgl->screenBitmap && gOgl->screenBitmap->hardwareId);
-	OglBitmap *oglBmp = (OglBitmap *)gOgl->screenBitmap->hardwareId;
 	ImGuiIO &  io     = ImGui::GetIO();
 
 	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
 	dl->AddCallback(IGC_SetRenderBitmap, nullptr);
-	dl->AddImage((void *)(uintptr_t)oglBmp->texture, ImVec2(0.0, 0.0), io.DisplaySize);
+	dl->AddImage(gOgl->screenBitmap, ImVec2(0.0, 0.0), io.DisplaySize);
 }
 
 struct TexCoordRect
@@ -325,15 +325,10 @@ static void QiOgl_Blit(const Bitmap *bitmap, const Rect *srcRect, const Rect *de
 	QiOgl_PixelRectToTexCoords(bitmap, srcRect, &srcUVs);
 
 	Assert(bitmap->hardwareId);
-	OglBitmap *oglBmp = (OglBitmap *)bitmap->hardwareId;
 
 	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
-	static volatile int bogus = 0;
-	if ((u32)tint != 0xFFFFFFFF) {
-		bogus = bogus + 1;
-	}
-	dl->AddImage((void *)(uintptr_t)oglBmp->texture, ul, br, srcUVs.ul, srcUVs.br, (u32)tint);
+	dl->AddImage((ImTextureID)bitmap, ul, br, srcUVs.ul, srcUVs.br, (u32)tint);
 }
 
 void QiOgl_LoadBitmapToTex(GLuint tex, const Bitmap *bitmap)
@@ -564,7 +559,6 @@ void QiOgl_DrawImGui(ImDrawData *drawData)
 			}
 			else
 			{
-				static volatile u32 screenBlits = 0;
 				ImVec4 clipRect;
 				clipRect.x = (cmd->ClipRect.x - clipOffset.x) * clipScale.x;
 				clipRect.y = (cmd->ClipRect.y - clipOffset.y) * clipScale.y;
@@ -576,13 +570,15 @@ void QiOgl_DrawImGui(ImDrawData *drawData)
 					glScissor(clipRect.x, (int)(fbHeight - clipRect.w), (int)(clipRect.z - clipRect.x), (int)(clipRect.w - clipRect.y));
 					CheckGl();
 
-					GLuint curTexture = (GLuint)(intptr_t)cmd->TextureId;
-					if (curTexture == ((OglBitmap *)(gOgl->screenBitmap->hardwareId))->texture)
+					Bitmap* bmp = (Bitmap *)cmd->TextureId;
+					if (bmp)
 					{
-						screenBlits++;
+						OglBitmap *oglBmp = (OglBitmap *)bmp->hardwareId;
+						Assert(oglBmp);
+
+						glBindTexture(GL_TEXTURE_2D, oglBmp->texture);
+						CheckGl();
 					}
-					glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)cmd->TextureId);
-					CheckGl();
 					glDrawElements(GL_TRIANGLES, (GLsizei)cmd->ElemCount, GL_UNSIGNED_SHORT, (void *)(intptr_t)(cmd->IdxOffset * sizeof(ImDrawIdx)));
 					CheckGl();
 				}
@@ -623,25 +619,19 @@ void QiOgl_CreateFontsTexture()
 	i32      width, height;
 	io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
-	glGenTextures(1, &gOgl->fontTexture);
-	glBindTexture(GL_TEXTURE_2D, gOgl->fontTexture);
+	Bm_CreateBitmapFromBuffer(pixels, &gOgl->fontBitmap, width, height);
+	QiOgl_RegisterBitmap(&gOgl->fontBitmap, false);
+	QiOgl_LoadBitmap(&gOgl->fontBitmap);
+
+	OglBitmap* oglBmp = (OglBitmap *)gOgl->fontBitmap.hardwareId;
+	Assert(oglBmp);
+
+	glBindTexture(GL_TEXTURE_2D, oglBmp->texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-
-	io.Fonts->TexID = (ImTextureID)(intptr_t)gOgl->fontTexture;
-}
-
-void QiOgl_DestroyFontTexture()
-{
-	if (gOgl->fontTexture)
-	{
-		ImGuiIO &io = ImGui::GetIO();
-		glDeleteTextures(1, &gOgl->fontTexture);
-		io.Fonts->TexID   = 0;
-		gOgl->fontTexture = 0;
-	}
+	io.Fonts->TexID = (ImTextureID)(&gOgl->fontBitmap);
 }
 
 // HWI interface

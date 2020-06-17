@@ -74,7 +74,7 @@ target_link_options(${GAME_TST_NAME} PRIVATE ${LINK_FLAGS})
 file(GLOB HEADER_LIST CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Header Files" FILES ${HEADER_LIST})
 
-set(QI_EXE_SRCS memory.cpp hw_ogl.cpp main_sdl.cpp)
+set(QI_EXE_SRCS memory.cpp main_sdl.cpp)
 
 file(GLOB IMGUI_SRCS CONFIGURE_DEPENDS ${IMGUI}/*.cpp ${IMGUI}/*.h)
 

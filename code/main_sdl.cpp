@@ -379,8 +379,6 @@ static void InitGuiFonts()
 		ImFont* font = io.Fonts->AddFontFromFileTTF(fontPath, def->size, &cfg);
 		font->DisplayOffset.y += def->yOffset;
 	}
-
-	// Merge in icon font
 }
 
 static void InitImGui(SDL_Window *window)

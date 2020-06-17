@@ -11,14 +11,21 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-void Bm_CreateBitmap(MemoryArena *arena, Bitmap *result, const u32 width, const u32 height, Bitmap::Format format, u32 flags)
+void Bm_CreateBitmapFromBuffer(void *buffer, Bitmap *result, const u32 width, const u32 height, Bitmap::Format format, u32 flags)
 {
-	Assert(arena && result);
+	Assert(buffer && result);
 	result->width    = width;
 	result->height   = height;
 	result->pitch    = width;
 	result->byteSize = width * height * sizeof(u32);
-	result->pixels   = (u32 *)MA_Alloc(arena, result->byteSize);
+	result->pixels   = (u32 *)buffer;
+}
+
+void Bm_CreateBitmap(MemoryArena *arena, Bitmap *result, const u32 width, const u32 height, Bitmap::Format format, u32 flags)
+{
+	Assert(arena && result);
+	size_t byteSize = width * height * sizeof(u32);
+	Bm_CreateBitmapFromBuffer(MA_Alloc(arena, byteSize), result, width, height, format, flags);
 }
 
 void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result, const char *filename, bool forceOpaque)

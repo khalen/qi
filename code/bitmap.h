@@ -55,5 +55,6 @@ struct MemoryArena;
 
 void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result, const char *filename, bool forceOpaque = false);
 void Bm_CreateBitmap(MemoryArena *arena, Bitmap *result, const u32 width, const u32 height, Bitmap::Format format = Bitmap::Format::RGBA8, u32 flags = 0);
+void Bm_CreateBitmapFromBuffer(void *buffer, Bitmap *result, const u32 width, const u32 height, Bitmap::Format format = Bitmap::Format::RGBA8, u32 flags = 0);
 
 #endif // QI_BITMAP_H

@@ -88,6 +88,10 @@ struct SpriteAtlas
 	Sprite* sprites[MAX_SPRITES_PER_ATLAS];
 };
 
+struct KeyStore;
+void Spr_ReadAtlasFromKeyStore(const KeyStore* ks, SpriteAtlas *atlas);
+void Spr_WriteAtlasToKeyStore(KeyStore* ks, const SpriteAtlas *atlas);
+
 struct Button
 {
 	bool endedDown;

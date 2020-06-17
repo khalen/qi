@@ -2,6 +2,8 @@
 #define __QI_MEMORY_H
 
 #include "debug.h"
+#include "bitmap.h"
+
 #include <string.h>
 
 //
