@@ -53,6 +53,8 @@ struct GameGlobals_s
 
 	BuddyAllocator *testAlloc;
 	Bitmap* screenBitmap;
+
+	bool enableEditor;
 };
 
 GameGlobals_s *g_game;
@@ -181,7 +183,7 @@ internal void InitGameGlobals(const SubSystem *sys, bool isReInit)
 	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[1], "test/test_scene_layer_01.bmp");
 	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[2], "test/test_scene_layer_02.bmp");
 	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[3], "test/test_scene_layer_03.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[4], "test/test_scene_layer_04.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[4], "test/test_scene_layer_04.bmp", true);
 
 	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][0], "test/test_hero_back_head.bmp");
 	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][1], "test/test_hero_back_cape.bmp");
@@ -291,7 +293,7 @@ void DrawDebugShapes(Bitmap *screen)
 
 void AddDebugShape(PolyShape_s *poly, r32 r, r32 g, r32 b)
 {
-	u32 rgba                         = ((u32)(r * 255.0f + 0.5f) << 16) | ((u32)(g * 255 + 0.5f) << 8) | (u32)(b * 255 + 0.5f);
+	u32 rgba                         = ((u32)(r * 255.0f + 0.5f) << 24) | ((u32)(g * 255 + 0.5f) << 16) | ((u32)(b * 255 + 0.5f) << 8) | 0xFF;
 	debugShapes[numDebugShapes]      = *poly;
 	debugShapeColors[numDebugShapes] = rgba;
 	numDebugShapes++;
@@ -486,7 +488,7 @@ internal void RenderRectangle(Bitmap *bitmap, i32 x0, i32 y0, i32 x1, i32 y1, r3
 		xel += bitmap->pitch;
 	}
 #else
-	const ColorU color(r, g, b, 255);
+	const Color color(r, g, b, 1.0f);
 	Rect rect;
 	rect.left = x0;
 	rect.top = y0;
@@ -688,11 +690,14 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 	static bool debugOpen = false;
 	static bool drawBG    = true;
 
-	if (ImGui::Begin("Debug", &debugOpen))
+	if (g_game->enableEditor)
 	{
-		ImGui::Checkbox("Draw background", &drawBG);
+		if (ImGui::Begin("Debug", &debugOpen))
+		{
+			ImGui::Checkbox("Draw background", &drawBG);
+		}
+		ImGui::End();
 	}
-	ImGui::End();
 
 #if 1
 	if (drawBG)
@@ -787,6 +792,11 @@ void               Qi_Init(const PlatFuncs_s *platFuncs, Memory *memory)
 	}
 }
 
+void Qi_ToggleEditor()
+{
+	g_game->enableEditor = !g_game->enableEditor;
+}
+
 internal GameFuncs_s s_game = {
 	sound,
 #if HAS(DEV_BUILD)
@@ -795,6 +805,7 @@ internal GameFuncs_s s_game = {
 	Qi_Init,
 	Qi_GameUpdateAndRender,
 	Qi_GetHwi,
+	Qi_ToggleEditor,
 };
 const GameFuncs_s *game = &s_game;
 

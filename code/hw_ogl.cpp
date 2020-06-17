@@ -329,6 +329,10 @@ static void QiOgl_Blit(const Bitmap *bitmap, const Rect *srcRect, const Rect *de
 
 	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
+	static volatile int bogus = 0;
+	if ((u32)tint != 0xFFFFFFFF) {
+		bogus = bogus + 1;
+	}
 	dl->AddImage((void *)(uintptr_t)oglBmp->texture, ul, br, srcUVs.ul, srcUVs.br, (u32)tint);
 }
 
@@ -453,7 +457,8 @@ void QiOgl_SetupImGuiState(ImDrawData *drawData, i32 fbWidth, i32 fbHeight, GLui
 	// Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
 	glEnable(GL_BLEND);
 	glBlendEquation(GL_FUNC_ADD);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	// glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_SCISSOR_TEST);
@@ -731,7 +736,7 @@ struct OglHwi : public Hwi
 	{
 		ImDrawList *dl = ImGui::GetBackgroundDrawList();
 		Assert(dl);
-		dl->AddLine(ImVec2(p0.x, p0.y), ImVec2(p1.x, p1.y), 1.0f, (u32)color);
+		dl->AddLine(ImVec2(p0.x, p0.y), ImVec2(p1.x, p1.y), (u32)color, 1.0f);
 	}
 
 	void DrawRect(const Rect *rect, ColorU color) override

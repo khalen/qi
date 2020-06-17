@@ -12,6 +12,7 @@
 #include "debug.h"
 #include "bitmap.h"
 #include "hwi.h"
+#include "stringtable.h"
 #include <string.h>
 
 #define GAME_DLL_NAME "qi.dll"
@@ -45,8 +46,47 @@ struct Rect
 	r32 height;
 };
 
+struct Rect16
+{
+	i16 left;
+	i16 top;
+	i16 width;
+	i16 height;
+};
+
 #define CONTROLLER_MAX_COUNT 5
 #define KBD					 (CONTROLLER_MAX_COUNT - 1)
+
+#define MAX_SPRITES_PER_ATLAS 1024
+#define MAX_FRAMES_PER_SPRITE 8
+
+struct SpriteFrame
+{
+	v2  topLeftUV;
+	v2  bottomRightUV;
+	i16 xOrigin;
+	i16 yOrigin;
+	Rect16 imageRect;
+};
+
+struct SpriteAtlas;
+
+struct Sprite
+{
+	Symbol name;
+	SpriteAtlas* atlas;
+	int numFrames;
+	// Frames follow immediately after the sprite in memory
+};
+
+struct SpriteAtlas
+{
+	char    imageFile[128];
+	Symbol  name;
+	Bitmap* bitmap;
+	u32     numSprites;
+	Sprite* sprites[MAX_SPRITES_PER_ATLAS];
+};
 
 struct Button
 {
@@ -184,6 +224,7 @@ struct Bitmap;
 typedef void Qi_GameUpdateAndRender_f(ThreadContext* tc, Input* input, Bitmap* screenBitmap);
 typedef void Qi_Init_f(const PlatFuncs_s* plat, Memory* memory);
 typedef Hwi* Qi_GetHwi_f();
+typedef void Qi_ToggleEditor_f();
 
 struct SoundFuncs_s;
 
@@ -201,6 +242,7 @@ struct GameFuncs_s
 	Qi_Init_f*				  Init;
 	Qi_GameUpdateAndRender_f* UpdateAndRender;
 	Qi_GetHwi_f*              GetHwi;
+	Qi_ToggleEditor_f*        ToggleEditor;
 };
 
 // Functions to be provided by the platform layer

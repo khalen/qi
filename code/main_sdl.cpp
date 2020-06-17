@@ -843,6 +843,10 @@ static void HandleKeyEvent(SDL_Event *event, Input *newInput)
 		else
 			ProcessButton(&kbdController->leftShoulder, isDown);
 	}
+	else if (vkCode == SDLK_e && ctrlKey && isDown)
+	{
+		g.game->ToggleEditor();
+	}
 	else if (vkCode == SDLK_e)
 	{
 		ProcessButton(&kbdController->rightShoulder, isDown);

@@ -170,10 +170,10 @@ struct Color
 	{
 	}
 	Color(u32 c)
-		: r((r32)((c >> 24) & 0xFF) / 255.0f)
-		, g((r32)((c >> 16) & 0xFF) / 255.0f)
-		, b((r32)((c >> 8) & 0xFF) / 255.0f)
-		, a((r32)((c >> 0) & 0xFF) / 255.0f)
+		: a((r32)((c >> 24) & 0xFF) / 255.0f)
+		, b((r32)((c >> 16) & 0xFF) / 255.0f)
+		, g((r32)((c >> 8) & 0xFF) / 255.0f)
+		, r((r32)((c >> 0) & 0xFF) / 255.0f)
 	{
 	}
 
@@ -181,12 +181,12 @@ struct Color
 
 	explicit operator u32() const
 	{
-		u32 a = (u32)((a + rnd255) * 255.0f);
-		u32 r = (u32)((r + rnd255) * 255.0f);
-		u32 g = (u32)((g + rnd255) * 255.0f);
-		u32 b = (u32)((b + rnd255) * 255.0f);
+		u32 ca = (u32)((a + rnd255) * 255.0f);
+		u32 cr = (u32)((r + rnd255) * 255.0f);
+		u32 cg = (u32)((g + rnd255) * 255.0f);
+		u32 cb = (u32)((b + rnd255) * 255.0f);
 
-		return (r << 24) | (g << 16) | (b << 8) | a;
+		return (ca << 24) | (cb << 16) | (cg << 8) | cr;
 	}
 };
 
@@ -203,10 +203,10 @@ struct ColorU
 	};
 
 	ColorU(u32 c)
-		: r((u8)(c >> 24))
-		, g((u8)(c >> 16))
-		, b((u8)(c >> 8))
-		, a((u8)c)
+		: a((u8)(c >> 24))
+		, b((u8)(c >> 16))
+		, g((u8)(c >> 8))
+		, r((u8)c)
 	{
 	}
 	ColorU(u8 ir, u8 ig, u8 ib, u8 ia)

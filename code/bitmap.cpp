@@ -4,7 +4,12 @@
 
 #include "bitmap.h"
 #include "util.h"
+#include "debug.h"
 #include "hwi.h"
+
+#define STBI_ASSERT Assert
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 void Bm_CreateBitmap(MemoryArena *arena, Bitmap *result, const u32 width, const u32 height, Bitmap::Format format, u32 flags)
 {
@@ -16,100 +21,31 @@ void Bm_CreateBitmap(MemoryArena *arena, Bitmap *result, const u32 width, const 
 	result->pixels   = (u32 *)MA_Alloc(arena, result->byteSize);
 }
 
-BEGIN_PACKED_DEFS
-
-struct BmpFileHeader_s
+void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result, const char *filename, bool forceOpaque)
 {
-	u16 type;
-	u32 fileSize;
-	u16 __reserved1;
-	u16 __reserved2;
-	u32 pixelDataOffset;
-} PACKED;
+	int wid, hgt, components;
+	stbi_set_flip_vertically_on_load(true);
+	u8* data = stbi_load(filename, &wid, &hgt, &components, 4);
 
-struct BmpImageHeader_s
-{
-	u32 size;
-	u32 width;
-	u32 height;
-	u16 planes;
-	u16 bpp;
-	u32 compression;
-	u32 imageSize;
-	u32 hResolution;
-	u32 vResolution;
-	u32 colors;
-	u32 importantColors;
-	u32 redMask;
-	u32 greenMask;
-	u32 blueMask;
-} PACKED;
-
-END_PACKED_DEFS
-
-void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result, const char *filename)
-{
-	size_t readSize;
-	u8 *   fileData = (u8 *)plat->ReadEntireFile(thread, filename, &readSize);
-	Assert(fileData);
-
-	const BmpFileHeader_s * fileHeader = (BmpFileHeader_s *)fileData;
-	const BmpImageHeader_s *imgHeader  = (BmpImageHeader_s *)(fileData + sizeof(BmpFileHeader_s));
-	u32 *                   srcXels    = nullptr;
-	u32 *                   dstXels    = nullptr;
-	u32                     rMask, gMask, bMask, aMask;
-	u32                     rShift, gShift, bShift, aShift;
-
-	if (fileHeader->type != 0x4D42) // 'BM' in ASCII
-	{
-		printf("Bad bmp type: 0x%x\n", fileHeader->type);
-		goto end;
-	}
-	if (imgHeader->size < 40)
-	{
-		printf("Unexpected bmp header size: %d\n", imgHeader->size);
-		goto end;
-	}
-
-	Bm_CreateBitmap(memArena, result, imgHeader->width, imgHeader->height);
-	srcXels = (u32 *)(fileData + fileHeader->pixelDataOffset);
-	dstXels = result->pixels;
-
-	if (imgHeader->compression == 3)
-	{
-		rMask = imgHeader->redMask;
-		gMask = imgHeader->greenMask;
-		bMask = imgHeader->blueMask;
-	}
-	else
-	{
-		rMask = 0xFF0000;
-		gMask = 0x00FF00;
-		bMask = 0x0000FF;
-	}
-
-	aMask = ~(rMask | gMask | bMask);
-
-	rShift = ShiftFromMask(rMask);
-	gShift = ShiftFromMask(gMask);
-	bShift = ShiftFromMask(bMask);
-	aShift = ShiftFromMask(aMask);
+	Bm_CreateBitmap(memArena, result, wid, hgt);
+	u8* srcXels = (u8 *)data;
+	u32* dstXels = result->pixels;
 
 	for (u32 idx = 0; idx < result->byteSize / sizeof(u32); idx++)
 	{
-		u32 src = srcXels[idx];
-		u32 r   = (src & rMask) >> rShift;
-		u32 g   = (src & gMask) >> gShift;
-		u32 b   = (src & bMask) >> bShift;
-		u32 a   = (src & aMask) >> aShift;
+		u32 r   = srcXels[0];
+		u32 g   = srcXels[1];
+		u32 b   = srcXels[2];
+		u32 a   = forceOpaque ? 0xFF : srcXels[3];
 
 		dstXels[idx] = (a << 24) | (b << 16) | (g << 8) | r;
+		srcXels += 4;
 	}
 
 	printf("Read %s: %d x %d\n", filename, result->width, result->height);
 	gHwi->RegisterBitmap(result, false);
 	gHwi->UploadBitmap(result);
 
-end:
-	plat->ReleaseFileBuffer(thread, fileData);
+	free(data);
 }
+
