@@ -1,0 +1,67 @@
+[
+    {
+        name = "floors"
+        imageFile = "tiles/floor.bmp"
+        baseSize = [ 32 32 ]
+        baseOrigin = [ 0 0 ]
+        sprites = [
+            {
+                name = "black"
+                frames = [
+                    { pos = [ 0 0 ] }
+                ]
+            }
+            {
+                name = "unknown"
+                frames = [
+                    { pos = [ 32 0 ] }
+                ]
+            }
+            {
+                name = "black_dirt"
+                frames = [
+                    { pos = [ 64 0 ] }
+                    { pos = [ 96 0 ] }
+                    { pos = [ 128 0 ] }
+                    { pos = [ 160 0 ] }
+                    { pos = [ 192 0 ] }
+                    { pos = [ 224 0 ] }
+                    { pos = [ 256 0 ] }
+                    { pos = [ 288 0 ] }
+                ]
+            }
+            {
+                name = "dark_dirt"
+                frames = [
+                    { pos = [ 320 0 ] }
+                    { pos = [ 352 0 ] }
+                    { pos = [ 384 0 ] }
+                    { pos = [ 416 0 ] }
+                    { pos = [ 448 0 ] }
+                    { pos = [ 480 0 ] }
+                    { pos = [ 512 0 ] }
+                    { pos = [ 544 0 ] }
+                ]
+            }
+            {
+                name = "gray_stone"
+                frames = [
+                    { pos = [ 576 0 ] }
+                    { pos = [ 608 0 ] }
+                    { pos = [ 640 0 ] }
+                    { pos = [ 672 0 ] }
+                    { pos = [ 704 0 ] }
+                    { pos = [ 736 0 ] }
+                    { pos = [ 768 0 ] }
+                    { pos = [ 800 0 ] }
+                    { pos = [ 832 0 ] }
+                ]
+            }
+            {
+                name = "brown_stone"
+                ref = "gray_stone"
+                tint = [ 136 54 10 ]
+            }
+         ]
+    }
+]

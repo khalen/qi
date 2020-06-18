@@ -91,6 +91,19 @@ struct SpriteAtlas
 struct KeyStore;
 void Spr_ReadAtlasFromKeyStore(const KeyStore* ks, SpriteAtlas *atlas);
 void Spr_WriteAtlasToKeyStore(KeyStore* ks, const SpriteAtlas *atlas);
+void Spr_CreateSimpleTileSheet(SpriteAtlas* atlas, const char* name, u32 tileSizeX, u32 tileSizeY, u32 *tileCount);
+void Spr_Draw(Bitmap* dest, Sprite* sprite, i32 frame, i32 x, i32 y, ColorU tint = ColorU(255, 255, 255, 255));
+void Spr_DrawStretched(Bitmap *dest, Sprite *sprite, i32 frame, i32 x, i32 y, i32 w, i32 h, ColorU tint = ColorU(255, 255, 255, 255));
+
+struct SpriteDLEntry
+{
+	Sprite* sprite;
+	i32 x, y;
+	i32 frame;
+	ColorU tint;
+};
+static_assert(sizeof(SpriteDLEntry) == 16, "Weirdly sized SpriteDLEntry");
+void Spr_DrawList(Bitmap* dest, SpriteDLEntry* entries, u32 numEntries);
 
 struct Button
 {
