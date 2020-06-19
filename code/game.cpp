@@ -14,6 +14,7 @@
 #include "util.h"
 #include "noise.h"
 #include "keystore.h"
+#include "qed_parse.h"
 #include "bitmap.h"
 #include "hwi.h"
 #include <stdio.h>
@@ -30,6 +31,8 @@
 
 #define PLAYER_RADIUS_X (0.5f * TILE_SIZE_METERS_X)
 #define PLAYER_RADIUS_Y (0.25f * TILE_SIZE_METERS_Y)
+
+#define MAX_SPRITE_ATLASES 32
 
 struct GameGlobals_s
 {
@@ -52,9 +55,12 @@ struct GameGlobals_s
 	i32    playerFacingIdx;
 
 	BuddyAllocator *testAlloc;
-	Bitmap* screenBitmap;
+	Bitmap *        screenBitmap;
 
 	bool enableEditor;
+
+	SpriteAtlas atlases[MAX_SPRITE_ATLASES];
+	u32         numAtlases;
 };
 
 GameGlobals_s *g_game;
@@ -73,8 +79,6 @@ T *MemoryArena_PushStruct(MemoryArena *arena)
 }
 
 static void InitGameGlobals(const SubSystem *, bool);
-
-SubSystem GameSubSystem = {"Game", InitGameGlobals, sizeof(GameGlobals_s), nullptr};
 
 internal void TestKeyStore(void)
 {
@@ -132,74 +136,6 @@ internal void TestKeyStore(void)
 
 	KS_Free(&ksf);
 #endif
-}
-
-internal void InitGameGlobals(const SubSystem *sys, bool isReInit)
-{
-	Assert(sys->globalPtr);
-
-	if (isReInit)
-		return;
-
-	MA_Init(&g_game->tileArena, g_game->memory, MB(32));
-
-	TestKeyStore();
-
-	g_game->playerPos.x.tile = 10;
-	g_game->playerPos.y.tile = 10;
-
-	for (i32 scrY = -32; scrY < 32; scrY++)
-	{
-		for (i32 scrX = -32; scrX < 32; scrX++)
-		{
-			for (i32 tileY = 0; tileY < ROOM_HGT; tileY++)
-			{
-				for (i32 tileX = 0; tileX < ROOM_WID; tileX++)
-				{
-					u32 value = TILE_EMPTY;
-					if ((tileX == 0 || tileX == (ROOM_WID - 1) || tileY == 0 || tileY == (ROOM_HGT - 1)) && ((tileX != ROOM_WID / 2) && (tileY != ROOM_HGT / 2)))
-						value = TILE_FULL;
-					WorldPos_s worldPos = {};
-					worldPos.x.tile     = scrX * ROOM_WID + tileX;
-					worldPos.y.tile     = scrY * ROOM_HGT + tileY;
-					SetTileValue(&g_game->tileArena, &g_game->world, &worldPos, value);
-				}
-			}
-
-			for (i32 junk = 0; junk < 10; junk++)
-			{
-				i32 rxo = (rand() % (ROOM_WID - 2)) + 1;
-				i32 ryo = (rand() % (ROOM_HGT - 2)) + 1;
-
-				WorldPos_s worldPos = {};
-				worldPos.x.tile     = scrX * ROOM_WID + rxo;
-				worldPos.y.tile     = scrY * ROOM_HGT + ryo;
-				SetTileValue(&g_game->tileArena, &g_game->world, &worldPos, TILE_FULL);
-			}
-		}
-	}
-
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[0], "test/test_scene_layer_00.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[1], "test/test_scene_layer_01.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[2], "test/test_scene_layer_02.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[3], "test/test_scene_layer_03.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[4], "test/test_scene_layer_04.bmp", true);
-
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][0], "test/test_hero_back_head.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][1], "test/test_hero_back_cape.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][2], "test/test_hero_back_torso.bmp");
-
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][0], "test/test_hero_right_head.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][1], "test/test_hero_right_cape.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][2], "test/test_hero_right_torso.bmp");
-
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][0], "test/test_hero_front_head.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][1], "test/test_hero_front_cape.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][2], "test/test_hero_front_torso.bmp");
-
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][0], "test/test_hero_left_head.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][1], "test/test_hero_left_cape.bmp");
-	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][2], "test/test_hero_left_torso.bmp");
 }
 
 #if 0
@@ -319,7 +255,7 @@ internal void UpdateGameState(Bitmap *screen, Input *input)
 	const r32 ddPlayerMag = 35.0f + (50.0f * input->controllers[KBD].leftStickButton.endedDown);
 
 	v2 ddPlayer = ctr0->dir * ctr0->trigger.reading * ddPlayerMag;
-	ddPlayer += -8.7 * g_game->dPlayerPos;
+	ddPlayer += -8.7f * g_game->dPlayerPos;
 
 	v2 playerOffset = {};
 	playerOffset    = (ddPlayer * 0.5f * input->dT * input->dT) + g_game->dPlayerPos * input->dT;
@@ -409,55 +345,115 @@ internal void UpdateGameState(Bitmap *screen, Input *input)
 		g_game->playerFacingIdx = 3;
 }
 
-extern SubSystem SoundSubSystem;
-extern SubSystem KeyStoreSubsystem;
-extern SubSystem DebugSubSystem;
-extern SubSystem UtilSubSystem;
-extern SubSystem HardwareSubsystem;
-
-internal SubSystem *s_subSystems[] = {
-#if !HAS(RELEASE_BUILD)
-	&DebugSubSystem,
-#endif
-	&HardwareSubsystem,
-	&KeyStoreSubsystem,
-	&SoundSubSystem,
-	&UtilSubSystem,
-	&GameSubSystem,
-};
-
-internal void InitGameSystems(Memory *memory)
+internal void VerifyLoad(const char *msg)
 {
-	NoiseGenerator::InitGradients();
+	if (!msg)
+		return;
 
-	g_game         = (GameGlobals_s *)memory->permanentStorage;
-	g_game->memory = memory;
+	fprintf(stderr, "Load failed: %s", msg);
+	exit(1);
+}
 
-	bool isReload = g_game->isInitialized;
-	if (!isReload)
+void Spr_ReadAtlasFromKeyStore(const KeyStore *ks, ValueRef avr, SpriteAtlas *atlas)
+{
+	atlas->name = KS_GetKeySymbol(ks, avr, "name");
+	strncpy(atlas->imageFile, KS_GetKeyString(ks, avr, "imageFile"), sizeof(atlas->imageFile));
+
+	printf("Reading atlas %s from %s\n", ST_ToString(KS_GetStringTable(), atlas->name), atlas->imageFile);
+	atlas->bitmap = Bm_MakeBitmapFromFile(nullptr, &g_game->tileArena, atlas->imageFile);
+
+	ValueRef spriteArr  = KS_ObjectGetValue(ks, avr, "sprites");
+	u32      numSprites = KS_ArrayCount(ks, spriteArr);
+	iv2      baseSize   = KS_GetKeySmallInt2(ks, avr, "baseSize");
+	iv2      baseOrigin = KS_GetKeySmallInt2(ks, avr, "baseOrigin");
+}
+
+internal void LoadSprites()
+{
+	KeyStore *atlasKs = nullptr;
+	VerifyLoad(QED_LoadFile(&atlasKs, "sprites", "qed/sprites/tiledefs.qed"));
+
+	Assert(atlasKs);
+
+	ValueRef root       = KS_Root(atlasKs);
+	u32      numAtlases = KS_ArrayCount(atlasKs, root);
+	Assert(numAtlases < MAX_SPRITE_ATLASES);
+
+	for (u32 ai = 0; ai < numAtlases; ++ai)
 	{
-		void* initMemPtr = M_AllocRaw(memory, sizeof(GameGlobals_s));
-		Assert(initMemPtr == (void *)g_game);
+		ValueRef avr = KS_ArrayElem(atlasKs, root, ai);
+		Spr_ReadAtlasFromKeyStore(atlasKs, avr, &g_game->atlases[ai]);
+	}
+}
+
+internal void InitGameGlobals(const SubSystem *sys, bool isReInit)
+{
+	Assert(sys->globalPtr);
+
+	if (isReInit)
+		return;
+
+	MA_Init(&g_game->tileArena, g_game->memory, MB(32));
+
+	TestKeyStore();
+
+	LoadSprites();
+
+	g_game->playerPos.x.tile = 10;
+	g_game->playerPos.y.tile = 10;
+
+	for (i32 scrY = -32; scrY < 32; scrY++)
+	{
+		for (i32 scrX = -32; scrX < 32; scrX++)
+		{
+			for (i32 tileY = 0; tileY < ROOM_HGT; tileY++)
+			{
+				for (i32 tileX = 0; tileX < ROOM_WID; tileX++)
+				{
+					u32 value = TILE_EMPTY;
+					if ((tileX == 0 || tileX == (ROOM_WID - 1) || tileY == 0 || tileY == (ROOM_HGT - 1)) && ((tileX != ROOM_WID / 2) && (tileY != ROOM_HGT / 2)))
+						value = TILE_FULL;
+					WorldPos_s worldPos = {};
+					worldPos.x.tile     = scrX * ROOM_WID + tileX;
+					worldPos.y.tile     = scrY * ROOM_HGT + tileY;
+					SetTileValue(&g_game->tileArena, &g_game->world, &worldPos, value);
+				}
+			}
+
+			for (i32 junk = 0; junk < 10; junk++)
+			{
+				i32 rxo = (rand() % (ROOM_WID - 2)) + 1;
+				i32 ryo = (rand() % (ROOM_HGT - 2)) + 1;
+
+				WorldPos_s worldPos = {};
+				worldPos.x.tile     = scrX * ROOM_WID + rxo;
+				worldPos.y.tile     = scrY * ROOM_HGT + ryo;
+				SetTileValue(&g_game->tileArena, &g_game->world, &worldPos, TILE_FULL);
+			}
+		}
 	}
 
-	for (i32 i = 0; i < countof(s_subSystems); i++)
-	{
-		SubSystem *sys       = &g_game->gameSubsystems[i];
-		void *     curMemPtr = sys->globalPtr;
-		*sys                 = *s_subSystems[i];
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[0], "test/test_scene_layer_00.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[1], "test/test_scene_layer_01.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[2], "test/test_scene_layer_02.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[3], "test/test_scene_layer_03.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->testBitmaps[4], "test/test_scene_layer_04.bmp", true);
 
-		if (curMemPtr == nullptr)
-			sys->globalPtr = M_AllocRaw(memory, sys->globalSize);
-		else
-			sys->globalPtr = curMemPtr;
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][0], "test/test_hero_back_head.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][1], "test/test_hero_back_cape.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[0][2], "test/test_hero_back_torso.bmp");
 
-		sys->initFunc(sys, isReload);
-	}
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][0], "test/test_hero_right_head.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][1], "test/test_hero_right_cape.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[1][2], "test/test_hero_right_torso.bmp");
 
-	if (!g_game->isInitialized)
-	{
-		g_game->isInitialized = true;
-	}
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][0], "test/test_hero_front_head.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][1], "test/test_hero_front_cape.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[2][2], "test/test_hero_front_torso.bmp");
+
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][0], "test/test_hero_left_head.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][1], "test/test_hero_left_cape.bmp");
+	Bm_ReadBitmap(nullptr, &g_game->tileArena, &g_game->playerBmps[3][2], "test/test_hero_left_torso.bmp");
 }
 
 static u32 RoundReal(r32 val)
@@ -494,10 +490,10 @@ internal void RenderRectangle(Bitmap *bitmap, i32 x0, i32 y0, i32 x1, i32 y1, r3
 	}
 #else
 	const Color color(r, g, b, 1.0f);
-	Rect rect;
-	rect.left = x0;
-	rect.top = y0;
-	rect.width = x1 - x0;
+	Rect        rect;
+	rect.left   = x0;
+	rect.top    = y0;
+	rect.width  = x1 - x0;
 	rect.height = y1 - y0;
 
 	if (bitmap != g_game->screenBitmap)
@@ -674,8 +670,8 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 	static NoiseGenerator noise(1234);
 
 	g_game->screenBitmap = screenBitmap;
-	g_game->screenWid = screenBitmap->width;
-	g_game->screenHgt = screenBitmap->height;
+	g_game->screenWid    = screenBitmap->width;
+	g_game->screenHgt    = screenBitmap->height;
 
 	Assert(g_game && g_game->isInitialized);
 	UpdateGameState(screenBitmap, input);
@@ -778,9 +774,62 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 	DrawDebugShapes(screenBitmap);
 }
 
-Hwi* Qi_GetHwi()
+Hwi *Qi_GetHwi()
 {
 	return gHwi;
+}
+
+extern SubSystem SoundSubSystem;
+extern SubSystem KeyStoreSubsystem;
+extern SubSystem DebugSubSystem;
+extern SubSystem UtilSubSystem;
+extern SubSystem HardwareSubsystem;
+
+SubSystem GameSubSystem = {"Game", InitGameGlobals, sizeof(GameGlobals_s), nullptr};
+
+internal SubSystem *s_subSystems[] = {
+#if !HAS(RELEASE_BUILD)
+	&DebugSubSystem,
+#endif
+	&HardwareSubsystem,
+	&KeyStoreSubsystem,
+	&SoundSubSystem,
+	&UtilSubSystem,
+	&GameSubSystem,
+};
+
+internal void InitGameSystems(Memory *memory)
+{
+	NoiseGenerator::InitGradients();
+
+	g_game         = (GameGlobals_s *)memory->permanentStorage;
+	g_game->memory = memory;
+
+	bool isReload = g_game->isInitialized;
+	if (!isReload)
+	{
+		void *initMemPtr = M_AllocRaw(memory, sizeof(GameGlobals_s));
+		Assert(initMemPtr == (void *)g_game);
+	}
+
+	for (i32 i = 0; i < countof(s_subSystems); i++)
+	{
+		SubSystem *sys       = &g_game->gameSubsystems[i];
+		void *     curMemPtr = sys->globalPtr;
+		*sys                 = *s_subSystems[i];
+
+		if (curMemPtr == nullptr)
+			sys->globalPtr = M_AllocRaw(memory, sys->globalSize);
+		else
+			sys->globalPtr = curMemPtr;
+
+		sys->initFunc(sys, isReload);
+	}
+
+	if (!g_game->isInitialized)
+	{
+		g_game->isInitialized = true;
+	}
 }
 
 const PlatFuncs_s *plat;

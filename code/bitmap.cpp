@@ -56,3 +56,10 @@ void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result,
 	free(data);
 }
 
+Bitmap* Bm_MakeBitmapFromFile(ThreadContext *thread, MemoryArena *memArena, const char *filename, bool forceOpaque)
+{
+	Bitmap* bm = (Bitmap *)MA_Alloc(memArena, sizeof(Bitmap));
+	Bm_ReadBitmap(thread, memArena, bm, filename, forceOpaque);
+	return bm;
+}
+

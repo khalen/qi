@@ -761,6 +761,40 @@ SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, Symbol key)
 	return (SmallIntValue)0;
 }
 
+void KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, Symbol key, i32 *result, u32 count)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
+	if (kv)
+	{
+		Assert(ValueRefType(kv->value) == ValueType::ARRAY);
+		Assert(KS_ArrayCount(ks, kv->value) >= count);
+		for (u32 i = 0; i < count; i++)
+		{
+			result[i] = KS_ValueSmallInt(ks, KS_ArrayElem(ks, kv->value, i));
+		}
+	}
+}
+
+void KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, const char *key, i32 *result, u32 count)
+{
+	KS_GetKeySmallIntN(ks, object, ST_Intern(gks->symbolTable, key), result, count);
+}
+
+iv2 KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, const char *key)
+{
+	iv2 result;
+	KS_GetKeySmallIntN(ks, object, ST_Intern(gks->symbolTable, key), result.v, 2);
+	return result;
+}
+
+iv2 KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, Symbol key)
+{
+	iv2 result;
+	KS_GetKeySmallIntN(ks, object, key, result.v, 2);
+	return result;
+}
+
 void KS_SetKeySmallInt(KeyStore **ksp, ValueRef object, const char *key, IntValue val) {}
 void KS_SetKeySmallInt(KeyStore **ksp, ValueRef object, Symbol key) {}
 
@@ -796,6 +830,23 @@ RealValue KS_GetKeyReal(const KeyStore *ks, ValueRef object, Symbol key)
 		return KS_ValueReal(ks, kv->value);
 	}
 	return (RealValue)0.0;
+}
+
+Symbol KS_GetKeySymbol(const KeyStore *ks, ValueRef object, const char *key)
+{
+	return KS_GetKeySymbol(ks, object, ST_Intern(gks->symbolTable, key));
+}
+
+Symbol KS_GetKeySymbol(const KeyStore *ks, ValueRef object, Symbol key)
+{
+	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
+	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
+	if (kv)
+	{
+		Assert(ValueRefType(kv->value) == ValueType::STRING);
+		return KS_ValueSymbol(ks, kv->value);
+	}
+	return 0;
 }
 
 const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, const char *key)

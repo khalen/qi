@@ -59,12 +59,6 @@ static ValueRef P_ParseValue();
 static ValueRef P_ParseArray();
 static ValueRef P_ParseObject(bool topLevel);
 
-// Returns nullptr on success, error message on failure; *ksp will be created if initially null
-const char *QED_LoadBuffer(KeyStore **ksp, const char *ksName, const char *buf, size_t bufSize);
-const char *QED_LoadFile(KeyStore **ksp, const char *ksName, const char *fileName); // Global data store interface
-KeyStore *  QED_LoadDataStore(const char *dsName);
-KeyStore *  QED_GetDataStore(const char *dsName);
-
 bool P_CanStartSymbol(char c)
 {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_');
@@ -292,11 +286,34 @@ static ValueRef P_ParseSymbol()
 
 	return ref;
 }
+
+static IntValue P_CharValue(IntValue base, char c)
+{
+	if (c >= 'a')
+	{
+		c = c - 'a';
+	}
+	else if (c >= 'A')
+	{
+		c = c - 'A';
+	}
+	else
+	{
+		c = c - '0';
+	}
+	if (c > base - 1)
+	{
+		P_Error("Bad character '%c' in base %lld integer constant", c, base);
+	}
+	return (IntValue)c;
+}
+
 static ValueRef P_ParseNumber()
 {
 	bool     isReal   = false;
 	IntValue sign     = 1;
 	IntValue intv     = 0;
+	IntValue base     = 10;
 	IntValue fracv    = 0;
 	IntValue fracdivv = 1;
 	IntValue expv     = 0;
@@ -304,6 +321,14 @@ static ValueRef P_ParseNumber()
 
 	// Integer part
 	char c = NEXT();
+	// Color constant
+	if (c == '#')
+	{
+		base = 16;
+		SKIP();
+		c = NEXT();
+	}
+
 	// Sign
 	if (c == '-')
 	{
@@ -314,20 +339,39 @@ static ValueRef P_ParseNumber()
 	{
 		SKIP();
 	}
-	// Optional leading 0s
+	// Optional leading 0s + detect hex or octal
 	else if (c == '0')
 	{
-		while (gpc.s < gpc.end && *gpc.s == '0')
-			gpc.s++;
+		SKIP();
+		c = NEXT();
+		if (c == 'x' || c == 'X')
+		{
+			base = 16;
+		}
+		else if (c == 'o' || c == 'O')
+		{
+			base = 8;
+		}
+
+		if (c == '0')
+		{
+			while (gpc.s < gpc.end && *gpc.s == '0')
+				gpc.s++;
+		}
 	}
 
 	// Number
 	c = NEXT();
-	while (gpc.s < gpc.end && (c >= '0' && c <= '9'))
+	while (gpc.s < gpc.end && ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')))
 	{
-		intv = 10 * intv + (c - '0');
+		intv = base * intv + P_CharValue(base, c);
 		SKIP();
 		c = NEXT();
+	}
+
+	if (base != 10)
+	{
+		goto done;
 	}
 
 	// Optional fractional part
@@ -381,6 +425,7 @@ static ValueRef P_ParseNumber()
 		}
 	}
 
+done:
 	ValueRef ret;
 	if (isReal)
 	{
@@ -483,11 +528,12 @@ static ValueRef P_ParseString()
 
 	return ref;
 }
+
 static ValueRef P_ParseValue()
 {
 	P_SkipSpace();
 	char c = NEXT();
-	if ((c >= '0' && c <= '9') || (c == '+' || c == '-' || c == '.'))
+	if ((c >= '0' && c <= '9') || (c == '+' || c == '-' || c == '.') || c == '#')
 		return P_ParseNumber();
 	else if (c == 'n')
 		return P_ParseNil();
@@ -508,6 +554,7 @@ static ValueRef P_ParseValue()
 
 	return NilValue;
 }
+
 static ValueRef P_ParseArray()
 {
 	ValueBuffer vb;
@@ -526,6 +573,7 @@ static ValueRef P_ParseArray()
 	PB_Destroy(&vb);
 	return rval;
 }
+
 ValueRef P_ParseObject(bool topLevel)
 {
 	ValueBuffer vb;

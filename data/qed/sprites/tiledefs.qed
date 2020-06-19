@@ -1,24 +1,24 @@
 [
     {
-        name = "floors"
+        name = floors
         imageFile = "tiles/floor.bmp"
         baseSize = [ 32 32 ]
         baseOrigin = [ 0 0 ]
         sprites = [
             {
-                name = "black"
+                name = black
                 frames = [
                     { pos = [ 0 0 ] }
                 ]
             }
             {
-                name = "unknown"
+                name = unknown
                 frames = [
                     { pos = [ 32 0 ] }
                 ]
             }
             {
-                name = "black_dirt"
+                name = black_dirt
                 frames = [
                     { pos = [ 64 0 ] }
                     { pos = [ 96 0 ] }
@@ -31,7 +31,7 @@
                 ]
             }
             {
-                name = "dark_dirt"
+                name = dark_dirt
                 frames = [
                     { pos = [ 320 0 ] }
                     { pos = [ 352 0 ] }
@@ -44,7 +44,7 @@
                 ]
             }
             {
-                name = "gray_stone"
+                name = gray_stone
                 frames = [
                     { pos = [ 576 0 ] }
                     { pos = [ 608 0 ] }
@@ -58,10 +58,88 @@
                 ]
             }
             {
-                name = "brown_stone"
-                ref = "gray_stone"
-                tint = [ 136 54 10 ]
+                name = brown_stone
+                ref = gray_stone
+                tint = #88540BFF
+            }
+            {
+                name = yellow_stone
+                ref = gray_stone
+                tint = #E9D66BFF
             }
          ]
     }
+    {
+        name = walls
+        imageFile = "data/tiles/wall.bmp"
+        baseSize = [ 32 32 ]
+        baseOrigin = [ 0 0 ]
+        sprites = [
+            {
+                name = mossy_stone
+                frames = [
+                    { pos = [ 0 0 ] }
+                    { pos = [ 32 0 ] }
+                    { pos = [ 64 0 ] }
+                    { pos = [ 96 0 ] }
+                    { pos = [ 160 0 ] }
+                    { pos = [ 192 0 ] }
+                    { pos = [ 224 0 ] }
+                ]
+            }
+            {
+                name = mossy_stone_torch
+                frames = [
+                    { pos = [ 640 0 ] }
+                    { pos = [ 672 0 ] }
+                    { pos = [ 704 0 ] }
+                    { pos = [ 736 0 ] }
+                ]
+            }
+            {
+                name = stone
+                frames = [
+                    { pos = [ 256 32 ] }
+                    { pos = [ 288 32 ] }
+                    { pos = [ 320 32 ] }
+                    { pos = [ 352 32 ] }
+                    { pos = [ 384 32 ] }
+                    { pos = [ 416 32 ] }
+                ]
+            }
+            {
+                name = stone_brazier
+                frames = [
+                    { pos = [ 640 32 ] }
+                    { pos = [ 672 32 ] }
+                    { pos = [ 704 32 ] }
+                    { pos = [ 736 32 ] }
+                ]
+            }
+            {
+                name = broken_bricks
+                frames = [
+                    { pos = [ 512 192 ] }
+                    { pos = [ 544 192 ] }
+                    { pos = [ 576 192 ] }
+                    { pos = [ 608 192 ] }
+                    { pos = [ 640 192 ] }
+                    { pos = [ 674 192 ] }
+                    { pos = [ 706 192 ] }
+                    { pos = [ 738 192 ] }
+                ]
+            }
+            {
+                name = gray_bricks
+                ref = broken_bricks
+                tint = #808080FF
+            }
+            {
+                name = brown_bricks
+                ref = broken_bricks
+                tint = #88540BFF
+            }
+        ]
+    }
 ]
+

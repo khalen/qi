@@ -108,16 +108,23 @@ u32      KS_ObjectCount(const KeyStore *ks, ValueRef object);
 // Simple helpers for common cases
 SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, const char *key);
 SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, Symbol key);
-IntValue      KS_GetKeyInt(const KeyStore *ks, ValueRef object, const char *key);
-IntValue      KS_GetKeyInt(const KeyStore *ks, ValueRef object, Symbol key);
-RealValue     KS_GetKeyReal(const KeyStore *ks, ValueRef object, const char *key);
-RealValue     KS_GetKeyReal(const KeyStore *ks, ValueRef object, Symbol key);
-const char *  KS_GetKeyString(const KeyStore *ks, ValueRef object, const char *key);
-const char *  KS_GetKeyString(const KeyStore *ks, ValueRef object, Symbol key);
-bool          KS_GetKeyBool(const KeyStore *ks, ValueRef object, const char *key);
-bool          KS_GetKeyBool(const KeyStore *ks, ValueRef object, Symbol key);
-const char *  KS_GetKeyAsString(const KeyStore *ks, ValueRef object, const char *key, ValueType *typePtr = nullptr);
-const char *  KS_GetKeyAsString(const KeyStore *ks, ValueRef object, Symbol key, ValueType *typePtr = nullptr);
+
+void        KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, Symbol key, i32 *result, u32 count);
+void        KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, const char *key, i32 *result, u32 count);
+iv2         KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, const char *key);
+iv2         KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, Symbol key);
+IntValue    KS_GetKeyInt(const KeyStore *ks, ValueRef object, const char *key);
+IntValue    KS_GetKeyInt(const KeyStore *ks, ValueRef object, Symbol key);
+RealValue   KS_GetKeyReal(const KeyStore *ks, ValueRef object, const char *key);
+RealValue   KS_GetKeyReal(const KeyStore *ks, ValueRef object, Symbol key);
+const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, const char *key);
+const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, Symbol key);
+Symbol      KS_GetKeySymbol(const KeyStore *ks, ValueRef object, const char *key);
+Symbol      KS_GetKeySymbol(const KeyStore *ks, ValueRef object, Symbol key);
+bool        KS_GetKeyBool(const KeyStore *ks, ValueRef object, const char *key);
+bool        KS_GetKeyBool(const KeyStore *ks, ValueRef object, Symbol key);
+const char *KS_GetKeyAsString(const KeyStore *ks, ValueRef object, const char *key, ValueType *typePtr = nullptr);
+const char *KS_GetKeyAsString(const KeyStore *ks, ValueRef object, Symbol key, ValueType *typePtr = nullptr);
 
 void KS_SetKeySmallInt(KeyStore **ksp, ValueRef object, const char *key, IntValue val);
 void KS_SetKeySmallInt(KeyStore **ksp, ValueRef object, Symbol key);
@@ -143,7 +150,7 @@ ValueRef KS_ObjectGetValue(const KeyStore *ks, ValueRef object, const char *key)
 ValueRef KS_ObjectGetValue(const KeyStore *ks, ValueRef object, ValueRef keyVal);
 
 struct BuddyAllocator;
-BuddyAllocator* KS_GetKeyStoreAllocator();
+BuddyAllocator *KS_GetKeyStoreAllocator();
 
 #define __KEYVALUES_H
 #endif // #ifndef __KEYVALUES_H

@@ -22,34 +22,39 @@
 #define Q_R32_EPSILON      1.0e-5f
 #define Q_R32_LARGE_NUMBER 1.0e6f
 
-struct v2
+template<typename T>
+struct Vec2
 {
+	typedef Vec2<T> Vec;
 	union
 	{
-		r32 f[2];
+		T v[2];
 		struct
 		{
-			r32 x;
-			r32 y;
+			T x;
+			T y;
 		};
 	};
 
-	r32 dot(const v2 &b) const { return x * b.x + y * b.y; }
+	Vec2<T>() = default;
+	Vec2<T>(T ia, T ib) : v{ia, ib} {}
 
-	v2 perp() const
+	T dot(const Vec &b) const { return x * b.x + y * b.y; }
+
+	Vec perp() const
 	{
-		v2 result;
+		Vec result;
 		result.x = y;
 		result.y = -x;
 		return result;
 	}
 
-	r32 lenSq() const { return x * x + y * y; }
-	r32 len() const { return sqrtf(lenSq()); }
+	T lenSq() const { return x * x + y * y; }
+	T len() const { return (T)sqrtf((r32)lenSq()); }
 
-	v2 normal() const
+	Vec2<r32> normal() const
 	{
-		v2        result;
+		Vec2<r32> result;
 		const r32 lenSq = x * x + y * y;
 		if (lenSq < Q_R32_EPSILON)
 		{
@@ -66,47 +71,59 @@ struct v2
 	}
 };
 
+typedef Vec2<i32> iv2;
+typedef Vec2<r32> v2;
+
 inline v2 V2(const r32 x, const r32 y)
 {
-	v2 result;
-	result.x = x;
-	result.y = y;
-	return result;
+	return v2(x, y);
 }
 
-inline v2 operator-(const v2 &a)
+inline iv2 IV2(const i32 x, const i32 y)
 {
-	return V2(-a.x, -a.y);
+	return iv2(x, y);
 }
 
-inline v2 operator+(const v2 &a, const v2 &b)
+template<typename T>
+inline Vec2<T> operator-(const Vec2<T> &a)
 {
-	return V2(a.x + b.x, a.y + b.y);
+	return Vec2<T>(-a.x, -a.y);
 }
 
-inline v2 operator-(const v2 &a, const v2 &b)
+template<typename T>
+inline Vec2<T> operator+(const Vec2<T> &a, const Vec2<T> &b)
+{
+	return Vec2<T>(a.x + b.x, a.y + b.y);
+}
+
+template<typename T>
+inline Vec2<T> operator-(const Vec2<T> &a, const Vec2<T> &b)
 {
 	return a + -b;
 }
 
-inline v2 &operator+=(v2 &a, const v2 &b)
+template <typename T>
+inline Vec2<T> &operator+=(Vec2<T> &a, const Vec2<T> &b)
 {
 	a.x += b.x;
 	a.y += b.y;
 	return a;
 }
 
-inline v2 operator*(const v2 &a, const r32 s)
+template<typename T>
+inline Vec2<T> operator*(const Vec2<T> &a, const T s)
 {
-	return V2(a.x * s, a.y * s);
+	return Vec2<T>(a.x * s, a.y * s);
 }
 
-inline v2 operator*(const r32 s, const v2 &a)
+template<typename T>
+inline Vec2<T> operator*(const T s, const Vec2<T> &a)
 {
 	return a * s;
 }
 
-inline v2 &operator*=(v2 &a, const r32 s)
+template<typename T>
+inline Vec2<T> &operator*=(Vec2<T> &a, const T s)
 {
 	a.x *= s;
 	a.y *= s;
