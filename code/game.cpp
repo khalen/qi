@@ -48,6 +48,7 @@ struct GameGlobals_s
 	v2          dPlayerPos;
 	WorldPos_s  cameraPos;
 	MemoryArena tileArena;
+	MemoryArena spriteArena;
 	MemoryArena assetArena;
 
 	Bitmap testBitmaps[5];
@@ -354,28 +355,123 @@ internal void VerifyLoad(const char *msg)
 	exit(1);
 }
 
+static void LoadFrame(const KeyStore* ks, const SpriteAtlas *atlas, const Sprite *sprite, SpriteFrame *frame, ValueRef frameRef)
+{
+	const r32 iAtlasW = 1.0f / atlas->bitmap->width;
+	const r32 iAtlasH = 1.0f / atlas->bitmap->height;
+	const r32 iSpriteW = 1.0f / sprite->size.x;
+	const r32 iSpriteH = 1.0f / sprite->size.y;
+
+	// Atlas coords are specified top left corner, width and height
+	// Must convert to bottom left, top right in UVs
+	iv2 pos = KS_GetKeySmallInt2(ks, frameRef, "pos");
+	frame->topLeftUV.x = pos.x * iAtlasW;
+	frame->bottomRightUV.y = (atlas->bitmap->height - pos.y) * iAtlasH;
+	frame->bottomRightUV.x = (pos.x + sprite->size.x) * iAtlasW;
+	frame->topLeftUV.y = (atlas->bitmap->height - pos.y - sprite->size.y) * iAtlasH;
+
+	frame->weight = (r32)KS_GetKeyReal(ks, frameRef, "weight", 1.0);
+	printf("    Frame %2.4f  %2.4f  %2.4f  %2.4f\n", frame->topLeftUV.x, frame->topLeftUV.y, frame->bottomRightUV.x, frame->bottomRightUV.y);
+}
+
+static const Sprite *Spr_FindSprite(const SpriteAtlas *atlas, Symbol name)
+{
+	for (u32 i = 0; i < atlas->numSprites; i++)
+	{
+		if (atlas->sprites[i]->name == name)
+			return atlas->sprites[i];
+	}
+	return nullptr;
+}
+
+internal Sprite* LoadSprite(const KeyStore* ks, const SpriteAtlas* atlas, ValueRef spriteRef)
+{
+	ValueRef frames = KS_ObjectGetValue(ks, spriteRef, "frames");
+	u32 frameCount = 0;
+
+	if (frames != NilValue)
+		frameCount = KS_ArrayCount(ks, frames);
+
+	Sprite *sprite = (Sprite *)MA_Alloc(&g_game->spriteArena, sizeof(Sprite) + frameCount * sizeof(SpriteFrame));
+	memset(sprite, 0, sizeof(Sprite));
+
+	Symbol spriteName = KS_GetKeySymbol(ks, spriteRef, "name", ST_Intern(KS_GetStringTable(), "(unnamed)"));
+	printf("Loading sprite: %s\n", ST_ToString(KS_GetStringTable(),spriteName));
+
+	// See if we're a ref to another sprite so we can reuse its frames
+	Symbol refName = KS_GetKeySymbol(ks, spriteRef, "ref");
+	if (ST_Valid(refName))
+	{
+		printf("  Ref sprite: %s\n", ST_ToString(KS_GetStringTable(), refName));
+		const Sprite* other = Spr_FindSprite(atlas, refName);
+		Assert(other != nullptr);
+		*sprite = *other;
+	}
+	else
+	{
+		AssertMsg(frames != NilValue, "Non ref sprite '%s' must have frames", ST_ToString(KS_GetStringTable(), spriteName));
+
+		sprite->size   = KS_GetKeySmallInt2(ks, spriteRef, "size", atlas->baseSize);
+		sprite->origin = KS_GetKeySmallInt2(ks, spriteRef, "origin", atlas->baseOrigin);
+
+		sprite->numFrames = KS_ArrayCount(ks, frames);
+		sprite->frames = (SpriteFrame *)(sprite + 1);
+		u32 i;
+		for (i = 0; i < sprite->numFrames; i++)
+		{
+			ValueRef frame = KS_ArrayElem(ks, frames, i);
+			LoadFrame(ks, atlas, sprite, &sprite->frames[i], frame);
+		}
+
+		// Normalize frame weights
+		r32 weightSum = 0.0f;
+		for (i = 0; i < sprite->numFrames; i++)
+			weightSum += sprite->frames[i].weight;
+
+		const r32 invWeightSum = 1.0f / weightSum;
+		for (i = 0; i < sprite->numFrames; i++)
+			sprite->frames[i].weight *= invWeightSum;
+	}
+
+	sprite->name = spriteName;
+	sprite->tint = ColorU((u32)KS_GetKeyInt(ks, spriteRef, "tint", (IntValue)0xFFFFFFFF));
+	printf("Tint: %02x %02x %02x %02x\n", sprite->tint.r, sprite->tint.g, sprite->tint.b, sprite->tint.a);
+	sprite->atlas = atlas;
+
+	return sprite;
+}
+
 void Spr_ReadAtlasFromKeyStore(const KeyStore *ks, ValueRef avr, SpriteAtlas *atlas)
 {
-	atlas->name = KS_GetKeySymbol(ks, avr, "name");
+	atlas->name = KS_GetKeySymbol(ks, avr, "name", ST_Intern(KS_GetStringTable(), "(unnamed)"));
 	strncpy(atlas->imageFile, KS_GetKeyString(ks, avr, "imageFile"), sizeof(atlas->imageFile));
 
 	printf("Reading atlas %s from %s\n", ST_ToString(KS_GetStringTable(), atlas->name), atlas->imageFile);
-	atlas->bitmap = Bm_MakeBitmapFromFile(nullptr, &g_game->tileArena, atlas->imageFile);
+	atlas->bitmap = Bm_MakeBitmapFromFile(nullptr, &g_game->spriteArena, atlas->imageFile);
 
 	ValueRef spriteArr  = KS_ObjectGetValue(ks, avr, "sprites");
 	u32      numSprites = KS_ArrayCount(ks, spriteArr);
-	iv2      baseSize   = KS_GetKeySmallInt2(ks, avr, "baseSize");
-	iv2      baseOrigin = KS_GetKeySmallInt2(ks, avr, "baseOrigin");
+	atlas->baseSize   = KS_GetKeySmallInt2(ks, avr, "baseSize", iv2(32, 32));
+	atlas->baseOrigin = KS_GetKeySmallInt2(ks, avr, "baseOrigin", iv2(0, 0));
+
+	for (atlas->numSprites = 0; atlas->numSprites < numSprites; atlas->numSprites++)
+	{
+		ValueRef spriteRef = KS_ArrayElem(ks, spriteArr, atlas->numSprites);
+		atlas->sprites[atlas->numSprites] = LoadSprite(ks, atlas, spriteRef);
+	}
 }
 
 internal void LoadSprites()
 {
+	MA_Reset(&g_game->spriteArena);
+
 	KeyStore *atlasKs = nullptr;
 	VerifyLoad(QED_LoadFile(&atlasKs, "sprites", "qed/sprites/tiledefs.qed"));
 
 	Assert(atlasKs);
 
 	ValueRef root       = KS_Root(atlasKs);
+	root = KS_ObjectGetValue(atlasKs, root, "atlases");
 	u32      numAtlases = KS_ArrayCount(atlasKs, root);
 	Assert(numAtlases < MAX_SPRITE_ATLASES);
 
@@ -394,6 +490,8 @@ internal void InitGameGlobals(const SubSystem *sys, bool isReInit)
 		return;
 
 	MA_Init(&g_game->tileArena, g_game->memory, MB(32));
+	MA_Init(&g_game->spriteArena, g_game->memory, MB(32));
+	MA_Init(&g_game->assetArena, g_game->memory, MB(512));
 
 	TestKeyStore();
 
@@ -665,6 +763,20 @@ internal void BltBmpStretchedFixed(ThreadContext *thread, Bitmap *dest, r32 rdx,
 	BltBmpStretched(thread, dest, rdx, rdy, rdw, rdh, src, 0, 0, src->width, src->height);
 }
 
+void Spr_DrawSpriteFrame(const Sprite *sprite, u32 frameIdx, const r32 dx, const r32 dy, const r32 wid, const r32 hgt)
+{
+	Assert(sprite);
+	const Bitmap* atlasBmp = sprite->atlas->bitmap;
+	Assert(frameIdx < sprite->numFrames);
+	const SpriteFrame* frame = &sprite->frames[frameIdx];
+	Rect dest;
+	dest.left = dx;
+	dest.top = dy;
+	dest.width = wid;
+	dest.height = hgt;
+	gHwi->BlitStretchedUV((Bitmap *)atlasBmp, frame->topLeftUV, frame->bottomRightUV, &dest, sprite->tint);
+}
+
 void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 {
 	static NoiseGenerator noise(1234);
@@ -700,12 +812,12 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 		ImGui::End();
 	}
 
-#if 1
+#if 0
 	if (drawBG)
 		for (i32 i = 4; i >= 0; i--)
 			BltBmpStretchedFixed(nullptr, screenBitmap, 0, 0, screenBitmap->width, screenBitmap->height, &g_game->testBitmaps[i]);
 
-#else
+#elif 0
 	for (i32 j = 0; j < (i32)screenBitmap->height; j++)
 	{
 		for (i32 i = 0; i < (i32)screenBitmap->width; i++)
@@ -717,6 +829,21 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 			// const r32 col = noise.GetReal(i);
 			// printf("%f\n", col);
 			PlotPt(screenBitmap, i, j, PackColor(col, col, col));
+		}
+	}
+#else
+	static RandomGenerator rnd(1);
+	SpriteAtlas* atlas = &g_game->atlases[0];
+
+	for (i32 row = -1; row < numScreenTilesY + 1; row++)
+	{
+		for (i32 col = -1; col < numScreenTilesX + 1; col++)
+		{
+			const r32 sx        = col * tilePixelWid - tilePixelWid / 2 - cameraOffsetPixelsX;
+			const r32 sy        = row * tilePixelHgt - tilePixelHgt / 2 - cameraOffsetPixelsY;
+			u32       spriteIdx = rnd.RandomBelow(atlas->numSprites);
+			Sprite *  sprite    = atlas->sprites[spriteIdx];
+			Spr_DrawSpriteFrame(sprite, rnd.RandomBelow(sprite->numFrames), sx, sy, tilePixelWid, tilePixelHgt);
 		}
 	}
 #endif

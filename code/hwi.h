@@ -31,6 +31,7 @@ struct Hwi
 	virtual void PushRenderTarget(Bitmap *targetBitmap) = 0;
 	virtual void PopRenderTarget() = 0;
 
+	virtual void BlitStretchedUV(Bitmap *srcBitmap, v2 bluv, v2 truv, const Rect *destRectPixels, ColorU tint = ColorU(255, 255, 255, 255)) = 0;
 	virtual void BlitStretched(Bitmap *srcBitmap, const Rect *srcRectPixels, const Rect *destRectPixels, ColorU tint = ColorU(255, 255, 255, 255)) = 0;
 	virtual void Blit(Bitmap *srcBitmap, v2 srcXY, v2 destXY, v2 size, ColorU tint = ColorU(255, 255, 255, 255)) = 0;
 

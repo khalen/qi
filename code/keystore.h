@@ -53,7 +53,7 @@ inline constexpr ValueType ValueRefType(const ValueRef ref)
 
 inline constexpr size_t ValueRefOffset(const ValueRef ref)
 {
-	return (size_t)((ref & SMALLINT) != 0 ? 0 : (ref >> VALUE_SHIFT));
+	return (size_t)((ref & SMALLINT) != 0 ? (ref >> SMALLINT_SHIFT) : (ref >> VALUE_SHIFT));
 }
 
 static_assert((i32)(MakeValueRef(LARGEST_SMALLINT, SMALLINT)) >> 1 == LARGEST_SMALLINT, "Small int encoding issue");
@@ -106,23 +106,23 @@ ValueRef KS_AddObject(KeyStore **ksp, KeyValue *initialKeyValues, u32 initialCou
 u32      KS_ObjectCount(const KeyStore *ks, ValueRef object);
 
 // Simple helpers for common cases
-SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, const char *key);
-SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, Symbol key);
+SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, const char *key, SmallIntValue def = 0);
+SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, Symbol key, SmallIntValue def = 0);
 
-void        KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, Symbol key, i32 *result, u32 count);
-void        KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, const char *key, i32 *result, u32 count);
-iv2         KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, const char *key);
-iv2         KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, Symbol key);
-IntValue    KS_GetKeyInt(const KeyStore *ks, ValueRef object, const char *key);
-IntValue    KS_GetKeyInt(const KeyStore *ks, ValueRef object, Symbol key);
-RealValue   KS_GetKeyReal(const KeyStore *ks, ValueRef object, const char *key);
-RealValue   KS_GetKeyReal(const KeyStore *ks, ValueRef object, Symbol key);
-const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, const char *key);
-const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, Symbol key);
-Symbol      KS_GetKeySymbol(const KeyStore *ks, ValueRef object, const char *key);
-Symbol      KS_GetKeySymbol(const KeyStore *ks, ValueRef object, Symbol key);
-bool        KS_GetKeyBool(const KeyStore *ks, ValueRef object, const char *key);
-bool        KS_GetKeyBool(const KeyStore *ks, ValueRef object, Symbol key);
+void        KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, Symbol key, i32 *result, u32 count, const i32* def = nullptr);
+void        KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, const char *key, i32 *result, u32 count, const i32* def = nullptr);
+iv2         KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, const char *key, iv2 def = iv2(0, 0));
+iv2         KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, Symbol key, iv2 def = iv2(0, 0));
+IntValue    KS_GetKeyInt(const KeyStore *ks, ValueRef object, const char *key, IntValue def = 0);
+IntValue    KS_GetKeyInt(const KeyStore *ks, ValueRef object, Symbol key, IntValue def = 0);
+RealValue   KS_GetKeyReal(const KeyStore *ks, ValueRef object, const char *key, RealValue def = 0.0);
+RealValue   KS_GetKeyReal(const KeyStore *ks, ValueRef object, Symbol key, RealValue def = 0.0);
+const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, const char *key, const char* def = "");
+const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, Symbol key, const char* def = "");
+Symbol      KS_GetKeySymbol(const KeyStore *ks, ValueRef object, const char *key, Symbol def = QI_ST_INVALID);
+Symbol      KS_GetKeySymbol(const KeyStore *ks, ValueRef object, Symbol key, Symbol def = QI_ST_INVALID);
+bool        KS_GetKeyBool(const KeyStore *ks, ValueRef object, const char *key, bool def = false);
+bool        KS_GetKeyBool(const KeyStore *ks, ValueRef object, Symbol key, bool def = false);
 const char *KS_GetKeyAsString(const KeyStore *ks, ValueRef object, const char *key, ValueType *typePtr = nullptr);
 const char *KS_GetKeyAsString(const KeyStore *ks, ValueRef object, Symbol key, ValueType *typePtr = nullptr);
 

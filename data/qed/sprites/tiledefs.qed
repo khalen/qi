@@ -1,6 +1,6 @@
-[
+atlases = [
     {
-        name = floors
+        name = `floors`
         imageFile = "tiles/floor.bmp"
         baseSize = [ 32 32 ]
         baseOrigin = [ 0 0 ]
@@ -71,7 +71,7 @@
     }
     {
         name = walls
-        imageFile = "data/tiles/wall.bmp"
+        imageFile = "tiles/wall.bmp"
         baseSize = [ 32 32 ]
         baseOrigin = [ 0 0 ]
         sprites = [

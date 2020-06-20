@@ -8,7 +8,8 @@
 
 #include "basictypes.h"
 
-#define QI_ST_FULL        -1
+#define QI_ST_FULL        ((u32)-1)
+#define QI_ST_INVALID     ((u32)-2)
 #define QI_ST_HASH_FACTOR 2.0f
 
 typedef u32 Symbol;
@@ -20,6 +21,11 @@ struct StringTable
 	u32 hashSlots;   // Total number of hash slots
 	u32 stringBytes; // Bytes consumed by string data
 };
+
+constexpr inline bool ST_Valid(Symbol s)
+{
+	return s < QI_ST_INVALID;
+}
 
 static inline u32*
 ST_HashTable(const StringTable* st)

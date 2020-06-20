@@ -56,6 +56,7 @@ struct MemoryArena
 
 void MA_Init(MemoryArena* arena, Memory* memory, const size_t size);
 u8* MA_Alloc(MemoryArena* arena, const size_t size);
+void MA_Reset(MemoryArena *arena);
 
 // Malloc / free general buddy allocator
 struct MemLink

@@ -33,6 +33,7 @@ void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result,
 	int wid, hgt, components;
 	stbi_set_flip_vertically_on_load(true);
 	u8* data = stbi_load(filename, &wid, &hgt, &components, 4);
+	AssertMsg(data, "Couldn't load image: %s", filename);
 
 	Bm_CreateBitmap(memArena, result, wid, hgt);
 	u8* srcXels = (u8 *)data;

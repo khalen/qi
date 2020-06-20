@@ -580,6 +580,14 @@ MA_Alloc(MemoryArena* arena, const size_t reqSize)
     return mem;
 }
 
+void MA_Reset(MemoryArena* arena)
+{
+	arena->curOffset = 0;
+#if HAS(DEV_BUILD)
+	memset(arena->base, 0, arena->size);
+#endif
+}
+
 static void*
 BAA_Realloc_(Allocator* alloc, void* prevMem, const size_t newSize)
 {

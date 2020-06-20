@@ -277,7 +277,7 @@ u32 KS__ValueToString_r(const KeyStore *ks, ValueRef value, char **bufPtr, const
 		}
 		else
 		{
-			bool needsQuote = !P_CanStartSymbol(*sym);
+			bool needsQuote = !P_CanStartSymbol(*sym) || *sym == 't' || *sym == 'f';
 			for (size_t i = 1; i < symLen; i++)
 				needsQuote |= !P_CanContinueSymbol(sym[i]);
 			if (needsQuote)
@@ -625,7 +625,7 @@ KeyValue *KS__ObjectFindKey(const KeyStore *ks, const ValueRef object, const Val
 	{
 		DataBlock *db = KS__GetBlock(ks, nextBlock);
 		KeyValue * kv = (KeyValue *)KS__GetBlockDataPtr(ks, db);
-		for (u32 i = 0; i < db->usedElems; i++)
+		for (u32 i = 0; i < db->usedElems; i++, kv++)
 		{
 			if (kv->key == key)
 			{
@@ -744,12 +744,12 @@ KeyStore *KS_CompactCopy(const KeyStore *ks)
 	return newKS;
 }
 
-SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, const char *key)
+SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, const char *key, SmallIntValue def)
 {
-	return KS_GetKeySmallInt(ks, object, ST_Intern(gks->symbolTable, key));
+	return KS_GetKeySmallInt(ks, object, ST_Intern(gks->symbolTable, key), def);
 }
 
-SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, Symbol key)
+SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, Symbol key, SmallIntValue def)
 {
 	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
 	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
@@ -758,10 +758,10 @@ SmallIntValue KS_GetKeySmallInt(const KeyStore *ks, ValueRef object, Symbol key)
 		Assert(ValueRefType(kv->value) == ValueType::SMALLINT);
 		return KS_ValueSmallInt(ks, kv->value);
 	}
-	return (SmallIntValue)0;
+	return def;
 }
 
-void KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, Symbol key, i32 *result, u32 count)
+void KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, Symbol key, i32 *result, u32 count, const i32* def)
 {
 	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
 	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
@@ -774,36 +774,43 @@ void KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, Symbol key, i32 *re
 			result[i] = KS_ValueSmallInt(ks, KS_ArrayElem(ks, kv->value, i));
 		}
 	}
+	else if (def)
+	{
+		for (u32 i = 0; i < count; i++)
+		{
+			result[i] = def[i];
+		}
+	}
 }
 
-void KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, const char *key, i32 *result, u32 count)
+void KS_GetKeySmallIntN(const KeyStore *ks, ValueRef object, const char *key, i32 *result, u32 count, const i32* def)
 {
-	KS_GetKeySmallIntN(ks, object, ST_Intern(gks->symbolTable, key), result, count);
+	KS_GetKeySmallIntN(ks, object, ST_Intern(gks->symbolTable, key), result, count, def);
 }
 
-iv2 KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, const char *key)
+iv2 KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, const char *key, iv2 def)
 {
 	iv2 result;
-	KS_GetKeySmallIntN(ks, object, ST_Intern(gks->symbolTable, key), result.v, 2);
+	KS_GetKeySmallIntN(ks, object, ST_Intern(gks->symbolTable, key), result.v, 2, def.v);
 	return result;
 }
 
-iv2 KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, Symbol key)
+iv2 KS_GetKeySmallInt2(const KeyStore *ks, ValueRef object, Symbol key, iv2 def)
 {
 	iv2 result;
-	KS_GetKeySmallIntN(ks, object, key, result.v, 2);
+	KS_GetKeySmallIntN(ks, object, key, result.v, 2, def.v);
 	return result;
 }
 
 void KS_SetKeySmallInt(KeyStore **ksp, ValueRef object, const char *key, IntValue val) {}
 void KS_SetKeySmallInt(KeyStore **ksp, ValueRef object, Symbol key) {}
 
-IntValue KS_GetKeyInt(const KeyStore *ks, ValueRef object, const char *key)
+IntValue KS_GetKeyInt(const KeyStore *ks, ValueRef object, const char *key, IntValue def)
 {
-	return KS_GetKeyInt(ks, object, ST_Intern(gks->symbolTable, key));
+	return KS_GetKeyInt(ks, object, ST_Intern(gks->symbolTable, key), def);
 }
 
-IntValue KS_GetKeyInt(const KeyStore *ks, ValueRef object, Symbol key)
+IntValue KS_GetKeyInt(const KeyStore *ks, ValueRef object, Symbol key, IntValue def)
 {
 	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
 	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
@@ -812,15 +819,15 @@ IntValue KS_GetKeyInt(const KeyStore *ks, ValueRef object, Symbol key)
 		Assert(ValueRefType(kv->value) == ValueType::INT);
 		return KS_ValueInt(ks, kv->value);
 	}
-	return (IntValue)0;
+	return def;
 }
 
-RealValue KS_GetKeyReal(const KeyStore *ks, ValueRef object, const char *key)
+RealValue KS_GetKeyReal(const KeyStore *ks, ValueRef object, const char *key, RealValue def)
 {
-	return KS_GetKeyReal(ks, object, ST_Intern(gks->symbolTable, key));
+	return KS_GetKeyReal(ks, object, ST_Intern(gks->symbolTable, key), def);
 }
 
-RealValue KS_GetKeyReal(const KeyStore *ks, ValueRef object, Symbol key)
+RealValue KS_GetKeyReal(const KeyStore *ks, ValueRef object, Symbol key, RealValue def)
 {
 	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
 	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
@@ -829,32 +836,32 @@ RealValue KS_GetKeyReal(const KeyStore *ks, ValueRef object, Symbol key)
 		Assert(ValueRefType(kv->value) == ValueType::REAL);
 		return KS_ValueReal(ks, kv->value);
 	}
-	return (RealValue)0.0;
+	return def;
 }
 
-Symbol KS_GetKeySymbol(const KeyStore *ks, ValueRef object, const char *key)
+Symbol KS_GetKeySymbol(const KeyStore *ks, ValueRef object, const char *key, Symbol def)
 {
-	return KS_GetKeySymbol(ks, object, ST_Intern(gks->symbolTable, key));
+	return KS_GetKeySymbol(ks, object, ST_Intern(gks->symbolTable, key), def);
 }
 
-Symbol KS_GetKeySymbol(const KeyStore *ks, ValueRef object, Symbol key)
+Symbol KS_GetKeySymbol(const KeyStore *ks, ValueRef object, Symbol key, Symbol def)
 {
 	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
 	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
 	if (kv)
 	{
-		Assert(ValueRefType(kv->value) == ValueType::STRING);
+		Assert(ValueRefType(kv->value) == ValueType::SYMBOL);
 		return KS_ValueSymbol(ks, kv->value);
 	}
-	return 0;
+	return def;
 }
 
-const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, const char *key)
+const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, const char *key, const char* def)
 {
-	return KS_GetKeyString(ks, object, ST_Intern(gks->symbolTable, key));
+	return KS_GetKeyString(ks, object, ST_Intern(gks->symbolTable, key), def);
 }
 
-const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, Symbol key)
+const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, Symbol key, const char* def)
 {
 	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
 	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
@@ -863,15 +870,15 @@ const char *KS_GetKeyString(const KeyStore *ks, ValueRef object, Symbol key)
 		Assert(ValueRefType(kv->value) == ValueType::STRING);
 		return KS_ValueString(ks, kv->value);
 	}
-	return nullptr;
+	return def;
 }
 
-bool KS_GetKeyBool(const KeyStore *ks, ValueRef object, const char *key)
+bool KS_GetKeyBool(const KeyStore *ks, ValueRef object, const char *key, bool def)
 {
-	return KS_GetKeyBool(ks, object, ST_Intern(gks->symbolTable, key));
+	return KS_GetKeyBool(ks, object, ST_Intern(gks->symbolTable, key), def);
 }
 
-bool KS_GetKeyBool(const KeyStore *ks, ValueRef object, Symbol key)
+bool KS_GetKeyBool(const KeyStore *ks, ValueRef object, Symbol key, bool def)
 {
 	ValueRef  keySym = MakeValueRef(key, ValueType::SYMBOL);
 	KeyValue *kv     = KS__ObjectFindKey(ks, object, keySym);
@@ -880,7 +887,7 @@ bool KS_GetKeyBool(const KeyStore *ks, ValueRef object, Symbol key)
 		Assert(kv->value == TrueValue || kv->value == FalseValue);
 		return kv->value == TrueValue;
 	}
-	return FalseValue;
+	return def;
 }
 
 const char *KS_GetKeyAsString(const KeyStore *ks, ValueRef object, const char *key, ValueType *typePtr)

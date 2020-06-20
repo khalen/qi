@@ -291,11 +291,11 @@ static IntValue P_CharValue(IntValue base, char c)
 {
 	if (c >= 'a')
 	{
-		c = c - 'a';
+		c = c - 'a' + 10;
 	}
 	else if (c >= 'A')
 	{
-		c = c - 'A';
+		c = c - 'A' + 10;
 	}
 	else
 	{

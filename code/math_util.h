@@ -220,10 +220,10 @@ struct ColorU
 	};
 
 	ColorU(u32 c)
-		: a((u8)(c >> 24))
-		, b((u8)(c >> 16))
-		, g((u8)(c >> 8))
-		, r((u8)c)
+		: r((u8)(c >> 24))
+		, g((u8)(c >> 16))
+		, b((u8)(c >> 8))
+		, a((u8)c)
 	{
 	}
 	ColorU(u8 ir, u8 ig, u8 ib, u8 ia)

@@ -10,7 +10,8 @@
 #include "profile.h"
 
 #if HAS(RELEASE_BUILD)
-#define Assert(foo) (void)(foo)
+#define Assert(foo)         (void)(foo)
+#define AssertMsg(foo, msg) ((void)(foo), (void)(msg))
 #else
 #if defined(__clang__)
 #define ASSERT_HANDLER_FUNC __attribute__((analyzer_noreturn))
@@ -24,6 +25,12 @@ extern void Qi_Assert_Handler(const char *, const char *, const int) ASSERT_HAND
 	{                                                    \
 		if (!(foo))                                      \
 			Qi_Assert_Handler(#foo, __FILE__, __LINE__); \
+	} while (0)
+#define AssertMsg(foo, msg, ...)                                                   \
+	do                                                                             \
+	{                                                                              \
+		if (!(foo))                                                                \
+			Qi_Assert_Handler(VS(#foo ": " msg, __VA_ARGS__), __FILE__, __LINE__); \
 	} while (0)
 #endif
 

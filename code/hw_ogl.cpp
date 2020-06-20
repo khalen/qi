@@ -314,6 +314,23 @@ static void QiOgl_PixelRectToTexCoords(const Bitmap *bitmap, const Rect *pixelRe
 	texCoordRect->br = ImVec2((pixelRect->left + pixelRect->width) * iw, (pixelRect->top + pixelRect->height) * ih);
 }
 
+static void QiOgl_BlitUV(const Bitmap *bitmap, v2 uvtl, v2 uvbr, const Rect *destRect, ColorU tint)
+{
+	Assert(gOgl->inBeginFrame > 0);
+
+	ImVec2       ul(destRect->left, destRect->top);
+	ImVec2       br(destRect->left + destRect->width, destRect->top + destRect->height);
+	TexCoordRect srcUVs;
+
+	Assert(bitmap->hardwareId);
+
+	ImDrawList *dl = ImGui::GetBackgroundDrawList();
+	Assert(dl);
+	const ImVec2 iuvtl(uvtl.x, uvtl.y);
+	const ImVec2 iuvbr(uvbr.x, uvbr.y);
+	dl->AddImage((ImTextureID)bitmap, ul, br, iuvtl, iuvbr, (u32)tint);
+}
+
 static void QiOgl_Blit(const Bitmap *bitmap, const Rect *srcRect, const Rect *destRect, ColorU tint)
 {
 	Assert(gOgl->inBeginFrame > 0);
@@ -671,6 +688,11 @@ struct OglHwi : public Hwi
 	void PushRenderTarget(Bitmap *targetBitmap) override { QiOgl_PushRenderBitmap(targetBitmap); }
 
 	void PopRenderTarget() override { QiOgl_PopRenderBitmap(); }
+
+	void BlitStretchedUV(Bitmap *srcBitmap, v2 ul, v2 lr, const Rect *destRectPixels, ColorU tint) override
+	{
+		QiOgl_BlitUV(srcBitmap, ul, lr, destRectPixels, tint);
+	}
 
 	void BlitStretched(Bitmap *srcBitmap, const Rect *srcRectPixels, const Rect *destRectPixels, ColorU tint) override
 	{

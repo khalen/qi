@@ -64,19 +64,20 @@ struct SpriteFrame
 {
 	v2  topLeftUV;
 	v2  bottomRightUV;
-	i16 xOrigin;
-	i16 yOrigin;
-	Rect16 imageRect;
+	r32 weight;
 };
 
 struct SpriteAtlas;
 
 struct Sprite
 {
+	const SpriteAtlas *atlas;
 	Symbol name;
-	SpriteAtlas* atlas;
-	int numFrames;
-	// Frames follow immediately after the sprite in memory
+	ColorU tint;
+	iv2 size;
+	iv2 origin;
+	u32 numFrames;
+	SpriteFrame* frames;  // If this is not a ref sprite, frames will point immediately after the Sprite struct.
 };
 
 struct SpriteAtlas
@@ -84,6 +85,8 @@ struct SpriteAtlas
 	char    imageFile[128];
 	Symbol  name;
 	Bitmap* bitmap;
+	iv2     baseOrigin;
+	iv2     baseSize;
 	u32     numSprites;
 	Sprite* sprites[MAX_SPRITES_PER_ATLAS];
 };

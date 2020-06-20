@@ -451,8 +451,8 @@ static void InitGameGlobals()
 	size_t baseAddressTrans = 0;
 #endif
 
-	g.memory.permanentSize = MB(64);
-	g.memory.transientSize = GB(4);
+	g.memory.permanentSize = GB(1);
+	g.memory.transientSize = GB(2);
 
 #if HAS(OSX_BUILD)
 	g.memory.permanentStorage = (u8 *)mmap((void *)baseAddressPerm, g.memory.permanentSize, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);

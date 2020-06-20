@@ -118,7 +118,7 @@ ST_Find(const StringTable* st, const char* str)
 		idx = (idx + 1) % st->hashSlots;
 	}
 
-	return QI_ST_FULL;
+	return QI_ST_INVALID;
 }
 
 Symbol
