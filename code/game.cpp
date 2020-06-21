@@ -374,7 +374,7 @@ static void LoadFrame(const KeyStore* ks, const SpriteAtlas *atlas, const Sprite
 	printf("    Frame %2.4f  %2.4f  %2.4f  %2.4f\n", frame->topLeftUV.x, frame->topLeftUV.y, frame->bottomRightUV.x, frame->bottomRightUV.y);
 }
 
-static const Sprite *Spr_FindSprite(const SpriteAtlas *atlas, Symbol name)
+const Sprite *Spr_FindSprite(const SpriteAtlas *atlas, Symbol name)
 {
 	for (u32 i = 0; i < atlas->numSprites; i++)
 	{
@@ -443,6 +443,7 @@ internal Sprite* LoadSprite(const KeyStore* ks, const SpriteAtlas* atlas, ValueR
 
 void Spr_ReadAtlasFromKeyStore(const KeyStore *ks, ValueRef avr, SpriteAtlas *atlas)
 {
+	Assert(atlas);
 	atlas->name = KS_GetKeySymbol(ks, avr, "name", ST_Intern(KS_GetStringTable(), "(unnamed)"));
 	strncpy(atlas->imageFile, KS_GetKeyString(ks, avr, "imageFile"), sizeof(atlas->imageFile));
 
@@ -463,7 +464,16 @@ void Spr_ReadAtlasFromKeyStore(const KeyStore *ks, ValueRef avr, SpriteAtlas *at
 
 internal void LoadSprites()
 {
-	MA_Reset(&g_game->spriteArena);
+	if (g_game->numAtlases)
+	{
+		for (i32 i = 0; i < g_game->numAtlases; i++)
+		{
+			gHwi->UnregisterBitmap(g_game->atlases[i].bitmap);
+		}
+		g_game->numAtlases = 0;
+
+		MA_Reset(&g_game->spriteArena);
+	}
 
 	KeyStore *atlasKs = nullptr;
 	VerifyLoad(QED_LoadFile(&atlasKs, "sprites", "qed/sprites/tiledefs.qed"));
@@ -480,6 +490,8 @@ internal void LoadSprites()
 		ValueRef avr = KS_ArrayElem(atlasKs, root, ai);
 		Spr_ReadAtlasFromKeyStore(atlasKs, avr, &g_game->atlases[ai]);
 	}
+
+	KS_Free(&atlasKs);
 }
 
 internal void InitGameGlobals(const SubSystem *sys, bool isReInit)
@@ -832,7 +844,7 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 		}
 	}
 #else
-	static RandomGenerator rnd(1);
+	RandomGenerator rnd(1);
 	SpriteAtlas* atlas = &g_game->atlases[0];
 
 	for (i32 row = -1; row < numScreenTilesY + 1; row++)
@@ -910,7 +922,8 @@ extern SubSystem SoundSubSystem;
 extern SubSystem KeyStoreSubsystem;
 extern SubSystem DebugSubSystem;
 extern SubSystem UtilSubSystem;
-extern SubSystem HardwareSubsystem;
+extern SubSystem HardwareSubSystem;
+extern SubSystem EditorSubSystem;
 
 SubSystem GameSubSystem = {"Game", InitGameGlobals, sizeof(GameGlobals_s), nullptr};
 
@@ -918,11 +931,12 @@ internal SubSystem *s_subSystems[] = {
 #if !HAS(RELEASE_BUILD)
 	&DebugSubSystem,
 #endif
-	&HardwareSubsystem,
+	&HardwareSubSystem,
 	&KeyStoreSubsystem,
 	&SoundSubSystem,
 	&UtilSubSystem,
 	&GameSubSystem,
+	&EditorSubSystem,
 };
 
 internal void InitGameSystems(Memory *memory)

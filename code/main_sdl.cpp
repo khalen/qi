@@ -836,7 +836,7 @@ static void HandleKeyEvent(SDL_Event *event, Input *newInput)
 	}
 	else if (vkCode == SDLK_q)
 	{
-		if (isDown && commandKey)
+		if (isDown && (commandKey || ctrlKey))
 			g.gameRunning = false;
 		else
 			ProcessButton(&kbdController->leftShoulder, isDown);
@@ -865,10 +865,12 @@ static void HandleKeyEvent(SDL_Event *event, Input *newInput)
 	{
 		ProcessButton(&kbdController->leftButton, isDown);
 	}
+#if 0
 	else if (vkCode == SDLK_ESCAPE)
 	{
 		g.gameRunning = false;
 	}
+#endif
 	else if (vkCode == SDLK_SPACE)
 	{
 	}
@@ -980,7 +982,7 @@ int main(int argc, const char *argv[])
 		SDL_Event event = {0};
 		while (SDL_PollEvent(&event))
 		{
-			if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
+			if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP || event.type == SDL_TEXTINPUT)
 				HandleKeyEvent(&event, &newInput);
 			else if (event.type >= SDL_MOUSEMOTION && event.type < SDL_JOYAXISMOTION)
 				HandleMouseEvent(&event, &newInput);

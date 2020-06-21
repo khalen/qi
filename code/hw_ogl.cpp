@@ -352,7 +352,8 @@ void QiOgl_LoadBitmapToTex(GLuint tex, const Bitmap *bitmap)
 {
 	glBindTexture(GL_TEXTURE_2D, tex);
 	CheckGl();
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap->width, bitmap->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, bitmap->pixels);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap->width, bitmap->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, bitmap->pixels);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, bitmap->width, bitmap->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, bitmap->pixels);
 	CheckGl();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	CheckGl();
@@ -474,6 +475,7 @@ void QiOgl_SetupImGuiState(ImDrawData *drawData, i32 fbWidth, i32 fbHeight, GLui
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_SCISSOR_TEST);
+	glEnable(GL_FRAMEBUFFER_SRGB);
 	CheckGl();
 
 	// Setup viewport, orthographic projection matrix
@@ -797,4 +799,4 @@ void QiOgl_InitSystem(const SubSystem *sys, bool isReinit)
 	}
 }
 
-SubSystem HardwareSubsystem = {"OglHardware", QiOgl_InitSystem, sizeof(OglGlobals) + sizeof(OglHwi) + kOglHardwareMemSize};
+SubSystem HardwareSubSystem = {"OglHardware", QiOgl_InitSystem, sizeof(OglGlobals) + sizeof(OglHwi) + kOglHardwareMemSize};
