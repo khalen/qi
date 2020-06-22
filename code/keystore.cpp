@@ -1022,6 +1022,11 @@ BuddyAllocator *KS_GetKeyStoreAllocator()
 	return gks->allocator;
 }
 
+const char *KS_SymbolString(Symbol sym)
+{
+	return ST_ToString(gks->symbolTable, sym);
+}
+
 #if HAS(IS_CLANG)
 #pragma clang diagnostic pop
 #endif

@@ -78,6 +78,8 @@ ValueRef KS_Root(const KeyStore *ks);
 void     KS_SetRoot(KeyStore *ks, ValueRef root);
 
 StringTable *KS_GetStringTable();
+const char* KS_SymbolString(Symbol sym);
+
 u32          KS_ValueToString(const KeyStore *ks, ValueRef value, const char *buffer, size_t bufSize, bool pretty);
 // Allocates and returns a new keystore based on the parameter. Will result in an optimally sized copy (no extra
 // space in objects/arrays, no unreferenced int/string/real values, etc.
