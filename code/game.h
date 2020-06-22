@@ -91,6 +91,8 @@ struct SpriteAtlas
 	Sprite* sprites[MAX_SPRITES_PER_ATLAS];
 };
 
+SpriteAtlas* Game_GetAtlases(u32* numAtlases);
+
 struct KeyStore;
 typedef u32 ValueRef;
 void Spr_ReadAtlasFromKeyStore(const KeyStore* ks, ValueRef ref, SpriteAtlas *atlas);

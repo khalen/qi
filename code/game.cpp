@@ -17,6 +17,7 @@
 #include "qed_parse.h"
 #include "bitmap.h"
 #include "hwi.h"
+#include "editor.h"
 #include <stdio.h>
 #include <imgui.h>
 
@@ -355,6 +356,13 @@ internal void VerifyLoad(const char *msg)
 	exit(1);
 }
 
+SpriteAtlas *Game_GetAtlases(u32 *numAtlases)
+{
+	Assert(numAtlases);
+	*numAtlases = g_game->numAtlases;
+	return g_game->atlases;
+}
+
 static void LoadFrame(const KeyStore* ks, const SpriteAtlas *atlas, const Sprite *sprite, SpriteFrame *frame, ValueRef frameRef)
 {
 	const r32 iAtlasW = 1.0f / atlas->bitmap->width;
@@ -482,10 +490,10 @@ internal void LoadSprites()
 
 	ValueRef root       = KS_Root(atlasKs);
 	root = KS_ObjectGetValue(atlasKs, root, "atlases");
-	u32      numAtlases = KS_ArrayCount(atlasKs, root);
-	Assert(numAtlases < MAX_SPRITE_ATLASES);
+	g_game->numAtlases = KS_ArrayCount(atlasKs, root);
+	Assert(g_game->numAtlases < MAX_SPRITE_ATLASES);
 
-	for (u32 ai = 0; ai < numAtlases; ++ai)
+	for (u32 ai = 0; ai < g_game->numAtlases; ++ai)
 	{
 		ValueRef avr = KS_ArrayElem(atlasKs, root, ai);
 		Spr_ReadAtlasFromKeyStore(atlasKs, avr, &g_game->atlases[ai]);
@@ -817,11 +825,7 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 
 	if (g_game->enableEditor)
 	{
-		if (ImGui::Begin("Debug", &debugOpen))
-		{
-			ImGui::Checkbox("Draw background", &drawBG);
-		}
-		ImGui::End();
+		Editor_UpdateAndRender();
 	}
 
 #if 0
