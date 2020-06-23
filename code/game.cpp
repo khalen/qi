@@ -271,13 +271,13 @@ internal void UpdateGameState(Bitmap *screen, Input *input)
 	// Compute bounding box of total player move in camera space
 	WorldPos_s oldPlrPosUL = oldPlrPos;
 	WorldPos_s oldPlrPosLR = oldPlrPos;
-	AddSubtileOffset(&oldPlrPosUL, V2(-PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
-	AddSubtileOffset(&oldPlrPosLR, V2(PLAYER_RADIUS_X, -PLAYER_RADIUS_Y));
+	AddSubtileOffset(&oldPlrPosUL, V2(-PLAYER_RADIUS_X, -PLAYER_RADIUS_Y));
+	AddSubtileOffset(&oldPlrPosLR, V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
 
 	WorldPos_s newPlrPosUL = newPlrPos;
 	WorldPos_s newPlrPosLR = newPlrPos;
-	AddSubtileOffset(&newPlrPosUL, V2(-PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
-	AddSubtileOffset(&newPlrPosLR, V2(PLAYER_RADIUS_X, -PLAYER_RADIUS_Y));
+	AddSubtileOffset(&newPlrPosUL, V2(-PLAYER_RADIUS_X, -PLAYER_RADIUS_Y));
+	AddSubtileOffset(&newPlrPosLR, V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
 
 	i64 tileMinX, tileMinY, tileMaxX, tileMaxY;
 	tileMinX = Min(oldPlrPosUL.x.tile, newPlrPosLR.x.tile);
@@ -300,8 +300,8 @@ internal void UpdateGameState(Bitmap *screen, Input *input)
 				continue;
 
 			GjkResult_s result;
-			// EllipseShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
-			BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
+			EllipseShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
+			//BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
 			BoxShape_s tileShape(V2((r32)x * TILE_SIZE_METERS_X, (r32)y * TILE_SIZE_METERS_Y), V2(TILE_SIZE_METERS_X / 2, TILE_SIZE_METERS_Y / 2));
 			AddDebugShape(&tileShape, 1.0f, 1.0f, 0.0f);
 			PolyShape_s gjkResulta, gjkResultb;
@@ -337,11 +337,13 @@ internal void UpdateGameState(Bitmap *screen, Input *input)
 	g_game->cameraPos.y.tile = (playerYScreen * SCREEN_NUM_TILES_Y) + SCREEN_NUM_TILES_Y / 2;
 	g_game->cameraPos.z.tile = g_game->playerPos.z.tile;
 
-	if (ctr0->dir.y > 0)
+	g_game->cameraPos = g_game->playerPos;
+
+	if (ctr0->dir.y < 0)
 		g_game->playerFacingIdx = 0;
 	if (ctr0->dir.x > 0)
 		g_game->playerFacingIdx = 1;
-	if (ctr0->dir.y < 0)
+	if (ctr0->dir.y > 0)
 		g_game->playerFacingIdx = 2;
 	if (ctr0->dir.x < 0)
 		g_game->playerFacingIdx = 3;
@@ -374,9 +376,9 @@ static void LoadFrame(const KeyStore* ks, const SpriteAtlas *atlas, const Sprite
 	// Must convert to bottom left, top right in UVs
 	iv2 pos = KS_GetKeySmallInt2(ks, frameRef, "pos");
 	frame->topLeftUV.x = pos.x * iAtlasW;
-	frame->bottomRightUV.y = (atlas->bitmap->height - pos.y) * iAtlasH;
+	frame->topLeftUV.y = pos.y * iAtlasH;
 	frame->bottomRightUV.x = (pos.x + sprite->size.x) * iAtlasW;
-	frame->topLeftUV.y = (atlas->bitmap->height - pos.y - sprite->size.y) * iAtlasH;
+	frame->bottomRightUV.y = (pos.y + sprite->size.y) * iAtlasH;
 
 	frame->weight = (r32)KS_GetKeyReal(ks, frameRef, "weight", 1.0);
 	printf("    Frame %2.4f  %2.4f  %2.4f  %2.4f\n", frame->topLeftUV.x, frame->topLeftUV.y, frame->bottomRightUV.x, frame->bottomRightUV.y);
@@ -904,15 +906,19 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 	r32 playerR   = 0.5f;
 	r32 playerG   = 1.0f;
 	r32 playerB   = 0.0f;
+
+	r32 playerPosX = playerOffsetPixelsX + screenBitmap->width / 2.0f;
+	r32 playerPosY = playerOffsetPixelsY + screenBitmap->height / 2.0f;
+	r32 playerX   = playerPosX - tilePixelWid / 2;
+	r32 playerY   = (playerPosY - tilePixelHgt) + (tilePixelHgt * 0.25f);
 	r32 playerWid = tilePixelWid;
 	r32 playerHgt = tilePixelHgt;
-	r32 playerX   = playerOffsetPixelsX + screenBitmap->width / 2.0f - tilePixelWid / 2;
-	r32 playerY   = playerOffsetPixelsY + screenBitmap->height / 2.0f;
 
 	DrawRectangle(screenBitmap, playerX, playerY, playerWid, playerHgt, playerR, playerG, playerB);
 	BltBmpStretchedFixed(nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][0]);
 	BltBmpStretchedFixed(nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][1]);
 	BltBmpStretchedFixed(nullptr, screenBitmap, playerX, playerY, playerWid, playerHgt, &g_game->playerBmps[g_game->playerFacingIdx][2]);
+	DrawRectangle(screenBitmap, playerPosX - 2, playerPosY - 2, 4, 4, 0.0f, 0.0f, 1.0f);
 
 	DrawDebugShapes(screenBitmap);
 }

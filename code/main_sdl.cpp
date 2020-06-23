@@ -26,6 +26,8 @@
 #include "hw_ogl.h"
 #include "iconfont.h"
 
+
+
 #if HAS(WIN32_BUILD)
 #include <direct.h>
 #define PATH_MAX MAX_PATH
@@ -820,7 +822,7 @@ static void HandleKeyEvent(SDL_Event *event, Input *newInput)
 
 	if (vkCode == SDLK_w)
 	{
-		ProcessKeyboardStick(&kbdController->leftStick, 0.0f, 1.0f, isDown);
+		ProcessKeyboardStick(&kbdController->leftStick, 0.0f, -1.0f, isDown);
 	}
 	else if (vkCode == SDLK_d)
 	{
@@ -828,7 +830,7 @@ static void HandleKeyEvent(SDL_Event *event, Input *newInput)
 	}
 	else if (vkCode == SDLK_s)
 	{
-		ProcessKeyboardStick(&kbdController->leftStick, 0.0f, -1.0f, isDown);
+		ProcessKeyboardStick(&kbdController->leftStick, 0.0f, 1.0f, isDown);
 	}
 	else if (vkCode == SDLK_a)
 	{

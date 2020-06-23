@@ -15,6 +15,10 @@
 #include "imgui.h"
 #include "bitmap.h"
 #include "hwi.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #include <new>
 
 #define FR() ((float)rand()) / (float)RAND_MAX
@@ -297,7 +301,7 @@ void QiOgl_EndFrame()
 	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
 	dl->AddCallback(IGC_SetRenderBitmap, nullptr);
-	dl->AddImage(gOgl->screenBitmap, ImVec2(0.0, 0.0), io.DisplaySize);
+	dl->AddImage(gOgl->screenBitmap, ImVec2(0.0, 0.0), io.DisplaySize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
 }
 
 struct TexCoordRect
@@ -637,6 +641,8 @@ void QiOgl_CreateFontsTexture()
 	u8 *     pixels;
 	i32      width, height;
 	io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+	// stbi_write_png("font.png", width, height, 4, pixels, 0);
 
 	Bm_CreateBitmapFromBuffer(pixels, &gOgl->fontBitmap, width, height);
 	QiOgl_RegisterBitmap(&gOgl->fontBitmap, false);

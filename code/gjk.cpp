@@ -423,6 +423,7 @@ GetPenetrationDepthAndNormal(GjkResult_s* result, const GjkShape_s* shapeA, cons
 			break;
 		}
 
+		Assert(spoly.numPoints < QI_GJK_MAX_POLY_POINTS - 1);
 		for (u32 moveIdx = spoly.numPoints - 1; moveIdx > index; moveIdx--)
 			spoly.points[moveIdx + 1] = spoly.points[moveIdx];
 

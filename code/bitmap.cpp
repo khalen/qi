@@ -31,7 +31,7 @@ void Bm_CreateBitmap(MemoryArena *arena, Bitmap *result, const u32 width, const 
 void Bm_ReadBitmap(ThreadContext *thread, MemoryArena *memArena, Bitmap *result, const char *filename, bool forceOpaque)
 {
 	int wid, hgt, components;
-	stbi_set_flip_vertically_on_load(true);
+	// stbi_set_flip_vertically_on_load(true);
 	u8* data = stbi_load(filename, &wid, &hgt, &components, 4);
 	AssertMsg(data, "Couldn't load image: %s", filename);
 
