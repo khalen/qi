@@ -219,7 +219,7 @@ static void IGC_SetRenderBitmap(const ImDrawList *, const ImDrawCmd *cmd)
 {
 	static GLenum drawNone[] = {GL_NONE};
 
-#if 1
+#if 0
 	if (cmd->UserCallbackData == nullptr)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -296,8 +296,10 @@ void QiOgl_EndFrame()
 
 	ImDrawList *dl = ImGui::GetBackgroundDrawList();
 	Assert(dl);
+#if 0
 	dl->AddCallback(IGC_SetRenderBitmap, nullptr);
 	dl->AddImage(gOgl->screenBitmap, ImVec2(0.0, 0.0), io.DisplaySize);
+#endif
 }
 
 struct TexCoordRect
@@ -669,6 +671,8 @@ struct OglHwi : public Hwi
 	{
 		QiOgl_EndFrame();
 		QiOgl_Clear();
+		ImDrawList* dl = ImGui::GetBackgroundDrawList();
+		//dl->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(500, 500), IM_COL32(255,0, 0, 255), IM_COL32(0, 255, 0, 255), IM_COL32(0, 0, 255, 255), IM_COL32(255, 255, 0, 255));
 		ImGui::EndFrame();
 		ImGui::Render();
 		QiOgl_DrawImGui(ImGui::GetDrawData());
