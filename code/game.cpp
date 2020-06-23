@@ -57,7 +57,8 @@ struct GameGlobals_s
 	i32    playerFacingIdx;
 
 	BuddyAllocator *testAlloc;
-	Bitmap *        screenBitmap;
+	Bitmap* screenBitmap;
+	Bitmap testBitmap;
 
 	bool enableEditor;
 
@@ -515,6 +516,18 @@ internal void InitGameGlobals(const SubSystem *sys, bool isReInit)
 	MA_Init(&g_game->spriteArena, g_game->memory, MB(32));
 	MA_Init(&g_game->assetArena, g_game->memory, MB(512));
 
+	Bm_CreateBitmap(&g_game->assetArena, &g_game->testBitmap, 128, 128, Bitmap::Format::RGBA8, 0);
+	for (u32 y = 0; y < 128; y++)
+	{
+		for (u32 x = 0; x < 128; x++)
+		{
+			ColorU color(x * 2, y * 2, 0, 255);
+			g_game->testBitmap.pixels[y * 128 + x] = (u32)color;
+		}
+	}
+	gHwi->RegisterBitmap(&g_game->testBitmap);
+	gHwi->UploadBitmap(&g_game->testBitmap);
+
 	TestKeyStore();
 
 	LoadSprites();
@@ -830,10 +843,13 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 		Editor_UpdateAndRender();
 	}
 
-#if 0
+#if 1
 	if (drawBG)
 		for (i32 i = 4; i >= 0; i--)
 			BltBmpStretchedFixed(nullptr, screenBitmap, 0, 0, screenBitmap->width, screenBitmap->height, &g_game->testBitmaps[i]);
+	BltBmpStretchedFixed(nullptr, screenBitmap, 0, 0, 128, 128, &g_game->testBitmap);
+	Rect dest = { screenBitmap->width - 128.0f, screenBitmap->height - 128.0f, 128.0f, 128.0f };
+	gHwi->BlitStretchedUV(&g_game->testBitmap, v2(0.0f, 0.0f), v2(1.0f, 1.0f), &dest);
 
 #elif 0
 	for (i32 j = 0; j < (i32)screenBitmap->height; j++)
