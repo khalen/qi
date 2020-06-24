@@ -11,7 +11,7 @@
 
 #if HAS(RELEASE_BUILD)
 #define Assert(foo)         (void)(foo)
-#define AssertMsg(foo, msg) ((void)(foo), (void)(msg))
+#define AssertMsg(foo, msg, ...) ((void)(foo), (void)(msg))
 #else
 #if defined(__clang__)
 #define ASSERT_HANDLER_FUNC __attribute__((analyzer_noreturn))

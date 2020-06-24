@@ -301,8 +301,8 @@ internal void UpdateGameState(Bitmap *screen, Input *input)
 				continue;
 
 			GjkResult_s result;
-			EllipseShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
-			//BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
+			// EllipseShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
+			BoxShape_s plrCollideShape(WorldPosToMeters(&newPlrPos), V2(PLAYER_RADIUS_X, PLAYER_RADIUS_Y));
 			BoxShape_s tileShape(V2((r32)x * TILE_SIZE_METERS_X, (r32)y * TILE_SIZE_METERS_Y), V2(TILE_SIZE_METERS_X / 2, TILE_SIZE_METERS_Y / 2));
 			AddDebugShape(&tileShape, 1.0f, 1.0f, 0.0f);
 			PolyShape_s gjkResulta, gjkResultb;
@@ -843,7 +843,7 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 		Editor_UpdateAndRender();
 	}
 
-#if 1
+#if 0
 	if (drawBG)
 		for (i32 i = 4; i >= 0; i--)
 			BltBmpStretchedFixed(nullptr, screenBitmap, 0, 0, screenBitmap->width, screenBitmap->height, &g_game->testBitmaps[i]);

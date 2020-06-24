@@ -68,7 +68,10 @@ void ShowSpritesTab()
 		}
 		ImGui::EndCombo();
 	}
-	ImGui::BeginChild("sprites", ImVec2(150, 0), true);
+	ImGui::Separator();
+	r32 childHeight = ImGui::GetContentRegionAvail().y;
+	ImGui::BeginChild("sprites", ImVec2(ImGui::GetContentRegionAvail().x * 0.4f, childHeight), true);
+	ImGui::Columns(2);
 	for (u32 i = 0; i < ged->curAtlas->numSprites; i++)
 	{
 		Sprite* spr = ged->curAtlas->sprites[i];
@@ -77,30 +80,45 @@ void ShowSpritesTab()
 			ged->curSpriteIdx = i;
 			SetCurAtlasItems();
 		}
-		ImGui::SameLine();
-		if (ImGui::InputInt2("size", spr->size.v))
+		ImGui::NextColumn();
+		ImGui::PushID(i);
+		if (ImGui::InputInt2("##size", spr->size.v))
 		{
 			printf("Recalc sprite %d %d\n", spr->size.x, spr->size.y);
 		}
 		ImGui::SameLine();
 		Color tint((u32)spr->tint);
-		if (ImGui::ColorEdit4("tint", tint.f, 0))
+		if (ImGui::ColorEdit4("tint", tint.f, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
 		{
 			spr->tint = ColorU(tint);
 		}
+		ImGui::PopID();
+		ImGui::NextColumn();
 	}
+	ImGui::Columns(1);
 	ImGui::EndChild();
 	ImGui::SameLine();
-	ImGui::BeginChild("frames");
+	ImGui::BeginChild("frames", ImVec2(0.0f, childHeight));
 	Color tint((u32)ged->curSprite->tint);
 	ImVec4 iTint(tint.r, tint.g, tint.b, tint.a);
-	for (u32 i = 0; i < ged->curSprite->numFrames; i++)
+	r32 framesVisWidth = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+	ImGuiStyle& style = ImGui::GetStyle();
+	for (i32 i = 0; i < ged->curSprite->numFrames; i++)
 	{
 		SpriteFrame* frame = &ged->curSprite->frames[i];
 		ImVec2 tluv(frame->topLeftUV.x, frame->topLeftUV.y);
 		ImVec2 bruv(frame->bottomRightUV.x, frame->bottomRightUV.y);
-		ImGui::Image((ImTextureID)ged->curAtlas->bitmap, ImVec2(60, 60), tluv, bruv, iTint, ImVec4(1.0, 1.0, 0.0, 1.0));
+		ImVec2 size(ged->curSprite->size.x * 2, ged->curSprite->size.y * 2);
+		ImGui::Image((ImTextureID)ged->curAtlas->bitmap, size, tluv, bruv, iTint, ImVec4(1.0, 1.0, 0.0, 1.0));
+		r32 lastX = ImGui::GetItemRectMax().x;
+		r32 nextX = lastX + style.ItemSpacing.x + size.x;
+		if (i < (i32)ged->curSprite->numFrames - 1 && nextX < framesVisWidth)
+			ImGui::SameLine();
 	}
+	ImGui::EndChild();
+	ImGui::Separator();
+	ImGui::BeginChild("atlas");
+	ImGui::Image((ImTextureID)ged->curAtlas->bitmap, ImVec2(ged->curAtlas->bitmap->width, ged->curAtlas->bitmap->height));
 	ImGui::EndChild();
 }
 
