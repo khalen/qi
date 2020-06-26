@@ -64,8 +64,12 @@ NoiseGenerator::InitGradients()
     }
 }
 
-r32
-NoiseGenerator::Perlin2D(const Vector2& unscaledCoords, r32 scale)
+r32 NoiseGenerator::Perlin2D(r32 x, r32 y, r32 scale)
+{
+	return Perlin2D(Vector2(x, y), scale);
+}
+
+r32 NoiseGenerator::Perlin2D(const Vector2& unscaledCoords, r32 scale)
 {
     const Vector2 coords  = unscaledCoords / scale;
     const Vector2 rCoords = floor(coords);

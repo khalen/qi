@@ -866,8 +866,8 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 		}
 	}
 #else
-	RandomGenerator rnd(1);
-	SpriteAtlas* atlas = &g_game->atlases[0];
+	NoiseGenerator rnd(1);
+	SpriteAtlas* atlas = &g_game->atlases[1];
 
 	for (i32 row = -1; row < numScreenTilesY + 1; row++)
 	{
@@ -875,9 +875,13 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 		{
 			const r32 sx        = col * tilePixelWid - tilePixelWid / 2 - cameraOffsetPixelsX;
 			const r32 sy        = row * tilePixelHgt - tilePixelHgt / 2 - cameraOffsetPixelsY;
-			u32       spriteIdx = rnd.RandomBelow(atlas->numSprites);
+
+			const r32 tx = col + g_game->playerPos.x.tile;
+			const r32 ty = row + g_game->playerPos.y.tile;
+			r32 rn = rnd.Perlin2D(tx, ty, 10.0f) + 1 / 2;
+			u32 spriteIdx = Qi_Clamp<u32>((u32)(rn * atlas->numSprites + 0.5f), 0, atlas->numSprites - 1);
 			Sprite *  sprite    = atlas->sprites[spriteIdx];
-			Spr_DrawSpriteFrame(sprite, rnd.RandomBelow(sprite->numFrames), sx, sy, tilePixelWid, tilePixelHgt);
+			Spr_DrawSpriteFrame(sprite, rnd.Get(tx * ty * 234521) % sprite->numFrames, sx, sy, tilePixelWid, tilePixelHgt);
 		}
 	}
 #endif

@@ -96,6 +96,8 @@ struct Globals_s
 	SDL_Window *  window;
 	char *        clipboardTextData;
 	ImGuiContext *imGuiContext;
+
+	bool showDemoWin;
 } g;
 
 #define NOTE_UNUSED(x) ((void)x);
@@ -824,6 +826,10 @@ static void HandleKeyEvent(SDL_Event *event, Input *newInput)
 	{
 		ProcessKeyboardStick(&kbdController->leftStick, 0.0f, -1.0f, isDown);
 	}
+	else if (vkCode == SDLK_d && ctrlKey && isDown)
+	{
+		g.showDemoWin = !g.showDemoWin;
+	}
 	else if (vkCode == SDLK_d)
 	{
 		ProcessKeyboardStick(&kbdController->leftStick, 1.0f, 0.0f, isDown);
@@ -1011,7 +1017,9 @@ int main(int argc, const char *argv[])
 
 		Hwi* hwi = g.game->GetHwi();
 		hwi->BeginFrame();
-		ImGui::ShowDemoWindow(&showDemoWindow);
+
+		if (g.showDemoWin)
+			ImGui::ShowDemoWindow(&showDemoWindow);
 
 		g.game->UpdateAndRender(&g.thread, &g.inputState, &g.frameBuffer);
 
