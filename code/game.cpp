@@ -33,8 +33,6 @@
 #define PLAYER_RADIUS_X (0.5f * TILE_SIZE_METERS_X)
 #define PLAYER_RADIUS_Y (0.25f * TILE_SIZE_METERS_Y)
 
-#define MAX_SPRITE_ATLASES 32
-
 struct GameGlobals_s
 {
 	bool      isInitialized;
@@ -62,8 +60,7 @@ struct GameGlobals_s
 
 	bool enableEditor;
 
-	SpriteAtlas atlases[MAX_SPRITE_ATLASES];
-	u32         numAtlases;
+	SpriteAtlasTable atlases;
 };
 
 GameGlobals_s *g_game;
@@ -359,11 +356,9 @@ internal void VerifyLoad(const char *msg)
 	exit(1);
 }
 
-SpriteAtlas *Game_GetAtlases(u32 *numAtlases)
+SpriteAtlasTable *Game_GetAtlasTable()
 {
-	Assert(numAtlases);
-	*numAtlases = g_game->numAtlases;
-	return g_game->atlases;
+	return &g_game->atlases;
 }
 
 static void LoadFrame(const KeyStore* ks, const SpriteAtlas *atlas, const Sprite *sprite, SpriteFrame *frame, ValueRef frameRef)
@@ -475,13 +470,13 @@ void Spr_ReadAtlasFromKeyStore(const KeyStore *ks, ValueRef avr, SpriteAtlas *at
 
 internal void LoadSprites()
 {
-	if (g_game->numAtlases)
+	if (g_game->atlases.numAtlases > 0)
 	{
-		for (i32 i = 0; i < g_game->numAtlases; i++)
+		for (i32 i = 0; i < g_game->atlases.numAtlases; i++)
 		{
-			gHwi->UnregisterBitmap(g_game->atlases[i].bitmap);
+			gHwi->UnregisterBitmap(g_game->atlases.atlases[i].bitmap);
 		}
-		g_game->numAtlases = 0;
+		g_game->atlases.numAtlases = 0;
 
 		MA_Reset(&g_game->spriteArena);
 	}
@@ -493,16 +488,49 @@ internal void LoadSprites()
 
 	ValueRef root       = KS_Root(atlasKs);
 	root = KS_ObjectGetValue(atlasKs, root, "atlases");
-	g_game->numAtlases = KS_ArrayCount(atlasKs, root);
-	Assert(g_game->numAtlases < MAX_SPRITE_ATLASES);
+	g_game->atlases.numAtlases = KS_ArrayCount(atlasKs, root);
+	Assert(g_game->atlases.numAtlases < MAX_ATLASES_PER_TABLE);
 
-	for (u32 ai = 0; ai < g_game->numAtlases; ++ai)
+	for (u32 ai = 0; ai < g_game->atlases.numAtlases; ++ai)
 	{
 		ValueRef avr = KS_ArrayElem(atlasKs, root, ai);
-		Spr_ReadAtlasFromKeyStore(atlasKs, avr, &g_game->atlases[ai]);
+		Spr_ReadAtlasFromKeyStore(atlasKs, avr, &g_game->atlases.atlases[ai]);
 	}
 
 	KS_Free(&atlasKs);
+}
+
+void Game_CopyAtlasTableUsingArena(MemoryArena* arena, SpriteAtlasTable* destAtlases, const SpriteAtlasTable* srcAtlases)
+{
+	Assert(destAtlases && srcAtlases && arena);
+	destAtlases->numAtlases = srcAtlases->numAtlases;
+
+	for (u32 i = 0; i < srcAtlases->numAtlases; i++)
+	{
+		destAtlases->atlases[i] = srcAtlases->atlases[i];
+		SpriteAtlas *atlas = &destAtlases->atlases[i];
+
+		for (u32 s = 0; s < atlas->numSprites; s++)
+		{
+			Sprite *srcSprite    = atlas->sprites[s];
+			Sprite *newSprite    = (Sprite *)MA_Alloc(arena, sizeof(Sprite) + srcSprite->numFrames * sizeof(SpriteFrame));
+			*newSprite           = *srcSprite;
+			newSprite->frames    = (SpriteFrame *)(newSprite + 1);
+
+			for (u32 f = 0; f < newSprite->numFrames; f++)
+				newSprite->frames[f] = srcSprite->frames[f];
+
+			atlas->sprites[s] = newSprite;
+		}
+	}
+}
+
+void Game_CopyAtlases(const SpriteAtlasTable* editorAtlases)
+{
+	g_game->atlases.numAtlases = 0;
+	MA_Reset(&g_game->spriteArena);
+
+	Game_CopyAtlasTableUsingArena(&g_game->spriteArena, &g_game->atlases, editorAtlases);
 }
 
 internal void InitGameGlobals(const SubSystem *sys, bool isReInit)
@@ -867,7 +895,7 @@ void Qi_GameUpdateAndRender(ThreadContext *, Input *input, Bitmap *screenBitmap)
 	}
 #else
 	NoiseGenerator rnd(1);
-	SpriteAtlas* atlas = &g_game->atlases[1];
+	SpriteAtlas* atlas = &g_game->atlases.atlases[1];
 
 	for (i32 row = -1; row < numScreenTilesY + 1; row++)
 	{

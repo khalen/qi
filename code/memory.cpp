@@ -561,12 +561,16 @@ M_TransientAllocRaw(Memory* memory, const size_t size)
 	return result;
 }
 
-void
-MA_Init(MemoryArena* arena, Memory* memory, const size_t size)
+void MA_InitBuffer(MemoryArena *arena, void *memory, const size_t size)
 {
-    arena->size		 = size;
-    arena->curOffset = 0;
-    arena->base		 = (u8*)M_AllocRaw(memory, size);
+	arena->size      = size;
+	arena->curOffset = 0;
+	arena->base      = (u8*)memory;
+}
+
+void MA_Init(MemoryArena *arena, Memory *memory, const size_t size)
+{
+	MA_InitBuffer(arena, M_AllocRaw(memory, size), size);
 }
 
 u8*
