@@ -10,34 +10,37 @@
 #include "imgui.h"
 #include "util.h"
 
-const size_t kEditorAdditionalMem = MB(32);
+const size_t kEditorAdditionalMem   = MB(32);
 const size_t kEditorSpriteArenaSize = MB(4);
-const size_t kFrameEditBufferCount = 32;
+const size_t kFrameEditBufferCount  = 32;
 
 struct Editor
 {
 	SpriteAtlasTable atlases;
-	MemoryArena editorSpriteArena;
+	MemoryArena      editorSpriteArena;
 
-	SpriteAtlas* curAtlas;
-	i32 curAtlasIdx;
+	SpriteAtlas *curAtlas;
+	i32          curAtlasIdx;
+	i32          prevAtlasIdx;
 
-	Sprite* curSprite;
-	i32 curSpriteIdx;
-	char spriteNameTextEditBuf[64];
-	bool isEditingCurSpriteName;
+	Sprite *curSprite;
+	i32     curSpriteIdx;
+	i32     prevSpriteIdx;
+	char    spriteNameTextEditBuf[64];
+	bool    isEditingCurSpriteName;
 
-	SpriteFrame* curFrame;
-	i32 curFrameIdx;
-	i32 hoveredFrameIdx;
+	SpriteFrame *curFrame;
+	i32          curFrameIdx;
+	i32          prevFrameIdx;
+	i32          hoveredFrameIdx;
 
 	r32 atlasImgScale;
 
 	bool editorWindowOpen;
 
-	bool isEditingCurSpriteFrames;
+	bool        isEditingCurSpriteFrames;
 	SpriteFrame frameEditBuffer[kFrameEditBufferCount];
-	u32 numEditFrames;
+	u32         numEditFrames;
 };
 static Editor *ged = nullptr;
 
@@ -68,47 +71,50 @@ static void EndEditingCurrentSpriteFrames()
 {
 	if (ged->isEditingCurSpriteFrames)
 	{
-
 	}
 }
 
-static void BeginEditingCurrentSpriteFrames()
-{
+static void BeginEditingCurrentSpriteFrames() {}
 
+static void FlushCurrentSprite()
+{
+	EndEditingCurrentSpriteName();
+	EndEditingCurrentSpriteFrames();
 }
 
-void CopyAtlasesFromGame();
+void        CopyAtlasesFromGame();
 static void SetCurAtlasItems()
 {
-	Assert(ged->curAtlasIdx < ged->atlases.numAtlases);
-	if (ged->curAtlas != &ged->atlases.atlases[ged->curAtlasIdx])
+	// We need to always reset pointers, since EndEditingCurrentSpriteName or Frames can cause a resync with
+	// the game and pointers may change.
+	ged->curAtlas = ged->curAtlasIdx < 0 ? nullptr : &ged->atlases.atlases[ged->curAtlasIdx];
+	bool atlasChanged = (ged->curAtlasIdx != ged->prevAtlasIdx);
+	if (atlasChanged)
 	{
-		EndEditingCurrentSpriteName();
+		FlushCurrentSprite();
 		ged->atlasImgScale = 1.0f;
+		ged->prevAtlasIdx = ged->curAtlasIdx;
 		ged->curSpriteIdx = 0;
-		ged->curFrameIdx  = 0;
-		ged->hoveredFrameIdx = -1;
 	}
-	ged->curAtlas = &ged->atlases.atlases[ged->curAtlasIdx];
 
-	Assert(ged->curSpriteIdx < ged->curAtlas->numSprites);
-	Sprite* editSprite = ged->curAtlas->sprites[ged->curSpriteIdx];
-	if (editSprite != ged->curSprite)
+	ged->curSpriteIdx = Qi_Clamp<i32>(ged->curSpriteIdx, -1, ged->curAtlas ? ged->curAtlas->numSprites - 1 : -1);
+	ged->curSprite = (ged->curSpriteIdx >= 0 && (ged->curAtlas && ged->curSpriteIdx < ged->curAtlas->numSprites)) ? ged->curAtlas->sprites[ged->curSpriteIdx] : nullptr;
+	bool spriteChanged = (ged->curSpriteIdx != ged->prevSpriteIdx);
+	if (spriteChanged)
 	{
-#if 0
-		// If we have moved this sprites' frames to the edit buffer, recopy it to the game and back to reset for editing the new sprite
-		if (ged->curSprite->frames == ged->frameEditBuffer)
-		{
-			Game_CopyAtlases(&ged->atlases);
-			CopyAtlasesFromGame();
-		}
-#endif
-		ged->curSprite = ged->curAtlas->sprites[ged->curSpriteIdx];
+		FlushCurrentSprite();
+		ged->prevSpriteIdx = ged->curSpriteIdx;
 		ged->curFrameIdx = 0;
 	}
 
-	Assert(ged->curFrameIdx < ged->curSprite->numFrames);
-	ged->curFrame = &ged->curSprite->frames[ged->curFrameIdx];
+	ged->curFrameIdx = Qi_Clamp<i32>(ged->curFrameIdx, -1, ged->curSprite ? ged->curSprite->numFrames - 1 : -1);
+	ged->curFrame = ged->curFrameIdx < 0 ? nullptr : &ged->curSprite->frames[ged->curFrameIdx];
+	bool frameChanged = (ged->curFrameIdx != ged->prevFrameIdx);
+	if (frameChanged)
+	{
+		FlushCurrentSprite();
+		ged->prevFrameIdx = ged->curFrameIdx;
+	}
 }
 
 static void CopyAtlasesFromGame()
@@ -144,9 +150,9 @@ void ShowSpritesTab()
 	ImGui::Columns(2);
 	for (u32 i = 0; i < ged->curAtlas->numSprites; i++)
 	{
-		Sprite* spr = ged->curAtlas->sprites[i];
-		bool isSelected = (i == ged->curSpriteIdx);
-		bool gotSelected = false;
+		Sprite *spr         = ged->curAtlas->sprites[i];
+		bool    isSelected  = (i == ged->curSpriteIdx);
+		bool    gotSelected = false;
 		if (isSelected && ged->isEditingCurSpriteName)
 		{
 			ImGui::PushID(KS_SymbolString(spr->name));
@@ -187,35 +193,35 @@ void ShowSpritesTab()
 
 	// Sprite Frames
 	ImGui::BeginChild("frames", ImVec2(0.0f, childHeight));
-	Color tint((u32)ged->curSprite->tint);
+	Color  tint((u32)ged->curSprite->tint);
 	ImVec4 iTint(tint.r, tint.g, tint.b, tint.a);
-	ged->hoveredFrameIdx = -1;
-	r32 framesVisWidth = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
-	ImGuiStyle& style = ImGui::GetStyle();
+	ged->hoveredFrameIdx       = -1;
+	r32         framesVisWidth = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+	ImGuiStyle &style          = ImGui::GetStyle();
 	for (i32 i = 0; i < ged->curSprite->numFrames; i++)
 	{
 		ImGui::BeginGroup();
-			ImGui::PushID(i);
-			SpriteFrame *frame = &ged->curSprite->frames[i];
-			ImVec2       tluv(frame->topLeftUV.x, frame->topLeftUV.y);
-			ImVec2       bruv(frame->bottomRightUV.x, frame->bottomRightUV.y);
-			ImVec2       size(ged->curSprite->size.x * 2, ged->curSprite->size.y * 2);
-			if (ImGui::ImageButton((ImTextureID)ged->curAtlas->bitmap, size, tluv, bruv, -1, ImVec4(0.0, 0.0, 0.0, 1.0), iTint))
-			{
-				ged->curFrameIdx = (u32)i;
-				SetCurAtlasItems();
-			}
-			else if (ImGui::IsItemHovered())
-				ged->hoveredFrameIdx = i;
-			r32 lastX = ImGui::GetItemRectMax().x;
-			r32 nextX = lastX + style.ItemSpacing.x + size.x;
-			ImGui::PushItemWidth(nextX - lastX);
-			if (ImGui::InputFloat("##weight", &frame->weight, 0.0f, 0.0f, "%2.2f"))
-			{
-				printf("Weight change");
-			}
-			ImGui::PopItemWidth();
-			ImGui::PopID();
+		ImGui::PushID(i);
+		SpriteFrame *frame = &ged->curSprite->frames[i];
+		ImVec2       tluv(frame->topLeftUV.x, frame->topLeftUV.y);
+		ImVec2       bruv(frame->bottomRightUV.x, frame->bottomRightUV.y);
+		ImVec2       size(ged->curSprite->size.x * 2, ged->curSprite->size.y * 2);
+		if (ImGui::ImageButton((ImTextureID)ged->curAtlas->bitmap, size, tluv, bruv, -1, ImVec4(0.0, 0.0, 0.0, 1.0), iTint))
+		{
+			ged->curFrameIdx = (u32)i;
+			SetCurAtlasItems();
+		}
+		else if (ImGui::IsItemHovered())
+			ged->hoveredFrameIdx = i;
+		r32 lastX = ImGui::GetItemRectMax().x;
+		r32 nextX = lastX + style.ItemSpacing.x + size.x;
+		ImGui::PushItemWidth(nextX - lastX);
+		if (ImGui::InputFloat("##weight", &frame->weight, 0.0f, 0.0f, "%2.2f"))
+		{
+			printf("Weight change");
+		}
+		ImGui::PopItemWidth();
+		ImGui::PopID();
 		ImGui::EndGroup();
 		if (i < (i32)ged->curSprite->numFrames - 1 && nextX < framesVisWidth)
 			ImGui::SameLine();
@@ -224,13 +230,14 @@ void ShowSpritesTab()
 	ImGui::Separator();
 
 	// Atlas texture
-	ImGui::DragFloat("##scale", &ged->atlasImgScale, 1.0f, 1.0f / 256.0f, 256.0f, "%.3f", 2.0f); ImGui::SameLine();
+	ImGui::DragFloat("##scale", &ged->atlasImgScale, 1.0f, 1.0f / 256.0f, 256.0f, "%.3f", 2.0f);
+	ImGui::SameLine();
 	ImGui::Text("Ctrl-click to zoom in, alt-click to zoom out");
 	ImGui::BeginChild("atlas");
-	r32 imgW = ged->curAtlas->bitmap->width * ged->atlasImgScale;
-	r32 imgH = ged->curAtlas->bitmap->height * ged->atlasImgScale;
-	ImGuiIO& io = ImGui::GetIO();
-	ImVec2 imgUL = ImGui::GetCursorScreenPos();
+	r32      imgW  = ged->curAtlas->bitmap->width * ged->atlasImgScale;
+	r32      imgH  = ged->curAtlas->bitmap->height * ged->atlasImgScale;
+	ImGuiIO &io    = ImGui::GetIO();
+	ImVec2   imgUL = ImGui::GetCursorScreenPos();
 	ImGui::Image((ImTextureID)ged->curAtlas->bitmap, ImVec2(imgW, imgH));
 	if (ImGui::IsItemClicked())
 	{
@@ -247,7 +254,7 @@ void ShowSpritesTab()
 	}
 
 	// Draw highlights around current sprites' frames
-	ImDrawList* dl = ImGui::GetWindowDrawList();
+	ImDrawList *dl = ImGui::GetWindowDrawList();
 	for (u32 i = 0; i < ged->curSprite->numFrames; i++)
 	{
 		u32 color;
@@ -259,17 +266,17 @@ void ShowSpritesTab()
 			color = 0xFF8F8F8F;
 
 		SpriteFrame *frame = &ged->curSprite->frames[i];
-		ImVec2 mins(imgUL.x + frame->topLeftUV.x * imgW, imgUL.y + frame->topLeftUV.y * imgH);
-		ImVec2 maxs(imgUL.x + frame->bottomRightUV.x * imgW, imgUL.y + frame->bottomRightUV.y * imgH);
+		ImVec2       mins(imgUL.x + frame->topLeftUV.x * imgW, imgUL.y + frame->topLeftUV.y * imgH);
+		ImVec2       maxs(imgUL.x + frame->bottomRightUV.x * imgW, imgUL.y + frame->bottomRightUV.y * imgH);
 		dl->AddRect(mins, maxs, color, 0, 0, 1.0f);
 	}
 
 	if (ImGui::IsItemHovered())
 	{
 		ImVec2 mouseScreenPos = ImGui::GetMousePos();
-		ImVec2 mouseImagePos = ImVec2(mouseScreenPos.x - imgUL.x, mouseScreenPos.y - imgUL.y);
-		r32 cellX = ged->curAtlas->baseSize.x * ged->atlasImgScale;
-		r32 cellY = ged->curAtlas->baseSize.y * ged->atlasImgScale;
+		ImVec2 mouseImagePos  = ImVec2(mouseScreenPos.x - imgUL.x, mouseScreenPos.y - imgUL.y);
+		r32    cellX          = ged->curAtlas->baseSize.x * ged->atlasImgScale;
+		r32    cellY          = ged->curAtlas->baseSize.y * ged->atlasImgScale;
 		ImVec2 rectUL(imgUL.x + floor(mouseImagePos.x / cellX) * cellX, imgUL.y + floor(mouseImagePos.y / cellY) * cellY);
 		ImVec2 rectBR(rectUL.x + cellX, rectUL.y + cellY);
 		dl->AddRect(rectUL, rectBR, 0xFF00FF00, 0, 0, 1.0f);
@@ -277,7 +284,6 @@ void ShowSpritesTab()
 	ImGui::EndChild();
 
 	// Highlight cell under cursor
-
 }
 
 void ShowOtherTab()
@@ -287,7 +293,7 @@ void ShowOtherTab()
 
 bool Editor_UpdateAndRender()
 {
-	ImGuiIO& io = ImGui::GetIO();
+	ImGuiIO &io = ImGui::GetIO();
 
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
 	ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.40, io.DisplaySize.y));
@@ -303,7 +309,7 @@ bool Editor_UpdateAndRender()
 			ShowSpritesTab();
 			ImGui::EndTabItem();
 		}
-		if( (ImGui::BeginTabItem("Other")))
+		if ((ImGui::BeginTabItem("Other")))
 		{
 			ShowOtherTab();
 			ImGui::EndTabItem();
@@ -315,7 +321,7 @@ bool Editor_UpdateAndRender()
 	return false;
 }
 
-static void Editor_Init(const SubSystem* sys, bool isReInit)
+static void Editor_Init(const SubSystem *sys, bool isReInit)
 {
 	ged = (Editor *)sys->globalPtr;
 
@@ -327,4 +333,4 @@ static void Editor_Init(const SubSystem* sys, bool isReInit)
 	}
 }
 
-SubSystem EditorSubSystem = { "Editor", Editor_Init, sizeof(Editor) + kEditorAdditionalMem, nullptr };
+SubSystem EditorSubSystem = {"Editor", Editor_Init, sizeof(Editor) + kEditorAdditionalMem, nullptr};
